@@ -1,0 +1,81 @@
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
+import type { Event } from '@/types/models'
+import * as eventsApi from '@/api/events'
+
+export const useEventsStore = defineStore('events', () => {
+  const events = ref<Event[]>([])
+  const upcomingEvents = ref<Event[]>([])
+  const isLoading = ref(false)
+  const isSubmitting = ref(false)
+
+  async function fetchEvents(page = 1) {
+    isLoading.value = true
+    try {
+      const res = await eventsApi.getEvents(page)
+      events.value = res.data.data
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  async function fetchUpcoming() {
+    try {
+      const res = await eventsApi.getUpcomingEvents()
+      upcomingEvents.value = res.data
+    } catch {
+      // Ignore
+    }
+  }
+
+  async function createEvent(formData: FormData) {
+    isSubmitting.value = true
+    try {
+      const res = await eventsApi.createEvent(formData)
+      events.value.unshift(res.data)
+      fetchUpcoming()
+      return res.data
+    } finally {
+      isSubmitting.value = false
+    }
+  }
+
+  async function rsvp(eventId: number, status: 'confirmed' | 'declined' | 'invited') {
+    await eventsApi.rsvpEvent(eventId, status)
+    fetchEvents()
+  }
+
+  async function deleteEvent(eventId: number) {
+    await eventsApi.deleteEvent(eventId)
+    events.value = events.value.filter(e => e.id !== eventId)
+    upcomingEvents.value = upcomingEvents.value.filter(e => e.id !== eventId)
+  }
+
+  async function updateEvent(eventId: number, formData: FormData) {
+    isSubmitting.value = true
+    try {
+      const res = await eventsApi.updateEvent(eventId, formData)
+      const index = events.value.findIndex(e => e.id === eventId)
+      if (index !== -1) {
+        events.value[index] = res.data
+      }
+      fetchUpcoming()
+      return res.data
+    } finally {
+      isSubmitting.value = false
+    }
+  }
+
+  return {
+    events,
+    upcomingEvents,
+    isLoading,
+    isSubmitting,
+    fetchEvents,
+    fetchUpcoming,
+    createEvent,
+    updateEvent,
+    rsvp,
+    deleteEvent,
+  }
+})
