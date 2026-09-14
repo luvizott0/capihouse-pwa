@@ -54,6 +54,24 @@ const router = createRouter({
           meta: { requiresApproved: true }
         },
         {
+          path: 'groups',
+          name: 'groups',
+          component: () => import('@/views/app/GroupsView.vue'),
+          meta: { requiresApproved: true }
+        },
+        {
+          path: 'groups/:id',
+          name: 'group-detail',
+          component: () => import('@/views/app/GroupDetailView.vue'),
+          meta: { requiresApproved: true }
+        },
+        {
+          path: 'notifications',
+          name: 'notifications',
+          component: () => import('@/views/app/NotificationsView.vue'),
+          meta: { requiresApproved: true }
+        },
+        {
           path: 'admin/users',
           name: 'admin-users',
           component: () => import('@/views/admin/AdminUsersView.vue'),

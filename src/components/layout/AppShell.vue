@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useFeedStore } from '@/stores/feed'
 import { useEventsStore } from '@/stores/events'
+import { useNotificationsStore } from '@/stores/notifications'
 import Marquee from './Marquee.vue'
 import NavMenu from './NavMenu.vue'
 import SearchBar from './SearchBar.vue'
@@ -17,6 +18,15 @@ const router = useRouter()
 const authStore = useAuthStore()
 const feedStore = useFeedStore()
 const eventsStore = useEventsStore()
+const notificationsStore = useNotificationsStore()
+
+onMounted(() => {
+  notificationsStore.startPolling()
+})
+
+onUnmounted(() => {
+  notificationsStore.stopPolling()
+})
 
 const showPostModal = ref(false)
 const showEventModal = ref(false)
@@ -65,6 +75,19 @@ function onEventCreated() {
         <div class="header-marquee-box">
           <Marquee :text="`★ Olá, ${authStore.user?.name || 'Visitante'}! ★ Explore o CapiHouse ★ A rede dos amigos da casa ★`" />
         </div>
+
+        <!-- Notification Bell Icon (Top Right) -->
+        <router-link
+          to="/notifications"
+          class="top-notif-link"
+          title="Notificações"
+          aria-label="Ver notificações"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="top-notif-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+          </svg>
+          <span v-if="notificationsStore.unreadCount > 0" class="top-notif-dot"></span>
+        </router-link>
       </div>
 
       <!-- Search & Contextual Action Bar -->
@@ -181,6 +204,42 @@ function onEventCreated() {
   flex: 1;
   overflow: hidden;
   max-width: 70%;
+}
+
+.top-notif-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--color-border, #D8CDC5);
+  border-radius: 2px;
+  background-color: var(--color-primary-50, #f8f6f1);
+  color: var(--color-primary-800, #5f4120);
+  text-decoration: none;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+.top-notif-link:hover {
+  background-color: var(--color-primary-100, #fdf8f3);
+  border-color: var(--color-primary, #a66130);
+  color: var(--color-primary);
+  text-decoration: none;
+}
+.top-notif-icon {
+  width: 20px;
+  height: 20px;
+}
+.top-notif-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 9px;
+  height: 9px;
+  background-color: var(--color-primary, #a66130);
+  border: 2px solid #ffffff;
+  border-radius: 50%;
 }
 
 .layout-main {

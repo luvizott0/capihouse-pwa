@@ -10,10 +10,16 @@ export const useFeedStore = defineStore('feed', () => {
   const currentPage = ref(1)
   const lastPage = ref(1)
 
-  async function fetchPosts(page = 1) {
+  const activeGroupId = ref<number | undefined>(undefined)
+
+  async function fetchPosts(page = 1, groupId?: number) {
     isLoading.value = true
+    if (groupId !== undefined) {
+      activeGroupId.value = groupId || undefined
+    }
+    const targetGroupId = groupId !== undefined ? (groupId || undefined) : activeGroupId.value
     try {
-      const res = await postsApi.getPosts(page)
+      const res = await postsApi.getPosts(page, targetGroupId)
       if (page === 1) {
         posts.value = res.data.data
       } else {
@@ -95,6 +101,7 @@ export const useFeedStore = defineStore('feed', () => {
     isSubmitting,
     currentPage,
     lastPage,
+    activeGroupId,
     fetchPosts,
     createPost,
     updatePost,

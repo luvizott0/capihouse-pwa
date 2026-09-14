@@ -10,6 +10,7 @@ const router = useRouter()
 const scope = computed({
   get() {
     if (route.path.startsWith('/events')) return 'events'
+    if (route.path.startsWith('/groups')) return 'groups'
     if (route.path.startsWith('/profile')) return 'profile'
     if (route.path.startsWith('/admin')) return 'admin'
     return 'feed'
@@ -17,6 +18,7 @@ const scope = computed({
   set(val: string) {
     if (val === 'feed') router.push('/feed')
     else if (val === 'events') router.push('/events')
+    else if (val === 'groups') router.push('/groups')
     else if (val === 'profile') router.push('/profile')
     else if (val === 'admin') router.push('/admin/users')
   }
@@ -39,6 +41,7 @@ const currentAction = computed(() => {
       <!-- Scope Selector -->
       <select v-model="scope" class="scope-select" aria-label="Selecionar tipo de pesquisa">
         <option value="feed">Feed</option>
+        <option value="groups">Grupos</option>
         <option value="profile">Perfil</option>
         <option value="events">Eventos</option>
         <option value="admin">Admin</option>

@@ -18,6 +18,9 @@ const authStore = useAuthStore()
           <router-link to="/events" class="nav-tab" active-class="active">
             Eventos
           </router-link>
+          <router-link to="/groups" class="nav-tab" active-class="active">
+            Grupos
+          </router-link>
           <router-link v-if="authStore.isAdmin" to="/admin/users" class="nav-tab" active-class="active">
             Admin
           </router-link>
@@ -45,6 +48,14 @@ const authStore = useAuthStore()
             <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           </svg>
           <span class="tab-label">Perfil</span>
+        </router-link>
+
+        <!-- Groups Tab -->
+        <router-link to="/groups" class="mobile-tab" active-class="active">
+          <svg xmlns="http://www.w3.org/2000/svg" class="tab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+          <span class="tab-label">Grupos</span>
         </router-link>
 
         <!-- Events Tab -->
@@ -160,12 +171,12 @@ const authStore = useAuthStore()
 
   .mobile-nav-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     height: 60px;
   }
 
   .mobile-nav-grid.has-admin {
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(6, 1fr);
   }
 
   .mobile-tab {

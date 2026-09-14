@@ -1,7 +1,9 @@
 import apiClient from './client'
 
-export function getPosts(page = 1) {
-  return apiClient.get(`/posts?page=${page}`)
+export function getPosts(page = 1, groupId?: number) {
+  const params: Record<string, unknown> = { page }
+  if (groupId) params.group_id = groupId
+  return apiClient.get('/posts', { params })
 }
 
 export function createPost(formData: FormData) {

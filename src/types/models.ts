@@ -63,6 +63,8 @@ export interface PostLike {
 export interface Post {
   id: number
   user_id: number
+  group_id?: number | null
+  group?: { id: number; name: string } | null
   content: string | null
   likes_count: number
   comments_count: number
@@ -74,6 +76,48 @@ export interface Post {
   comments: PostComment[]
   likes?: PostLike[]
   is_liked?: boolean
+}
+
+export interface Group {
+  id: number
+  name: string
+  description: string | null
+  creator_id: number
+  creator?: User
+  image_url: string | null
+  members_count: number
+  is_member: boolean
+  membership_status: 'pending' | 'accepted' | 'declined' | null
+  my_role: 'owner' | 'admin' | 'member' | null
+  accepted_members?: User[]
+  created_at: string
+}
+
+export interface GroupMessage {
+  id: number
+  group_id: number
+  user_id: number
+  content: string
+  user: User
+  created_at: string
+}
+
+export interface AppNotification {
+  id: number
+  user_id: number
+  type: string
+  title: string
+  content: string | null
+  data?: {
+    group_id?: number
+    group_name?: string
+    inviter_id?: number
+    inviter_name?: string
+    status?: 'pending' | 'accepted' | 'declined'
+    [key: string]: unknown
+  } | null
+  read_at: string | null
+  created_at: string
 }
 
 export interface EventUser {

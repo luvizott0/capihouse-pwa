@@ -108,6 +108,13 @@ async function confirmDeletePost() {
           </div>
           <div class="post-sub-line">
             <span class="post-time">{{ formatRelativeTime(post.created_at) }}</span>
+            <router-link
+              v-if="post.group"
+              :to="`/groups/${post.group.id}`"
+              class="post-group-link"
+            >
+              • [ 👥 {{ post.group.name }} ]
+            </router-link>
             <span v-if="post.feeling" class="feeling-indicator">
               • se sentindo <strong>{{ post.feeling.name }}</strong> {{ post.feeling.emoji }}
             </span>
@@ -360,6 +367,17 @@ async function confirmDeletePost() {
 
 .feeling-indicator {
   color: var(--color-primary-700, #7d5628);
+}
+
+.post-group-link {
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: var(--color-primary, #a66130);
+  text-decoration: none;
+}
+.post-group-link:hover {
+  text-decoration: underline;
 }
 
 .post-header-actions {

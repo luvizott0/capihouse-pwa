@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useFeedStore } from '@/stores/feed'
+import { useGroupsStore } from '@/stores/groups'
 import RetroModal from '@/components/ui/RetroModal.vue'
 import RetroButton from '@/components/ui/RetroButton.vue'
 import EmojiPicker from '@/components/ui/EmojiPicker.vue'
@@ -9,8 +10,10 @@ const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{ (e: 'update:modelValue', value: boolean): void; (e: 'created'): void }>()
 
 const feedStore = useFeedStore()
+const groupsStore = useGroupsStore()
 
 const content = ref('')
+const selectedGroupId = ref<number | null>(null)
 const feelingEmoji = ref('😊')
 const feelingText = ref('')
 const hashtagInput = ref('')
@@ -18,6 +21,16 @@ const hashtags = ref<string[]>([])
 const selectedFiles = ref<File[]>([])
 const filePreviews = ref<string[]>([])
 const errorMsg = ref('')
+
+onMounted(() => {
+  groupsStore.fetchMyGroups()
+})
+
+watch(() => props.modelValue, (isOpen) => {
+  if (isOpen) {
+    groupsStore.fetchMyGroups()
+  }
+})
 
 function clearFeeling() {
   feelingText.value = ''
@@ -72,6 +85,9 @@ async function handleSubmit() {
   hashtags.value.forEach(tag => {
     formData.append('hashtags[]', tag)
   })
+  if (selectedGroupId.value) {
+    formData.append('group_id', selectedGroupId.value.toString())
+  }
   selectedFiles.value.forEach(file => {
     formData.append('media[]', file)
   })
@@ -80,6 +96,7 @@ async function handleSubmit() {
     await feedStore.createPost(formData)
     // Reset form
     content.value = ''
+    selectedGroupId.value = null
     feelingText.value = ''
     feelingEmoji.value = '😊'
     hashtags.value = []
@@ -102,6 +119,17 @@ function handleClose() {
     <div class="post-create-form">
       <div v-if="errorMsg" class="error-banner">
         {{ errorMsg }}
+      </div>
+
+      <!-- Audience / Group selector -->
+      <div class="audience-row">
+        <label class="audience-label">Visibilidade:</label>
+        <select v-model="selectedGroupId" class="audience-select">
+          <option :value="null">🌐 Público (todos)</option>
+          <option v-for="grp in groupsStore.myGroups" :key="grp.id" :value="grp.id">
+            👥 Grupo: {{ grp.name }}
+          </option>
+        </select>
       </div>
 
       <textarea
@@ -207,6 +235,36 @@ function handleClose() {
   color: #b91c1c;
   font-size: 0.85rem;
   border-radius: 2px;
+}
+
+.audience-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.audience-label {
+  font-family: var(--font-heading);
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: var(--color-primary-800);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.audience-select {
+  flex: 1;
+  padding: 0.45rem 0.6rem;
+  font-family: var(--font-heading);
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: var(--color-primary-800);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-primary-100);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+.audience-select:focus {
+  border-color: var(--color-primary);
 }
 
 .retro-textarea {
