@@ -18,9 +18,20 @@ export const useAuthStore = defineStore('auth', () => {
       return null
     }
   })())
+  const impersonatorToken = ref<string | null>(localStorage.getItem('capihouse_impersonator_token'))
+  const impersonatorUser = ref<User | null>((() => {
+    try {
+      const cached = localStorage.getItem('capihouse_impersonator_user')
+      if (!cached) return null
+      return JSON.parse(cached)
+    } catch {
+      return null
+    }
+  })())
   const isLoading = ref(false)
 
   const isAuthenticated = computed(() => !!token.value && !!user.value)
+  const isImpersonating = computed(() => !!impersonatorToken.value)
   const isAdmin = computed(() => {
     const r = user.value?.role
     return r === 'admin' || (r as any)?.value === 'admin'
@@ -56,8 +67,46 @@ export const useAuthStore = defineStore('auth', () => {
   function clearAuth() {
     token.value = null
     user.value = null
+    impersonatorToken.value = null
+    impersonatorUser.value = null
     localStorage.removeItem('capihouse_token')
     localStorage.removeItem('capihouse_user')
+    localStorage.removeItem('capihouse_impersonator_token')
+    localStorage.removeItem('capihouse_impersonator_user')
+  }
+
+  async function impersonate(target: { user_id?: number; login?: string }) {
+    isLoading.value = true
+    try {
+      if (token.value && user.value && !impersonatorToken.value) {
+        impersonatorToken.value = token.value
+        impersonatorUser.value = user.value
+        localStorage.setItem('capihouse_impersonator_token', token.value)
+        localStorage.setItem('capihouse_impersonator_user', JSON.stringify(user.value))
+      }
+
+      const res = await authApi.impersonate(target)
+      const resData = res.data as any
+      const rawUser = resData.user || resData.data || resData
+      setAuth(resData.token, rawUser)
+      return res.data
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  function stopImpersonating() {
+    if (impersonatorToken.value && impersonatorUser.value) {
+      const origToken = impersonatorToken.value
+      const origUser = impersonatorUser.value
+      impersonatorToken.value = null
+      impersonatorUser.value = null
+      localStorage.removeItem('capihouse_impersonator_token')
+      localStorage.removeItem('capihouse_impersonator_user')
+      setAuth(origToken, origUser)
+    } else {
+      clearAuth()
+    }
   }
 
   async function login(data: LoginRequest) {
@@ -121,6 +170,11 @@ export const useAuthStore = defineStore('auth', () => {
     setAuth,
     updateUser,
     clearAuth,
+    impersonate,
+    stopImpersonating,
+    impersonatorToken,
+    impersonatorUser,
+    isImpersonating,
     login,
     register,
     logout,

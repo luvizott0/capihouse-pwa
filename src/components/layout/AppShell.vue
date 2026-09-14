@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useFeedStore } from '@/stores/feed'
 import { useEventsStore } from '@/stores/events'
@@ -12,6 +13,7 @@ import PostCreateModal from '@/components/feed/PostCreateModal.vue'
 import EventCreateModal from '@/components/events/EventCreateModal.vue'
 import RetroModal from '@/components/ui/RetroModal.vue'
 
+const router = useRouter()
 const authStore = useAuthStore()
 const feedStore = useFeedStore()
 const eventsStore = useEventsStore()
@@ -19,6 +21,11 @@ const eventsStore = useEventsStore()
 const showPostModal = ref(false)
 const showEventModal = ref(false)
 const showMobileUsersDrawer = ref(false)
+
+function handleStopImpersonating() {
+  authStore.stopImpersonating()
+  router.push('/feed')
+}
 
 function onPostCreated() {
   feedStore.fetchPosts(1)
@@ -32,6 +39,19 @@ function onEventCreated() {
 
 <template>
   <div class="layout-shell">
+    <!-- Impersonation Alert Banner -->
+    <div v-if="authStore.isImpersonating" class="impersonate-banner">
+      <div class="impersonate-banner-content">
+        <span class="impersonate-badge">🎭 MODO IMPERSONATE</span>
+        <span class="impersonate-text">
+          Conectado como: <strong>{{ authStore.user?.name }}</strong> (@{{ authStore.user?.username }})
+        </span>
+        <button @click="handleStopImpersonating" class="impersonate-exit-btn">
+          [ Sair da Personificação ]
+        </button>
+      </div>
+    </div>
+
     <!-- Top Header Bar -->
     <header class="top-header">
       <div class="header-main-row">
@@ -225,5 +245,59 @@ function onEventCreated() {
   .mobile-users-fab:active {
     transform: scale(0.96);
   }
+}
+
+.impersonate-banner {
+  background-color: #fef08a;
+  border-bottom: 2px solid #ca8a04;
+  color: #713f12;
+  padding: 0.4rem 1rem;
+  font-size: 0.85rem;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.impersonate-banner-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.impersonate-badge {
+  background-color: #ca8a04;
+  color: #ffffff;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.15rem 0.4rem;
+  border-radius: 2px;
+}
+
+.impersonate-text {
+  flex: 1;
+  font-family: var(--font-body, 'Outfit', sans-serif);
+}
+
+.impersonate-exit-btn {
+  background-color: #854d0e;
+  color: #ffffff;
+  border: 1px solid #713f12;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.25rem 0.6rem;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.impersonate-exit-btn:hover {
+  background-color: #713f12;
 }
 </style>

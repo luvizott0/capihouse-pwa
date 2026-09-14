@@ -541,12 +541,14 @@ async function confirmDeletePost() {
   padding: 0.5rem 1rem;
 }
 .tag-badge {
-  font-family: var(--font-heading);
+  font-family: var(--font-heading, 'Space Mono', monospace);
   font-size: 0.75rem;
-  color: var(--color-primary, #a66130);
-  background-color: var(--color-primary-50, #f8f6f1);
-  padding: 0.15rem 0.4rem;
+  font-weight: bold;
+  color: #ffffff;
+  background-color: var(--color-primary, #a66130);
+  padding: 0.18rem 0.5rem;
   border-radius: 2px;
+  display: inline-block;
 }
 
 .post-actions {

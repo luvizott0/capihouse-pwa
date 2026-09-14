@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import * as authApi from '@/api/auth'
 import GuestShell from '@/components/layout/GuestShell.vue'
 
 const router = useRouter()
@@ -15,10 +16,25 @@ const form = ref({
 })
 
 const errorMsg = ref('')
+const devUsers = ref<any[]>([])
+const selectedDevUserId = ref<number | ''>('')
+const isLoggingInDev = ref(false)
 
-onMounted(() => {
+onMounted(async () => {
   if (route.query.notice === 'pending') {
     errorMsg.value = 'A sua conta ainda não foi aprovada pelo administrador. Aguarde a aprovação.'
+  }
+
+  try {
+    const res = await authApi.getDevUsers()
+    if (res.data?.users) {
+      devUsers.value = res.data.users
+      if (devUsers.value.length > 0) {
+        selectedDevUserId.value = devUsers.value[0].id
+      }
+    }
+  } catch {
+    // Em produção ou indisponível, devUsers permanece vazio
   }
 })
 
@@ -31,6 +47,22 @@ async function handleSubmit() {
     errorMsg.value =
       err.response?.data?.message ||
       'Credenciais inválidas. Tente novamente.'
+  }
+}
+
+async function handleDevLogin() {
+  if (!selectedDevUserId.value) return
+  errorMsg.value = ''
+  isLoggingInDev.value = true
+  try {
+    await authStore.impersonate({ user_id: Number(selectedDevUserId.value) })
+    router.push('/feed')
+  } catch (err: any) {
+    errorMsg.value =
+      err.response?.data?.message ||
+      'Erro ao realizar login via impersonate.'
+  } finally {
+    isLoggingInDev.value = false
   }
 }
 </script>
@@ -115,6 +147,34 @@ async function handleSubmit() {
               <span v-else>[ Entrar ]</span>
             </button>
           </form>
+        </div>
+      </div>
+
+      <!-- Dev Impersonate Quick Login Card (Apenas em ambiente local/desenvolvimento) -->
+      <div v-if="devUsers.length > 0" class="retro-box dev-box">
+        <div class="retro-header-center dev-header">
+          ⚡ Personificar / Teste Local ({{ devUsers.length }} usuários)
+        </div>
+        <div class="form-body">
+          <p class="dev-desc">
+            Selecione qualquer usuário de teste local para logar sem precisar digitar senha:
+          </p>
+          <div class="form-group">
+            <select v-model="selectedDevUserId" class="retro-field dev-select">
+              <option v-for="u in devUsers" :key="u.id" :value="u.id">
+                {{ u.name }} (@{{ u.username }}) — [{{ u.role === 'admin' ? 'ADMIN' : 'USUÁRIO' }} | {{ u.status.toUpperCase() }}]
+              </option>
+            </select>
+          </div>
+          <button
+            type="button"
+            @click="handleDevLogin"
+            class="retro-submit-btn dev-btn"
+            :disabled="isLoggingInDev || !selectedDevUserId"
+          >
+            <span v-if="isLoggingInDev">[ Entrando... ]</span>
+            <span v-else>🎭 [ Entrar como Selecionado ]</span>
+          </button>
         </div>
       </div>
 
@@ -310,5 +370,36 @@ async function handleSubmit() {
 
 .register-link:hover {
   color: var(--color-primary-600, #9a6a32);
+}
+
+.dev-box {
+  border-color: #ca8a04;
+}
+
+.dev-header {
+  background-color: #ca8a04;
+  color: #ffffff;
+}
+
+.dev-desc {
+  font-size: 0.8rem;
+  color: #713f12;
+  margin-bottom: 0.75rem;
+}
+
+.dev-select {
+  border-color: #fde047;
+  background-color: #fefce8;
+  font-size: 0.82rem;
+  width: 100%;
+}
+
+.dev-btn {
+  background-color: #ca8a04;
+  margin-top: 0.75rem;
+}
+
+.dev-btn:hover:not(:disabled) {
+  background-color: #a16207;
 }
 </style>

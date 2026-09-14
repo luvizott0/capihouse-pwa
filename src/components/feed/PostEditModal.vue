@@ -314,9 +314,9 @@ function handleClose() {
   gap: 0.25rem;
   font-family: var(--font-heading);
   font-size: 0.75rem;
-  background-color: var(--color-primary-100);
-  color: var(--color-primary-800);
-  padding: 0.15rem 0.4rem;
+  background-color: var(--color-primary, #a66130);
+  color: #ffffff;
+  padding: 0.2rem 0.5rem;
   border-radius: 2px;
 }
 
@@ -325,11 +325,11 @@ function handleClose() {
   border: none;
   font-size: 0.9rem;
   cursor: pointer;
-  color: var(--color-muted);
+  color: #ffffff;
   line-height: 1;
 }
 .remove-tag-btn:hover {
-  color: var(--color-danger);
+  opacity: 0.8;
 }
 
 .modal-footer {

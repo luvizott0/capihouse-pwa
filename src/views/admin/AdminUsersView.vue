@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAdminStore } from '@/stores/admin'
+import { useAuthStore } from '@/stores/auth'
 import RetroCard from '@/components/ui/RetroCard.vue'
 import RetroInput from '@/components/ui/RetroInput.vue'
 import RetroSelect from '@/components/ui/RetroSelect.vue'
@@ -10,6 +12,8 @@ import UserAvatar from '@/components/ui/UserAvatar.vue'
 import RetroConfirmModal from '@/components/ui/RetroConfirmModal.vue'
 
 const adminStore = useAdminStore()
+const authStore = useAuthStore()
+const router = useRouter()
 
 const statusOptions = [
   { label: 'Todos', value: '' },
@@ -60,6 +64,20 @@ async function handleConfirmModalAction() {
   }
 }
 
+const isImpersonatingTarget = ref<number | null>(null)
+
+async function handleImpersonate(targetUser: any) {
+  isImpersonatingTarget.value = targetUser.id
+  try {
+    await authStore.impersonate({ user_id: targetUser.id })
+    router.push('/feed')
+  } catch (err: any) {
+    alert(err.response?.data?.message || 'Falha ao personificar o usuário.')
+  } finally {
+    isImpersonatingTarget.value = null
+  }
+}
+
 const getStatusColor = (status: string) => {
   if (status === 'approved') return 'success'
   if (status === 'pending') return 'warning'
@@ -98,7 +116,17 @@ const getStatusColor = (status: string) => {
             </td>
             <td style="padding: 0.75rem;"><RetroBadge :variant="getStatusColor(user.status)" :text="user.status.toUpperCase()" /></td>
             <td style="padding: 0.75rem;"><RetroBadge :variant="user.role === 'admin' ? 'primary' : 'neutral'" :text="user.role.toUpperCase()" /></td>
-            <td style="padding: 0.75rem; display: flex; gap: 0.25rem;">
+            <td style="padding: 0.75rem; display: flex; gap: 0.25rem; flex-wrap: wrap;">
+              <button
+                v-if="user.id !== authStore.user?.id"
+                @click="handleImpersonate(user)"
+                :disabled="isImpersonatingTarget === user.id"
+                class="retro-button"
+                style="font-size: 0.7rem; padding: 0.2rem 0.5rem; background-color: #fef08a; border-color: #ca8a04; color: #854d0e;"
+                title="Logar diretamente como este usuário"
+              >
+                {{ isImpersonatingTarget === user.id ? 'Entrando...' : '🎭 Personificar' }}
+              </button>
               <button v-if="user.status === 'pending'" @click="adminStore.approve(user.id)" class="retro-button retro-button-secondary" style="font-size: 0.7rem; padding: 0.2rem 0.5rem;">Aprovar</button>
               <button v-if="user.status === 'pending'" @click="openRejectConfirm(user)" class="retro-button retro-button-danger" style="font-size: 0.7rem; padding: 0.2rem 0.5rem;">Rejeitar</button>
               <button v-if="user.status === 'approved' && user.role !== 'admin'" @click="openBanConfirm(user)" class="retro-button retro-button-danger" style="font-size: 0.7rem; padding: 0.2rem 0.5rem;">Banir</button>

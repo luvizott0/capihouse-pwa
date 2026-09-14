@@ -388,9 +388,8 @@ function handleClose() {
   align-items: center;
   gap: 0.25rem;
   padding: 0.2rem 0.5rem;
-  background-color: var(--color-primary-100, #fdf8f3);
-  border: 1px solid var(--color-primary-300, #d4a574);
-  color: var(--color-primary-800, #5f4120);
+  background-color: var(--color-primary, #a66130);
+  color: #ffffff;
   font-family: var(--font-heading);
   font-size: 0.75rem;
   border-radius: 2px;
@@ -399,7 +398,7 @@ function handleClose() {
   background: none;
   border: none;
   cursor: pointer;
-  color: var(--color-primary-800);
+  color: #ffffff;
   font-weight: bold;
 }
 

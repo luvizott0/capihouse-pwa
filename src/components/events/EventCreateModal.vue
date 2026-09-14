@@ -71,6 +71,11 @@ function handleImageSelect(e: Event) {
   }
 }
 
+function removeImage() {
+  selectedImage.value = null
+  imagePreview.value = null
+}
+
 async function handleSubmit() {
   errorMsg.value = ''
   if (!name.value.trim() || !description.value.trim() || !date.value) {
@@ -142,6 +147,9 @@ function handleClose() {
         <input type="file" accept="image/*" @change="handleImageSelect" class="retro-field" />
         <div v-if="imagePreview" class="preview-box">
           <img :src="imagePreview" alt="Capa do evento" class="preview-img" />
+          <button type="button" class="remove-preview-btn" @click="removeImage" title="Remover foto">
+            [ Remover foto ]
+          </button>
         </div>
       </div>
 
@@ -246,16 +254,38 @@ function handleClose() {
 }
 
 .preview-box {
+  position: relative;
   margin-top: 0.5rem;
-  max-height: 160px;
+  max-height: 140px;
   overflow: hidden;
   border: 1px solid var(--color-border);
   border-radius: 2px;
 }
 .preview-img {
   width: 100%;
-  height: 100%;
+  height: 140px;
   object-fit: cover;
+  display: block;
+}
+
+.remove-preview-btn {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  background-color: rgba(0, 0, 0, 0.75);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.7rem;
+  font-weight: bold;
+  padding: 0.2rem 0.4rem;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.remove-preview-btn:hover {
+  background-color: #b91c1c;
 }
 
 .muted-note {
@@ -278,11 +308,12 @@ function handleClose() {
 }
 
 .guests-selector-list {
-  max-height: 150px;
+  max-height: 140px;
   overflow-y: auto;
   border: 1px solid var(--color-border);
   background: #ffffff;
   border-radius: 2px;
+  scrollbar-width: thin;
 }
 
 .guest-selector-item {
@@ -337,5 +368,11 @@ function handleClose() {
   gap: 0.75rem;
   border-top: 1px solid var(--color-border);
   padding-top: 0.75rem;
+  position: sticky;
+  bottom: -1rem;
+  background-color: var(--bg-white, #ffffff);
+  z-index: 10;
+  margin-top: 0.5rem;
+  padding-bottom: 0.25rem;
 }
 </style>
