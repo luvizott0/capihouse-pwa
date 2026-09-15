@@ -36,7 +36,7 @@ const DEFAULT_SHADES: Record<string, string> = {
 /** Parse "#rrggbb" into { r, g, b } (0-255 integers) */
 function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
   const m = /^#([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})$/.exec(hex)
-  if (!m) return null
+  if (!m || !m[1] || !m[2] || !m[3]) return null
   return { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) }
 }
 
