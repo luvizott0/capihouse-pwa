@@ -2,6 +2,7 @@
 import { onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { RouterView } from 'vue-router'
+import OfflineBanner from '@/components/ui/OfflineBanner.vue'
 
 const authStore = useAuthStore()
 
@@ -11,5 +12,6 @@ onMounted(() => {
 </script>
 
 <template>
+  <OfflineBanner />
   <RouterView />
 </template>
