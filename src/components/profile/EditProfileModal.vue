@@ -17,7 +17,7 @@ watch(() => props.modelValue, (isOpen) => {
     form.value = {
       name: profileStore.profile.name || '',
       bio: profileStore.profile.bio || '',
-      birth: profileStore.profile.birth || '',
+      birth: profileStore.profile.birth ? profileStore.profile.birth.substring(0, 10) : '',
       instagram: profileStore.profile.instagram || '',
       spotify: profileStore.profile.spotify || ''
     }

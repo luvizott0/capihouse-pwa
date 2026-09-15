@@ -124,6 +124,12 @@ export interface AppNotification {
     inviter_id?: number
     inviter_name?: string
     status?: 'pending' | 'accepted' | 'declined'
+    post_id?: number
+    comment_id?: number
+    liker_id?: number
+    liker_name?: string
+    commenter_id?: number
+    commenter_name?: string
     [key: string]: unknown
   } | null
   read_at: string | null

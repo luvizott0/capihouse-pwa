@@ -52,6 +52,15 @@ async function handleDecline(notifId: number, groupId: number) {
     actionLoadingId.value = null
   }
 }
+
+async function handleItemClick(item: any) {
+  if (!item.read_at) {
+    await notifStore.markAsRead(item.id)
+  }
+  if (item.data?.post_id) {
+    router.push(`/feed#post-${item.data.post_id}`)
+  }
+}
 </script>
 
 <template>
@@ -90,16 +99,18 @@ async function handleDecline(notifId: number, groupId: number) {
             :key="item.id"
             class="notif-item"
             :class="{ unread: !item.read_at }"
-            @click="notifStore.markAsRead(item.id)"
+            @click="handleItemClick(item)"
           >
             <!-- Unread primary dot indicator -->
             <div class="notif-status-col">
               <span v-if="!item.read_at" class="item-unread-dot" title="Não lida"></span>
             </div>
 
-            <!-- Notification Icon or Group icon -->
+            <!-- Notification Icon: Group, Like, Comment or General -->
             <div class="notif-icon-col">
               <span v-if="item.type === 'group_invite'" class="type-icon">👥</span>
+              <span v-else-if="item.type === 'post_like'" class="type-icon">❤️</span>
+              <span v-else-if="item.type === 'post_comment'" class="type-icon">💬</span>
               <span v-else class="type-icon">🔔</span>
             </div>
 
@@ -110,6 +121,11 @@ async function handleDecline(notifId: number, groupId: number) {
                 <span class="notif-time">{{ formatRelativeTime(item.created_at) }}</span>
               </div>
               <p class="notif-text">{{ item.content }}</p>
+
+              <!-- Post Navigation Hint -->
+              <div v-if="item.data?.post_id" class="post-action-hint">
+                <span class="post-link-text">» Ver publicação</span>
+              </div>
 
               <!-- Group Invite Actions & Status -->
               <template v-if="item.type === 'group_invite' && item.data?.group_id">
@@ -360,5 +376,20 @@ async function handleDecline(notifId: number, groupId: number) {
   background-color: #f3f4f6;
   color: #6b7280;
   border: 1px solid #d1d5db;
+}
+
+.post-action-hint {
+  margin-top: 0.25rem;
+}
+
+.post-link-text {
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-primary, #a66130);
+}
+
+.notif-item:hover .post-link-text {
+  text-decoration: underline;
 }
 </style>

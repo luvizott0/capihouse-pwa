@@ -1,18 +1,29 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
+import { useRoute } from 'vue-router'
 import { useFeedStore } from '@/stores/feed'
 import { useAuthStore } from '@/stores/auth'
 import PostCard from '@/components/feed/PostCard.vue'
 import PostCreateModal from '@/components/feed/PostCreateModal.vue'
 import UserAvatar from '@/components/ui/UserAvatar.vue'
 
+const route = useRoute()
 const feedStore = useFeedStore()
 const authStore = useAuthStore()
 
 const showCreateModal = ref(false)
 
-onMounted(() => {
-  feedStore.fetchPosts()
+onMounted(async () => {
+  await feedStore.fetchPosts()
+  if (route.hash) {
+    await nextTick()
+    setTimeout(() => {
+      const el = document.querySelector(route.hash)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth' })
+      }
+    }, 100)
+  }
 })
 </script>
 
@@ -47,9 +58,37 @@ onMounted(() => {
     <!-- Feed Header Title -->
     <div class="feed-header-line">
       <h2 class="feed-title">» Publicações recentes</h2>
-      <button type="button" class="refresh-btn" @click="feedStore.fetchPosts(1)">
-        [ Atualizar ]
+      <button
+        type="button"
+        class="refresh-btn"
+        :class="{ 'is-refreshing': feedStore.isLoading }"
+        :disabled="feedStore.isLoading"
+        @click="feedStore.fetchPosts(1)"
+        title="Recarregar publicações"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="refresh-icon"
+          :class="{ 'spin': feedStore.isLoading }"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+          />
+        </svg>
+        <span>{{ feedStore.isLoading ? 'Atualizando...' : 'Atualizar feed' }}</span>
       </button>
+    </div>
+
+    <!-- Background refreshing indicator if posts already exist -->
+    <div v-if="feedStore.isLoading && feedStore.posts.length > 0" class="refresh-indicator-bar">
+      <span class="refresh-dot"></span>
+      <span>Recarregando publicações...</span>
     </div>
 
     <!-- Loading State -->
@@ -214,13 +253,79 @@ onMounted(() => {
 }
 
 .refresh-btn {
-  background: none;
-  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background-color: var(--color-primary-50, #f8f6f1);
+  border: 1px solid var(--color-border, #D8CDC5);
+  border-radius: 2px;
+  padding: 0.35rem 0.65rem;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-primary-800, #5f4120);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.refresh-btn:hover:not(:disabled) {
+  background-color: var(--color-primary-100, #eedfd4);
+  border-color: var(--color-primary, #a66130);
+  color: var(--color-primary, #a66130);
+}
+.refresh-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.refresh-icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin {
+  animation: spin 0.8s linear infinite;
+}
+
+.refresh-indicator-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: var(--color-primary-100, #f8f6f1);
+  border: 1px solid var(--color-primary-300, #c4884e);
+  border-radius: 2px;
+  padding: 0.4rem 0.75rem;
   font-family: var(--font-heading);
   font-size: 0.8rem;
-  color: var(--color-primary);
-  cursor: pointer;
-  font-weight: bold;
+  color: var(--color-primary-800);
+}
+
+.refresh-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--color-primary);
+  animation: pulse 1s infinite alternate;
+}
+
+@keyframes pulse {
+  from {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.15);
+  }
 }
 
 .loading-state {

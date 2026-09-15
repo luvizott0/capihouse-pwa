@@ -92,7 +92,7 @@ async function confirmDeletePost() {
 </script>
 
 <template>
-  <div class="retro-post-card">
+  <div :id="'post-' + post.id" class="retro-post-card">
     <!-- Header: Author info & feeling -->
     <div class="post-header">
       <div class="author-row">

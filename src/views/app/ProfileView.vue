@@ -12,6 +12,7 @@ import RetroConfirmModal from '@/components/ui/RetroConfirmModal.vue'
 import ImageCropper from '@/components/profile/ImageCropper.vue'
 import ThemeCustomizerModal from '@/components/profile/ThemeCustomizerModal.vue'
 import PostCard from '@/components/feed/PostCard.vue'
+import { formatBirthDate } from '@/utils/date'
 
 const route = useRoute()
 const router = useRouter()
@@ -380,7 +381,7 @@ const userPosts = computed(() => {
             </div>
             <!-- Birth read mode -->
             <div v-else class="info-text">
-              {{ user.birth ? new Date(user.birth).toLocaleDateString('pt-BR') : 'Aniversário não informado' }}
+              {{ user.birth ? formatBirthDate(user.birth) : 'Aniversário não informado' }}
             </div>
           </div>
         </div>
