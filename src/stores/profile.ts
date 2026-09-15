@@ -1,9 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { User, Interest } from '@/types/models'
+import type { User, Interest, UserTheme } from '@/types/models'
 import * as profileApi from '@/api/profile'
 import * as interestsApi from '@/api/interests'
 import { useAuthStore } from './auth'
+import { useThemeStore } from './theme'
 
 export const useProfileStore = defineStore('profile', () => {
   const profile = ref<User | null>(null)
@@ -11,6 +12,7 @@ export const useProfileStore = defineStore('profile', () => {
   const isEditing = ref(false)
   const isLoading = ref(false)
   const authStore = useAuthStore()
+  const themeStore = useThemeStore()
 
   async function fetchProfile(username?: string) {
     isLoading.value = true
@@ -75,6 +77,34 @@ export const useProfileStore = defineStore('profile', () => {
     await profileApi.updatePassword(data)
   }
 
+  async function updateTheme(theme: UserTheme) {
+    await updateProfile({ theme })
+    themeStore.applyTheme(theme)
+  }
+
+  async function uploadThemeBackground(file: File) {
+    const formData = new FormData()
+    formData.append('background', file)
+    const res = await profileApi.uploadThemeBackground(formData)
+    const data = (res.data as any)?.data || res.data
+    return data.url as string
+  }
+
+  async function resetProfileTheme() {
+    isLoading.value = true
+    try {
+      const res = await profileApi.resetTheme()
+      const user = (res.data as any)?.data || res.data
+      profile.value = user
+      if (authStore.user?.id === user.id) {
+        authStore.updateUser(user)
+      }
+      themeStore.resetTheme()
+    } finally {
+      isLoading.value = false
+    }
+  }
+
   return {
     profile,
     interests,
@@ -85,6 +115,9 @@ export const useProfileStore = defineStore('profile', () => {
     uploadAvatar,
     uploadBanner,
     syncInterests,
-    updatePassword
+    updatePassword,
+    updateTheme,
+    uploadThemeBackground,
+    resetProfileTheme,
   }
 })

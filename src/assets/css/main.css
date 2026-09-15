@@ -24,6 +24,12 @@
   --color-warning: #f59e0b;
   --color-info: #3b82f6;
 
+  /* Theme-overridable background variables */
+  --bg-app: var(--bg-paper);
+  --bg-app-size: auto;
+  --bg-app-repeat: no-repeat;
+  --bg-app-position: center;
+
   --font-heading: 'Space Mono', monospace;
   --font-body: 'Outfit', sans-serif;
 }
@@ -37,6 +43,11 @@
 body {
   font-family: var(--font-body);
   background-color: var(--bg-paper);
+  background-image: var(--bg-app-image, none);
+  background-size: var(--bg-app-size, auto);
+  background-repeat: var(--bg-app-repeat, no-repeat);
+  background-position: var(--bg-app-position, center);
+  background-attachment: fixed;
   color: var(--text-main);
   line-height: 1.5;
 }

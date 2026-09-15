@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useProfileStore } from '@/stores/profile'
 import { useAuthStore } from '@/stores/auth'
 import { useFeedStore } from '@/stores/feed'
+import { useThemeStore } from '@/stores/theme'
 import UserAvatar from '@/components/ui/UserAvatar.vue'
 import RetroModal from '@/components/ui/RetroModal.vue'
 import RetroButton from '@/components/ui/RetroButton.vue'
 import RetroConfirmModal from '@/components/ui/RetroConfirmModal.vue'
 import ImageCropper from '@/components/profile/ImageCropper.vue'
+import ThemeCustomizerModal from '@/components/profile/ThemeCustomizerModal.vue'
 import PostCard from '@/components/feed/PostCard.vue'
 
 const route = useRoute()
@@ -16,6 +18,7 @@ const router = useRouter()
 const profileStore = useProfileStore()
 const authStore = useAuthStore()
 const feedStore = useFeedStore()
+const themeStore = useThemeStore()
 
 const isOwner = computed(() => {
   return !route.params.username || route.params.username === authStore.user?.username
@@ -28,6 +31,7 @@ const showBannerCropper = ref(false)
 const showAvatarCropper = ref(false)
 const showSettingsModal = ref(false)
 const showLogoutConfirm = ref(false)
+const showThemeModal = ref(false)
 
 // Settings form
 const settingsName = ref('')
@@ -61,6 +65,11 @@ const newInterestInput = ref('')
 async function loadProfile() {
   if (!isOwner.value && route.params.username) {
     await profileStore.fetchProfile(route.params.username as string)
+    // Apply the visited user's theme while on their profile page
+    themeStore.loadThemeFromUser(profileStore.profile)
+  } else {
+    // Restore own theme when viewing own profile
+    themeStore.loadThemeFromUser(authStore.user)
   }
   if (user.value) {
     settingsName.value = user.value.name
@@ -69,6 +78,13 @@ async function loadProfile() {
     birthInput.value = user.value.birth ? user.value.birth.substring(0, 10) : ''
   }
 }
+
+// Restore own theme when leaving a visited profile page
+onUnmounted(() => {
+  if (!isOwner.value) {
+    themeStore.loadThemeFromUser(authStore.user)
+  }
+})
 
 onMounted(() => {
   loadProfile()
@@ -278,6 +294,17 @@ const userPosts = computed(() => {
               </button>
               <button
                 type="button"
+                class="profile-icon-btn customize-btn"
+                title="Personalizar tema"
+                aria-label="Personalizar tema"
+                @click="showThemeModal = true"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                </svg>
+              </button>
+              <button
+                type="button"
                 class="profile-icon-btn logout-btn"
                 title="Sair da conta"
                 aria-label="Sair da conta"
@@ -416,6 +443,9 @@ const userPosts = computed(() => {
       title="Editar Foto de Perfil"
       @cropped="handleAvatarCropped"
     />
+
+    <!-- Theme Customizer Modal -->
+    <ThemeCustomizerModal v-model="showThemeModal" />
 
     <!-- Settings & Password Modal -->
     <RetroModal v-model="showSettingsModal" title="» Configurações da Conta" size="md">
@@ -725,6 +755,18 @@ const userPosts = computed(() => {
   background-color: var(--color-primary-200, #ebd5c1);
   border-color: var(--color-primary);
   color: var(--color-primary-900);
+  transform: translateY(-1px);
+}
+
+.profile-icon-btn.customize-btn {
+  background-color: #ede9fe;
+  border-color: #c4b5fd;
+  color: #6d28d9;
+}
+.profile-icon-btn.customize-btn:hover {
+  background-color: #ddd6fe;
+  border-color: #7c3aed;
+  color: #5b21b6;
   transform: translateY(-1px);
 }
 

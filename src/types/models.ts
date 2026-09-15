@@ -1,3 +1,12 @@
+export interface UserTheme {
+  bg_type: 'color' | 'image'
+  bg_value: string
+  bg_size?: 'cover' | 'contain' | 'auto' | '100% 100%' | '100% auto'
+  bg_repeat?: 'no-repeat' | 'repeat' | 'repeat-x' | 'repeat-y'
+  bg_position?: string
+  color_primary?: string
+}
+
 export interface User {
   id: number
   name: string
@@ -14,6 +23,7 @@ export interface User {
   initials: string
   is_admin: boolean
   is_online: boolean
+  theme?: UserTheme | null
   avatar: Media | null
   banner: Media | null
   interests: Interest[]
