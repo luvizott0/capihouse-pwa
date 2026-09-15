@@ -29,7 +29,10 @@ onUnmounted(() => {
           <UserAvatar :user="user" size="sm" />
           <OnlineIndicator :isOnline="true" style="position: absolute; bottom: -2px; right: -2px;" />
         </div>
-        <span class="user-name">{{ user.name }}</span>
+        <div class="user-info">
+          <span class="user-name">{{ user.name }}</span>
+          <span class="user-username">@{{ user.username }}</span>
+        </div>
       </router-link>
     </div>
   </div>
@@ -45,5 +48,7 @@ onUnmounted(() => {
 }
 .online-user-item:last-child { border-bottom: none; }
 .online-user-item:hover { background-color: var(--color-primary-50); text-decoration: none; }
+.user-info { display: flex; flex-direction: column; gap: 0.1rem; }
 .user-name { font-size: 0.9rem; font-weight: 500; }
+.user-username { font-size: 0.75rem; color: var(--text-muted); }
 </style>
