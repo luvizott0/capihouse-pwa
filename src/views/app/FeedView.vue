@@ -27,13 +27,18 @@ onMounted(() => {
         </div>
       </div>
       <div class="quick-actions-row">
-        <button type="button" class="quick-action-btn">
-          <span>📷</span> Anexar foto
-        </button>
-        <button type="button" class="quick-action-btn">
-          <span>😊</span> Sentimento
-        </button>
-        <button type="button" class="quick-publish-btn">
+        <div class="quick-actions-left">
+          <button type="button" class="quick-action-btn" @click.stop="showCreateModal = true">
+            <span class="action-icon">📷</span>
+            <span class="action-text-full">Anexar foto</span>
+            <span class="action-text-short">Foto</span>
+          </button>
+          <button type="button" class="quick-action-btn" @click.stop="showCreateModal = true">
+            <span class="action-icon">😊</span>
+            <span>Sentimento</span>
+          </button>
+        </div>
+        <button type="button" class="quick-publish-btn" @click.stop="showCreateModal = true">
           [ Criar post ]
         </button>
       </div>
@@ -63,7 +68,7 @@ onMounted(() => {
 
     <!-- Empty State -->
     <div v-else class="empty-feed-card">
-      <div class="empty-icon">🦫</div>
+      <img src="/capihouse-logo.png" alt="Capivara" class="empty-capivara-logo" />
       <h3 class="empty-title">Nenhuma publicação ainda</h3>
       <p class="empty-subtitle">Seja o primeiro a compartilhar algo com os amigos da casa!</p>
       <button type="button" class="empty-create-btn" @click="showCreateModal = true">
@@ -122,20 +127,59 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.5rem;
   border-top: 1px solid var(--color-primary-100);
   padding-top: 0.5rem;
 }
 
+.quick-actions-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
 .quick-action-btn {
   background: none;
-  border: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   color: var(--color-primary-800);
   font-family: var(--font-heading);
   cursor: pointer;
+  white-space: nowrap;
+  padding: 0.25rem 0.4rem;
+  transition: all 0.15s ease;
+}
+.quick-action-btn:hover {
+  background-color: var(--color-primary-50, #f8f6f1);
+  border-color: var(--color-border);
+}
+
+.action-icon {
+  font-size: 0.95rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+}
+
+.action-text-short {
+  display: none;
+}
+.action-text-full {
+  display: inline;
+}
+
+@media (max-width: 480px) {
+  .action-text-full {
+    display: none;
+  }
+  .action-text-short {
+    display: inline;
+  }
 }
 
 .quick-publish-btn {
@@ -145,9 +189,12 @@ onMounted(() => {
   font-family: var(--font-heading);
   font-size: 0.8rem;
   font-weight: bold;
-  padding: 0.3rem 0.75rem;
+  padding: 0.35rem 0.65rem;
   border-radius: 2px;
   cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background-color 0.15s ease;
 }
 .quick-publish-btn:hover {
   background-color: var(--color-primary-600);

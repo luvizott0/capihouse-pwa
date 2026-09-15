@@ -72,7 +72,7 @@ function onGroupCreated() {
 
     <!-- Empty State -->
     <div v-else class="empty-groups-box">
-      <span class="empty-icon">🦫</span>
+      <img src="/capihouse-logo.png" alt="Capivara" class="empty-capivara-logo" />
       <h3 class="empty-title">Você ainda não participa de nenhum grupo</h3>
       <p class="empty-subtitle">
         Os grupos no CapiHouse funcionam apenas por convite. Crie o seu próprio grupo para reunir os amigos da casa ou aguarde um convite!

@@ -78,7 +78,7 @@ onUnmounted(() => {
   <transition name="slide-fade">
     <div v-if="showInstallBanner" class="pwa-banner install-banner">
       <div class="banner-content">
-        <span class="banner-icon">🦫</span>
+        <img src="/capihouse-logo.png" alt="CapiHouse" class="banner-capivara-img" />
         <div class="banner-text">
           Instale o <strong>CapiHouse</strong> na tela inicial para uma experiência rápida e offline!
         </div>
@@ -118,6 +118,13 @@ onUnmounted(() => {
 
 .banner-icon {
   font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.banner-capivara-img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
   flex-shrink: 0;
 }
 

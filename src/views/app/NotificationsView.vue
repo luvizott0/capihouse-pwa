@@ -79,7 +79,7 @@ async function handleDecline(notifId: number, groupId: number) {
         </div>
 
         <div v-else-if="notifStore.notifications.length === 0" class="empty-notif-box">
-          <span class="empty-icon">🦫</span>
+          <img src="/capihouse-logo.png" alt="Capivara" class="empty-capivara-logo" />
           <h3 class="empty-title">Tudo limpo por aqui!</h3>
           <p class="empty-subtitle">Você não possui nenhuma notificação recente.</p>
         </div>

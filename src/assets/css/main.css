@@ -236,3 +236,56 @@ input, select, textarea, button, a {
   }
 }
 
+/* Password Input Wrapper & Toggle Button */
+.password-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.password-input-wrapper input {
+  width: 100%;
+  padding-right: 2.75rem !important;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-muted, #847062);
+  line-height: 1;
+  user-select: none;
+  border-radius: 2px;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.password-toggle-btn:hover {
+  color: var(--color-primary, #a66130);
+  background-color: var(--color-primary-100, #f8f1ea);
+}
+
+.eye-icon {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2;
+}
+
+/* Capivara Empty State Logo */
+.empty-capivara-logo {
+  width: 76px;
+  height: 76px;
+  object-fit: contain;
+  margin-bottom: 0.5rem;
+  opacity: 0.92;
+  filter: drop-shadow(0 2px 4px rgba(166, 97, 48, 0.15));
+}
+
