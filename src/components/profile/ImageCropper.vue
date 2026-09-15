@@ -1,58 +1,89 @@
 <script setup lang="ts">
-import { ref, onBeforeUnmount } from 'vue'
+import { ref, watch, onBeforeUnmount } from 'vue'
 import RetroModal from '@/components/ui/RetroModal.vue'
 import RetroButton from '@/components/ui/RetroButton.vue'
 import Cropper from 'cropperjs'
 import 'cropperjs/dist/cropper.min.css'
 
-const props = defineProps<{ modelValue: boolean; aspectRatio?: number; title?: string }>()
-const emit = defineEmits<{ (e: 'update:modelValue', value: boolean): void; (e: 'cropped', blob: Blob): void }>()
+const props = defineProps<{
+  modelValue: boolean
+  aspectRatio?: number | null
+  title?: string
+  initialImage?: string | null
+  maxWidth?: number
+  maxHeight?: number
+}>()
+
+const emit = defineEmits<{
+  (e: 'update:modelValue', value: boolean): void
+  (e: 'cropped', blob: Blob): void
+}>()
 
 const imageEl = ref<HTMLImageElement | null>(null)
 const selectedImage = ref<string | null>(null)
 let cropperInstance: Cropper | null = null
 
+function initCropper() {
+  setTimeout(() => {
+    if (imageEl.value) {
+      if (cropperInstance) cropperInstance.destroy()
+      const ratio = props.aspectRatio === 0 || props.aspectRatio === null ? NaN : (props.aspectRatio ?? 1)
+      cropperInstance = new Cropper(imageEl.value, {
+        aspectRatio: ratio,
+        viewMode: 1,
+        autoCropArea: 1,
+        responsive: true,
+      } as Cropper.Options)
+    }
+  }, 100)
+}
+
+watch(() => props.modelValue, (open) => {
+  if (open && props.initialImage) {
+    selectedImage.value = props.initialImage
+    initCropper()
+  } else if (!open) {
+    handleClose()
+  }
+})
+
 function onFileSelect(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0]
   if (file) {
     selectedImage.value = URL.createObjectURL(file)
-    setTimeout(() => {
-      if (imageEl.value) {
-        if (cropperInstance) cropperInstance.destroy()
-        cropperInstance = new Cropper(imageEl.value, {
-          aspectRatio: props.aspectRatio || 1,
-          viewMode: 1,
-          autoCropArea: 1,
-          responsive: true,
-        } as Cropper.Options)
-      }
-    }, 100)
+    initCropper()
   }
 }
 
 function handleCrop() {
   if (cropperInstance) {
     const canvas = cropperInstance.getCroppedCanvas({
-      maxWidth: 1024,
-      maxHeight: 1024,
+      maxWidth: props.maxWidth || 2048,
+      maxHeight: props.maxHeight || 2048,
     })
     canvas.toBlob((blob: Blob | null) => {
       if (blob) {
         emit('cropped', blob)
-        emit('update:modelValue', false)
+        handleClose()
       }
-    }, 'image/jpeg', 0.85)
+    }, 'image/jpeg', 0.88)
   }
 }
 
 function handleClose() {
-  if (cropperInstance) { cropperInstance.destroy(); cropperInstance = null }
+  if (cropperInstance) {
+    cropperInstance.destroy()
+    cropperInstance = null
+  }
   selectedImage.value = null
   emit('update:modelValue', false)
 }
 
 onBeforeUnmount(() => {
-  if (cropperInstance) { cropperInstance.destroy(); cropperInstance = null }
+  if (cropperInstance) {
+    cropperInstance.destroy()
+    cropperInstance = null
+  }
 })
 </script>
 <template>

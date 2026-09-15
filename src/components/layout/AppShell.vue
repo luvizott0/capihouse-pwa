@@ -9,10 +9,10 @@ import Marquee from './Marquee.vue'
 import NavMenu from './NavMenu.vue'
 import SearchBar from './SearchBar.vue'
 import OnlineSidebar from '@/components/sidebar/OnlineSidebar.vue'
+import MobileUsersSidebar from '@/components/sidebar/MobileUsersSidebar.vue'
 import EventsSidebar from '@/components/sidebar/EventsSidebar.vue'
 import PostCreateModal from '@/components/feed/PostCreateModal.vue'
 import EventCreateModal from '@/components/events/EventCreateModal.vue'
-import RetroModal from '@/components/ui/RetroModal.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -123,19 +123,13 @@ function onEventCreated() {
       type="button"
       class="mobile-users-fab"
       @click="showMobileUsersDrawer = true"
-      title="Ver amigos online"
+      title="Ver amigos da casa"
     >
       <span>👥</span> [ Usuários ]
     </button>
 
-    <!-- Mobile Users Drawer Modal -->
-    <RetroModal
-      v-model="showMobileUsersDrawer"
-      title="» Amigos da Casa"
-      size="sm"
-    >
-      <OnlineSidebar />
-    </RetroModal>
+    <!-- Mobile Users Sidebar Drawer -->
+    <MobileUsersSidebar v-model="showMobileUsersDrawer" />
 
     <!-- Global Modals -->
     <PostCreateModal

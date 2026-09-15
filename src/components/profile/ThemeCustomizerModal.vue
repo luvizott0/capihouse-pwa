@@ -2,6 +2,7 @@
 import { ref, watch, computed } from 'vue'
 import RetroModal from '@/components/ui/RetroModal.vue'
 import RetroButton from '@/components/ui/RetroButton.vue'
+import ImageCropper from '@/components/profile/ImageCropper.vue'
 import { useProfileStore } from '@/stores/profile'
 import { useThemeStore, DEFAULT_THEME } from '@/stores/theme'
 import { useAuthStore } from '@/stores/auth'
@@ -104,13 +105,34 @@ watch(draft, (d) => {
   themeStore.applyTheme(previewTheme)
 }, { deep: true })
 
+// ── Background Image Cropping State ──
+const showBgCropper = ref(false)
+const rawBgToCrop = ref<string | null>(null)
+
 // ── File input handler ──
 function onBgFileChange(e: Event) {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
   if (!file) return
+  rawBgToCrop.value = URL.createObjectURL(file)
+  showBgCropper.value = true
+  input.value = ''
+}
+
+function openCropCurrent() {
+  if (bgImagePreviewUrl.value) {
+    rawBgToCrop.value = bgImagePreviewUrl.value
+    showBgCropper.value = true
+  } else if (draft.value.bg_value) {
+    rawBgToCrop.value = draft.value.bg_value
+    showBgCropper.value = true
+  }
+}
+
+function handleBgCropped(blob: Blob) {
+  const file = new File([blob], 'theme-bg.jpg', { type: 'image/jpeg' })
   bgImageFile.value = file
-  bgImagePreviewUrl.value = URL.createObjectURL(file)
+  bgImagePreviewUrl.value = URL.createObjectURL(blob)
   draft.value.bg_type = 'image'
   draft.value = { ...draft.value }
 }
@@ -118,6 +140,7 @@ function onBgFileChange(e: Event) {
 function clearBgImage() {
   bgImageFile.value = null
   bgImagePreviewUrl.value = ''
+  rawBgToCrop.value = null
   if (bgImageInputRef.value) bgImageInputRef.value.value = ''
   draft.value.bg_type = 'color'
   draft.value.bg_value = DEFAULT_THEME.bg_value
@@ -288,6 +311,15 @@ async function resetAndSave() {
                   class="file-input-hidden"
                   @change="onBgFileChange"
                 />
+                <button
+                  v-if="bgImagePreviewUrl || draft.bg_value"
+                  type="button"
+                  class="crop-btn"
+                  @click="openCropCurrent"
+                  title="Recortar enquadramento da imagem"
+                >
+                  ✂️ Cortar
+                </button>
                 <button v-if="bgImageFile || draft.bg_value" type="button" class="clear-btn" @click="clearBgImage">
                   ✕ Remover
                 </button>
@@ -481,9 +513,35 @@ async function resetAndSave() {
     </template>
 
   </RetroModal>
+
+  <!-- Cropper Modal para imagem de fundo -->
+  <ImageCropper
+    v-model="showBgCropper"
+    :initialImage="rawBgToCrop"
+    :aspectRatio="0"
+    title="Cortar Imagem de Fundo"
+    @cropped="handleBgCropped"
+  />
 </template>
 
 <style scoped>
+.crop-btn {
+  background: none;
+  border: 1px solid var(--color-primary);
+  color: var(--color-primary);
+  font-family: var(--font-heading);
+  font-size: 0.75rem;
+  font-weight: bold;
+  padding: 0.35rem 0.6rem;
+  border-radius: 2px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s;
+}
+.crop-btn:hover {
+  background-color: var(--color-primary-50);
+}
+
 .customizer-container {
   display: flex;
   flex-direction: column;
