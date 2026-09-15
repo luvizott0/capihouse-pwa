@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import RetroModal from '@/components/ui/RetroModal.vue'
 import RetroButton from '@/components/ui/RetroButton.vue'
 import { useProfileStore } from '@/stores/profile'
@@ -44,6 +44,33 @@ const colorSwatches = [
   '#1e293b', // Slate dark
 ]
 
+// Effective background image URL for display
+const effectiveBgImageUrl = computed(() => {
+  if (draft.value.bg_type !== 'image') return ''
+  return bgImagePreviewUrl.value || draft.value.bg_value || ''
+})
+
+// CSS style object applied to the profile emulation mockup screen
+const mockupBackgroundStyle = computed(() => {
+  if (draft.value.bg_type === 'image' && effectiveBgImageUrl.value) {
+    return {
+      backgroundColor: '#f8f6f1',
+      backgroundImage: `url("${effectiveBgImageUrl.value}")`,
+      backgroundSize: draft.value.bg_size || 'cover',
+      backgroundRepeat: draft.value.bg_repeat || 'no-repeat',
+      backgroundPosition: draft.value.bg_position || 'center',
+    }
+  }
+
+  return {
+    backgroundColor: draft.value.bg_value || '#f8f6f1',
+    backgroundImage: 'none',
+    backgroundSize: 'auto',
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'center',
+  }
+})
+
 // ── Sync draft with current saved theme when modal opens ──
 watch(() => props.modelValue, (open) => {
   if (open) {
@@ -66,9 +93,8 @@ watch(() => props.modelValue, (open) => {
   }
 })
 
-// ── Live preview — apply draft to DOM as the user edits ──
+// ── Live preview — apply draft to app DOM as the user edits ──
 watch(draft, (d) => {
-  // Build a preview theme; if a local file is selected, use its object URL
   const previewTheme: UserTheme = {
     ...d,
     bg_value: bgImagePreviewUrl.value && d.bg_type === 'image'
@@ -86,7 +112,6 @@ function onBgFileChange(e: Event) {
   bgImageFile.value = file
   bgImagePreviewUrl.value = URL.createObjectURL(file)
   draft.value.bg_type = 'image'
-  // Trigger watcher to show preview immediately
   draft.value = { ...draft.value }
 }
 
@@ -139,8 +164,9 @@ async function save() {
     await profileStore.updateTheme(themeToSave)
     saveSuccess.value = 'Tema salvo com sucesso!'
     setTimeout(() => emit('update:modelValue', false), 800)
-  } catch (err: any) {
-    saveError.value = err?.response?.data?.message || 'Erro ao salvar o tema.'
+  } catch (err: unknown) {
+    const error = err as { response?: { data?: { message?: string } } }
+    saveError.value = error.response?.data?.message || 'Erro ao salvar o tema.'
   } finally {
     isSaving.value = false
   }
@@ -157,8 +183,9 @@ async function resetAndSave() {
     bgImagePreviewUrl.value = ''
     saveSuccess.value = 'Tema restaurado!'
     setTimeout(() => emit('update:modelValue', false), 800)
-  } catch (err: any) {
-    saveError.value = err?.response?.data?.message || 'Erro ao restaurar o tema.'
+  } catch (err: unknown) {
+    const error = err as { response?: { data?: { message?: string } } }
+    saveError.value = error.response?.data?.message || 'Erro ao restaurar o tema.'
   } finally {
     isSaving.value = false
   }
@@ -166,167 +193,289 @@ async function resetAndSave() {
 </script>
 
 <template>
-  <RetroModal :modelValue="modelValue" @update:modelValue="cancel" title="» Personalizar tema" size="lg">
+  <RetroModal :modelValue="modelValue" @update:modelValue="cancel" title="» Personalizar tema do perfil" size="xl">
 
-    <div class="customizer-body">
+    <div class="customizer-container">
 
       <!-- Status banners -->
       <div v-if="saveError" class="banner banner-error">{{ saveError }}</div>
       <div v-if="saveSuccess" class="banner banner-success">{{ saveSuccess }}</div>
 
-      <!-- ── Section: Primary colour ─────────────────────── -->
-      <section class="section">
-        <div class="section-title">🎨 Cor primária</div>
-        <p class="section-hint">Afeta botões, headers, links e todos os elementos de destaque.</p>
+      <div class="customizer-grid">
 
-        <!-- Swatches -->
-        <div class="swatches">
-          <button
-            v-for="swatch in colorSwatches"
-            :key="swatch"
-            type="button"
-            class="swatch-btn"
-            :class="{ active: draft.color_primary === swatch }"
-            :style="{ backgroundColor: swatch }"
-            :title="swatch"
-            @click="draft.color_primary = swatch"
-          />
-        </div>
+        <!-- ── Left Column: Controls ─────────────────────── -->
+        <div class="controls-column">
 
-        <!-- Custom colour picker -->
-        <div class="color-picker-row">
-          <label class="picker-label">Personalizada:</label>
-          <input
-            type="color"
-            v-model="draft.color_primary"
-            class="color-input"
-            title="Escolher cor personalizada"
-          />
-          <span class="color-hex-display">{{ draft.color_primary }}</span>
-        </div>
-      </section>
+          <!-- Section 1: Primary Colour -->
+          <section class="section">
+            <div class="section-title">🎨 Cor do Sistema (Primária)</div>
+            <p class="section-hint">Define a cor de destaque dos botões, menus e cabeçalhos de caixas.</p>
 
-      <div class="divider" />
+            <!-- Swatches -->
+            <div class="swatches">
+              <button
+                v-for="swatch in colorSwatches"
+                :key="swatch"
+                type="button"
+                class="swatch-btn"
+                :class="{ active: draft.color_primary === swatch }"
+                :style="{ backgroundColor: swatch }"
+                :title="swatch"
+                @click="draft.color_primary = swatch"
+              />
+            </div>
 
-      <!-- ── Section: Background ──────────────────────────── -->
-      <section class="section">
-        <div class="section-title">🖼️ Plano de fundo</div>
+            <!-- Custom colour picker -->
+            <div class="color-picker-row">
+              <label class="picker-label">Cor personalizada:</label>
+              <input
+                type="color"
+                v-model="draft.color_primary"
+                class="color-input"
+                title="Escolher cor personalizada"
+              />
+              <span class="color-hex-display">{{ draft.color_primary }}</span>
+            </div>
+          </section>
 
-        <!-- Toggle: Color vs Image -->
-        <div class="toggle-group">
-          <button
-            type="button"
-            class="toggle-btn"
-            :class="{ active: draft.bg_type === 'color' }"
-            @click="draft.bg_type = 'color'; bgImageFile = null; bgImagePreviewUrl = ''"
-          >
-            Cor sólida
+          <div class="divider" />
+
+          <!-- Section 2: Background -->
+          <section class="section">
+            <div class="section-title">🖼️ Plano de Fundo da Rede</div>
+            <p class="section-hint">Personaliza o fundo geral do app e do seu perfil para você e seus visitantes.</p>
+
+            <!-- Toggle: Color vs Image -->
+            <div class="toggle-group">
+              <button
+                type="button"
+                class="toggle-btn"
+                :class="{ active: draft.bg_type === 'color' }"
+                @click="draft.bg_type = 'color'; bgImageFile = null; bgImagePreviewUrl = ''"
+              >
+                Cor sólida
+              </button>
+              <button
+                type="button"
+                class="toggle-btn"
+                :class="{ active: draft.bg_type === 'image' }"
+                @click="draft.bg_type = 'image'"
+              >
+                Imagem de fundo
+              </button>
+            </div>
+
+            <!-- Colour background options -->
+            <div v-if="draft.bg_type === 'color'" class="color-picker-row">
+              <label class="picker-label">Cor do fundo:</label>
+              <input type="color" v-model="draft.bg_value" class="color-input" />
+              <span class="color-hex-display">{{ draft.bg_value }}</span>
+            </div>
+
+            <!-- Image background options -->
+            <div v-else class="image-options">
+              <!-- File upload -->
+              <div class="upload-row">
+                <label class="upload-label" for="bg-upload">
+                  <span class="upload-icon">📁</span>
+                  <span class="upload-text">{{ bgImageFile ? bgImageFile.name : (draft.bg_value ? 'Alterar imagem...' : 'Escolher imagem...') }}</span>
+                </label>
+                <input
+                  id="bg-upload"
+                  ref="bgImageInputRef"
+                  type="file"
+                  accept="image/*"
+                  class="file-input-hidden"
+                  @change="onBgFileChange"
+                />
+                <button v-if="bgImageFile || draft.bg_value" type="button" class="clear-btn" @click="clearBgImage">
+                  ✕ Remover
+                </button>
+              </div>
+
+              <!-- bg-size -->
+              <div class="select-group">
+                <label class="select-label">Ajuste:</label>
+                <select v-model="draft.bg_size" class="retro-select">
+                  <option value="cover">Cover (Cobrir toda a tela)</option>
+                  <option value="contain">Contain (Caber sem cortar)</option>
+                  <option value="auto">Auto (Tamanho original)</option>
+                  <option value="100% 100%">Esticar (100% x 100%)</option>
+                </select>
+              </div>
+
+              <!-- bg-repeat -->
+              <div class="select-group">
+                <label class="select-label">Repetição:</label>
+                <select v-model="draft.bg_repeat" class="retro-select">
+                  <option value="no-repeat">Sem repetição</option>
+                  <option value="repeat">Repetir padrão (Mosaico)</option>
+                  <option value="repeat-x">Repetir só na horizontal</option>
+                  <option value="repeat-y">Repetir só na vertical</option>
+                </select>
+              </div>
+
+              <!-- bg-position -->
+              <div class="select-group">
+                <label class="select-label">Posição:</label>
+                <select v-model="draft.bg_position" class="retro-select">
+                  <option value="center">Centro</option>
+                  <option value="top">Topo central</option>
+                  <option value="bottom">Rodapé central</option>
+                  <option value="left">Esquerda</option>
+                  <option value="right">Direita</option>
+                  <option value="top left">Topo à esquerda</option>
+                  <option value="top right">Topo à direita</option>
+                </select>
+              </div>
+            </div>
+          </section>
+
+          <!-- Restore default button -->
+          <button type="button" class="restore-btn" @click="restoreDefaults" :disabled="isSaving">
+            ↺ Testar visual original padrão
           </button>
-          <button
-            type="button"
-            class="toggle-btn"
-            :class="{ active: draft.bg_type === 'image' }"
-            @click="draft.bg_type = 'image'"
-          >
-            Imagem
-          </button>
         </div>
 
-        <!-- Colour background options -->
-        <div v-if="draft.bg_type === 'color'" class="color-picker-row">
-          <label class="picker-label">Cor do fundo:</label>
-          <input type="color" v-model="draft.bg_value" class="color-input" />
-          <span class="color-hex-display">{{ draft.bg_value }}</span>
+        <!-- ── Right Column: Interactive Profile Screen Mockup ─────────────────────── -->
+        <div class="preview-column">
+          <div class="preview-header">
+            <span class="preview-title">📱 Emulador de Perfil (Preview)</span>
+            <span class="preview-badge" :style="{ backgroundColor: draft.color_primary }">
+              {{ draft.bg_type === 'image' ? '🖼️ Imagem' : '🎨 Cor' }}
+            </span>
+          </div>
+
+          <div class="mockup-frame">
+            <!-- Mockup Phone Bezel Top -->
+            <div class="mockup-top-bar">
+              <span class="mockup-time">16:20</span>
+              <div class="mockup-speaker"></div>
+              <span class="mockup-battery">100%</span>
+            </div>
+
+            <!-- Mockup Screen Body (receives dynamic background) -->
+            <div class="mockup-screen" :style="mockupBackgroundStyle">
+
+              <!-- Emulated App Header -->
+              <div class="mockup-app-header">
+                <div class="mockup-app-brand">
+                  <img src="/capihouse-logo.png" alt="Logo" class="mockup-mini-logo" />
+                  <span class="mockup-app-title" :style="{ color: draft.color_primary }">CapiHouse</span>
+                </div>
+                <div class="mockup-app-icons">
+                  <span class="mockup-dot-icon" :style="{ backgroundColor: draft.color_primary }">🔔</span>
+                </div>
+              </div>
+
+              <!-- Emulated Profile Content -->
+              <div class="mockup-profile-container">
+
+                <!-- Header Box (Banner + Avatar + Info) -->
+                <div class="mockup-box">
+                  <!-- Banner -->
+                  <div
+                    class="mockup-banner"
+                    :style="authStore.user?.banner_url ? { backgroundImage: `url(${authStore.user.banner_url})` } : { backgroundColor: draft.color_primary }"
+                  ></div>
+
+                  <!-- Profile Bar -->
+                  <div class="mockup-profile-bar">
+                    <div class="mockup-avatar-wrapper">
+                      <img
+                        v-if="authStore.user?.avatar_url"
+                        :src="authStore.user.avatar_url"
+                        alt="Avatar"
+                        class="mockup-avatar"
+                      />
+                      <div
+                        v-else
+                        class="mockup-avatar-fallback"
+                        :style="{ backgroundColor: draft.color_primary }"
+                      >
+                        {{ authStore.user?.initials || 'CR' }}
+                      </div>
+                    </div>
+
+                    <div class="mockup-names">
+                      <div class="mockup-display-name">{{ authStore.user?.name || 'Seu Nome' }}</div>
+                      <div class="mockup-username" :style="{ color: draft.color_primary }">@{{ authStore.user?.username || 'usuario' }}</div>
+                    </div>
+
+                    <div class="mockup-actions">
+                      <span class="mockup-btn" :style="{ backgroundColor: draft.color_primary }">[ 🎨 ]</span>
+                      <span class="mockup-btn-outline" :style="{ borderColor: draft.color_primary, color: draft.color_primary }">[ ⚙️ ]</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Box: Sobre mim -->
+                <div class="mockup-box">
+                  <div class="mockup-box-header" :style="{ backgroundColor: draft.color_primary }">
+                    » SOBRE MIM
+                  </div>
+                  <div class="mockup-box-content">
+                    <p class="mockup-bio-text">
+                      "{{ authStore.user?.bio || 'Bem-vindo ao meu perfil no CapiHouse!' }}"
+                    </p>
+                  </div>
+                </div>
+
+                <!-- Box: Meus Interesses -->
+                <div class="mockup-box">
+                  <div class="mockup-box-header" :style="{ backgroundColor: draft.color_primary }">
+                    » MEUS INTERESSES
+                  </div>
+                  <div class="mockup-box-content mockup-interests-row">
+                    <span class="mockup-tag">Capivaras</span>
+                    <span class="mockup-tag">Música</span>
+                    <span class="mockup-tag">Retro</span>
+                  </div>
+                </div>
+
+                <!-- Mini Post -->
+                <div class="mockup-box mockup-post">
+                  <div class="mockup-post-head">
+                    <span class="mockup-post-author">{{ authStore.user?.name || 'Você' }}</span>
+                    <span class="mockup-post-time">há pouco</span>
+                  </div>
+                  <p class="mockup-post-content">
+                    Personalizando meu perfil com as novas cores e plano de fundo! 🦫✨
+                  </p>
+                  <div class="mockup-post-footer">
+                    <span class="mockup-like-badge" :style="{ color: draft.color_primary, borderColor: draft.color_primary }">
+                      ❤️ Curtir
+                    </span>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- Mockup Bottom Bar -->
+            <div class="mockup-bottom-bar">
+              <div class="mockup-home-indicator"></div>
+            </div>
+          </div>
+
+          <p class="mockup-caption">
+            💡 Role a tela acima para ver como o fundo interage com o conteúdo.
+          </p>
         </div>
 
-        <!-- Image background options -->
-        <div v-else class="image-options">
-          <!-- File upload -->
-          <div class="upload-row">
-            <label class="upload-label" for="bg-upload">
-              <span class="upload-icon">📁</span>
-              {{ bgImageFile ? bgImageFile.name : 'Escolher imagem...' }}
-            </label>
-            <input
-              id="bg-upload"
-              ref="bgImageInputRef"
-              type="file"
-              accept="image/*"
-              class="file-input-hidden"
-              @change="onBgFileChange"
-            />
-            <button v-if="bgImageFile || draft.bg_value" type="button" class="clear-btn" @click="clearBgImage">
-              ✕ Remover
-            </button>
-          </div>
+      </div>
 
-          <!-- Current image preview thumbnail -->
-          <div v-if="bgImagePreviewUrl || draft.bg_value" class="bg-thumbnail-wrap">
-            <img
-              :src="bgImagePreviewUrl || draft.bg_value"
-              alt="Preview do fundo"
-              class="bg-thumbnail"
-            />
-          </div>
-
-          <!-- bg-size -->
-          <div class="select-group">
-            <label class="select-label">Tamanho:</label>
-            <select v-model="draft.bg_size" class="retro-select">
-              <option value="cover">Cover (cobrir toda a tela)</option>
-              <option value="contain">Contain (caber na tela)</option>
-              <option value="auto">Auto (tamanho original)</option>
-              <option value="100% 100%">Esticar (100% x 100%)</option>
-            </select>
-          </div>
-
-          <!-- bg-repeat -->
-          <div class="select-group">
-            <label class="select-label">Repetição:</label>
-            <select v-model="draft.bg_repeat" class="retro-select">
-              <option value="no-repeat">Sem repetição</option>
-              <option value="repeat">Repetir (X e Y)</option>
-              <option value="repeat-x">Repetir horizontal</option>
-              <option value="repeat-y">Repetir vertical</option>
-            </select>
-          </div>
-
-          <!-- bg-position -->
-          <div class="select-group">
-            <label class="select-label">Posição:</label>
-            <select v-model="draft.bg_position" class="retro-select">
-              <option value="center">Centro</option>
-              <option value="top">Topo</option>
-              <option value="bottom">Rodapé</option>
-              <option value="left">Esquerda</option>
-              <option value="right">Direita</option>
-              <option value="top left">Topo esquerda</option>
-              <option value="top right">Topo direita</option>
-            </select>
-          </div>
-        </div>
-      </section>
-
-      <!-- Preview hint -->
-      <p class="preview-hint">
-        💡 O preview está sendo aplicado em tempo real no app. Feche o modal ou clique em Cancelar para reverter.
-      </p>
-
-      <!-- Restore default button -->
-      <button type="button" class="restore-btn" @click="restoreDefaults" :disabled="isSaving">
-        ↺ Pré-visualizar tema padrão
-      </button>
     </div>
 
     <!-- Footer -->
     <template #footer>
       <div class="modal-footer">
         <RetroButton variant="danger" :disabled="isSaving" @click="resetAndSave">
-          Restaurar padrão
+          Restaurar padrão original
         </RetroButton>
         <div class="footer-right">
           <RetroButton variant="secondary" :disabled="isSaving" @click="cancel">Cancelar</RetroButton>
-          <RetroButton :loading="isSaving" @click="save">Salvar tema</RetroButton>
+          <RetroButton :loading="isSaving" @click="save">Salvar personalização</RetroButton>
         </div>
       </div>
     </template>
@@ -335,11 +484,23 @@ async function resetAndSave() {
 </template>
 
 <style scoped>
-.customizer-body {
+.customizer-container {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
-  padding: 0.25rem 0;
+  gap: 1rem;
+}
+
+.customizer-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 860px) {
+  .customizer-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .banner {
@@ -356,6 +517,13 @@ async function resetAndSave() {
   background-color: #dcfce7;
   border: 1px solid #22c55e;
   color: #15803d;
+}
+
+/* ── Controls Column ── */
+.controls-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
 }
 
 .section {
@@ -398,10 +566,10 @@ async function resetAndSave() {
   transition: transform 0.1s, border-color 0.1s;
 }
 .swatch-btn:hover {
-  transform: scale(1.15);
+  transform: scale(1.12);
 }
 .swatch-btn.active {
-  border-color: var(--color-primary-800);
+  border-color: #181818;
   outline: 2px solid #ffffff;
   outline-offset: 1px;
 }
@@ -484,7 +652,7 @@ async function resetAndSave() {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  padding: 0.4rem 0.8rem;
+  padding: 0.45rem 0.8rem;
   font-family: var(--font-heading);
   font-size: 0.8rem;
   font-weight: bold;
@@ -494,7 +662,7 @@ async function resetAndSave() {
   color: var(--color-primary-800);
   background-color: var(--color-primary-50);
   transition: border-color 0.15s;
-  max-width: 300px;
+  max-width: 280px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -518,25 +686,12 @@ async function resetAndSave() {
   font-family: var(--font-heading);
   font-size: 0.75rem;
   font-weight: bold;
-  padding: 0.3rem 0.6rem;
+  padding: 0.35rem 0.6rem;
   border-radius: 2px;
   cursor: pointer;
 }
 .clear-btn:hover {
   background-color: #fee2e2;
-}
-
-.bg-thumbnail-wrap {
-  width: 100%;
-  height: 100px;
-  border: 2px solid var(--color-border);
-  border-radius: 2px;
-  overflow: hidden;
-}
-.bg-thumbnail {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
 }
 
 /* ── Selects ── */
@@ -570,24 +725,14 @@ async function resetAndSave() {
   border-color: var(--color-primary);
 }
 
-/* ── Preview hint ── */
-.preview-hint {
-  font-size: 0.78rem;
-  color: var(--color-muted);
-  background-color: var(--color-primary-50);
-  padding: 0.5rem 0.75rem;
-  border-left: 3px solid var(--color-primary);
-  border-radius: 0 2px 2px 0;
-}
-
-/* ── Restore default ── */
+/* ── Restore button ── */
 .restore-btn {
   background: none;
   border: 1px dashed var(--color-border);
   color: var(--color-muted);
   font-family: var(--font-heading);
   font-size: 0.8rem;
-  padding: 0.35rem 0.75rem;
+  padding: 0.4rem 0.8rem;
   border-radius: 2px;
   cursor: pointer;
   align-self: flex-start;
@@ -597,9 +742,316 @@ async function resetAndSave() {
   color: var(--color-primary);
   border-color: var(--color-primary);
 }
-.restore-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+
+/* ── Right Column: Mockup Preview ── */
+.preview-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0 0.25rem;
+}
+
+.preview-title {
+  font-family: var(--font-heading);
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: var(--color-primary-800);
+  text-transform: uppercase;
+}
+
+.preview-badge {
+  font-family: var(--font-heading);
+  font-size: 0.7rem;
+  color: #ffffff;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  font-weight: bold;
+}
+
+/* ── Smartphone Mockup Device Frame ── */
+.mockup-frame {
+  width: 100%;
+  max-width: 320px;
+  height: 480px;
+  background-color: #1e1e1e;
+  border: 3px solid #333333;
+  border-radius: 28px;
+  padding: 8px 6px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.mockup-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.15rem 0.8rem 0.35rem;
+  font-size: 0.65rem;
+  color: #888888;
+  font-family: monospace;
+}
+
+.mockup-speaker {
+  width: 36px;
+  height: 4px;
+  background-color: #444444;
+  border-radius: 2px;
+}
+
+.mockup-bottom-bar {
+  display: flex;
+  justify-content: center;
+  padding-top: 0.35rem;
+}
+
+.mockup-home-indicator {
+  width: 80px;
+  height: 3px;
+  background-color: #555555;
+  border-radius: 2px;
+}
+
+/* ── Mockup Internal Screen ── */
+.mockup-screen {
+  flex: 1;
+  border-radius: 18px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  scrollbar-width: thin;
+}
+
+.mockup-app-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: #ffffff;
+  border-bottom: 1px solid #D8CDC5;
+  padding: 0.35rem 0.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mockup-app-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.mockup-mini-logo {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+.mockup-app-title {
+  font-family: var(--font-heading);
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+.mockup-dot-icon {
+  font-size: 0.65rem;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2px;
+  color: white;
+}
+
+/* ── Mockup Content ── */
+.mockup-profile-container {
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.mockup-box {
+  background-color: #ffffff;
+  border: 1px solid #D8CDC5;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.mockup-banner {
+  height: 52px;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.mockup-profile-bar {
+  padding: 0 0.5rem 0.5rem;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.4rem;
+  position: relative;
+}
+
+.mockup-avatar-wrapper {
+  margin-top: -1.2rem;
+  flex-shrink: 0;
+}
+
+.mockup-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 2px;
+  border: 2px solid #ffffff;
+  object-fit: cover;
+  display: block;
+}
+
+.mockup-avatar-fallback {
+  width: 38px;
+  height: 38px;
+  border-radius: 2px;
+  border: 2px solid #ffffff;
+  color: #ffffff;
+  font-family: var(--font-heading);
+  font-size: 0.75rem;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mockup-names {
+  flex: 1;
+  min-width: 0;
+}
+
+.mockup-display-name {
+  font-family: var(--font-heading);
+  font-size: 0.7rem;
+  font-weight: bold;
+  color: #333333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mockup-username {
+  font-family: var(--font-heading);
+  font-size: 0.55rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mockup-actions {
+  display: flex;
+  gap: 0.2rem;
+}
+
+.mockup-btn {
+  font-size: 0.55rem;
+  color: white;
+  padding: 0.15rem 0.35rem;
+  border-radius: 2px;
+  font-family: monospace;
+}
+
+.mockup-btn-outline {
+  font-size: 0.55rem;
+  padding: 0.15rem 0.35rem;
+  border-radius: 2px;
+  border: 1px solid;
+  font-family: monospace;
+}
+
+.mockup-box-header {
+  color: #ffffff;
+  font-family: var(--font-heading);
+  font-size: 0.55rem;
+  font-weight: bold;
+  padding: 0.2rem 0.4rem;
+  text-transform: uppercase;
+}
+
+.mockup-box-content {
+  padding: 0.4rem;
+}
+
+.mockup-bio-text {
+  font-size: 0.6rem;
+  color: #555555;
+  font-style: italic;
+  line-height: 1.2;
+}
+
+.mockup-interests-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.mockup-tag {
+  background-color: #344d0e;
+  color: #ffffff;
+  font-size: 0.55rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 2px;
+}
+
+.mockup-post {
+  padding: 0.4rem;
+}
+
+.mockup-post-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.55rem;
+  margin-bottom: 0.2rem;
+}
+
+.mockup-post-author {
+  font-weight: bold;
+  color: #333333;
+}
+
+.mockup-post-time {
+  color: #888888;
+}
+
+.mockup-post-content {
+  font-size: 0.6rem;
+  color: #444444;
+  line-height: 1.2;
+}
+
+.mockup-post-footer {
+  margin-top: 0.35rem;
+}
+
+.mockup-like-badge {
+  font-size: 0.55rem;
+  border: 1px solid;
+  padding: 0.1rem 0.35rem;
+  border-radius: 2px;
+  font-weight: bold;
+}
+
+.mockup-caption {
+  font-size: 0.72rem;
+  color: var(--color-muted);
+  text-align: center;
 }
 
 /* ── Modal footer ── */
@@ -619,3 +1071,4 @@ async function resetAndSave() {
   margin-left: auto;
 }
 </style>
+

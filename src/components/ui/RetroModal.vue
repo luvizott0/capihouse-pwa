@@ -4,7 +4,7 @@ import RetroCard from './RetroCard.vue'
 defineProps<{
   modelValue: boolean
   title?: string
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'sm' | 'md' | 'lg' | 'xl'
 }>()
 defineEmits<{ (e: 'update:modelValue', value: boolean): void }>()
 </script>
@@ -61,6 +61,7 @@ defineEmits<{ (e: 'update:modelValue', value: boolean): void }>()
 
 .modal-sm { max-width: 360px; }
 .modal-lg { max-width: 800px; }
+.modal-xl { max-width: 980px; }
 
 .modal-close-btn {
   background: none;

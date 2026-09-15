@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useThemeStore } from '@/stores/theme'
 import AppShell from '@/components/layout/AppShell.vue'
 
 const router = createRouter({
@@ -118,6 +119,21 @@ router.beforeEach(async (to, from, next) => {
   }
 
   next()
+})
+
+router.afterEach((to) => {
+  const auth = useAuthStore()
+  const themeStore = useThemeStore()
+
+  // Se a rota NÃO for perfil de outro usuário, garante a restauração do tema do usuário logado
+  const isVisitingOtherUser =
+    to.name === 'user-profile' &&
+    to.params.username &&
+    to.params.username !== auth.user?.username
+
+  if (!isVisitingOtherUser) {
+    themeStore.loadThemeFromUser(auth.user)
+  }
 })
 
 export default router

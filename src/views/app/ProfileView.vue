@@ -62,12 +62,16 @@ const birthInput = ref('')
 // New interest input
 const newInterestInput = ref('')
 
+const wasVisitingOther = ref(false)
+
 async function loadProfile() {
   if (!isOwner.value && route.params.username) {
+    wasVisitingOther.value = true
     await profileStore.fetchProfile(route.params.username as string)
     // Apply the visited user's theme while on their profile page
     themeStore.loadThemeFromUser(profileStore.profile)
   } else {
+    wasVisitingOther.value = false
     // Restore own theme when viewing own profile
     themeStore.loadThemeFromUser(authStore.user)
   }
@@ -81,7 +85,7 @@ async function loadProfile() {
 
 // Restore own theme when leaving a visited profile page
 onUnmounted(() => {
-  if (!isOwner.value) {
+  if (wasVisitingOther.value) {
     themeStore.loadThemeFromUser(authStore.user)
   }
 })

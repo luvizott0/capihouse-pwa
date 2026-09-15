@@ -108,6 +108,7 @@ export const useThemeStore = defineStore('theme', () => {
     // ── Background ─────────────────────────────────────────
     if (t.bg_type === 'image' && t.bg_value) {
       root.style.setProperty('--bg-paper', 'transparent')
+      root.style.setProperty('--bg-app-color', 'transparent')
       root.style.setProperty('--bg-app-image', `url("${t.bg_value}")`)
       root.style.setProperty('--bg-app-size',     t.bg_size     || 'cover')
       root.style.setProperty('--bg-app-repeat',   t.bg_repeat   || 'no-repeat')
@@ -116,6 +117,7 @@ export const useThemeStore = defineStore('theme', () => {
       // Solid colour background
       const bgColor = (t.bg_type === 'color' && t.bg_value) ? t.bg_value : DEFAULT_THEME.bg_value
       root.style.setProperty('--bg-paper', bgColor)
+      root.style.setProperty('--bg-app-color', bgColor)
       root.style.setProperty('--bg-app-image',    'none')
       root.style.setProperty('--bg-app-size',     'auto')
       root.style.setProperty('--bg-app-repeat',   'no-repeat')
@@ -137,6 +139,7 @@ export const useThemeStore = defineStore('theme', () => {
       root.style.removeProperty(prop)
     }
     root.style.removeProperty('--bg-paper')
+    root.style.removeProperty('--bg-app-color')
     root.style.removeProperty('--bg-app-image')
     root.style.removeProperty('--bg-app-size')
     root.style.removeProperty('--bg-app-repeat')

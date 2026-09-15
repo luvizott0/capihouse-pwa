@@ -155,7 +155,12 @@ function onEventCreated() {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background-color: var(--color-primary-50, #f8f6f1);
+  background-color: var(--bg-app-color, var(--color-primary-50, #f8f6f1));
+  background-image: var(--bg-app-image, none);
+  background-size: var(--bg-app-size, auto);
+  background-repeat: var(--bg-app-repeat, no-repeat);
+  background-position: var(--bg-app-position, center);
+  background-attachment: fixed;
 }
 
 .top-header {

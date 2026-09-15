@@ -25,7 +25,8 @@
   --color-info: #3b82f6;
 
   /* Theme-overridable background variables */
-  --bg-app: var(--bg-paper);
+  --bg-app-color: var(--color-primary-50, #f8f6f1);
+  --bg-app-image: none;
   --bg-app-size: auto;
   --bg-app-repeat: no-repeat;
   --bg-app-position: center;
@@ -199,6 +200,12 @@ a:hover {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  background-color: var(--bg-app-color, var(--color-primary-50, #f8f6f1));
+  background-image: var(--bg-app-image, none);
+  background-size: var(--bg-app-size, auto);
+  background-repeat: var(--bg-app-repeat, no-repeat);
+  background-position: var(--bg-app-position, center);
+  background-attachment: fixed;
 }
 .layout-main {
   display: flex;
