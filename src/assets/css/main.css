@@ -212,3 +212,27 @@ a:hover {
     display: none;
   }
 }
+
+/* Touch and auto-zoom prevention for mobile app experience */
+html, body {
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+}
+
+input, select, textarea, button, a {
+  touch-action: manipulation;
+}
+
+/* On mobile/touch devices, ensure form fields have a minimum of 16px font-size to prevent iOS Safari auto-zoom */
+@media (max-width: 820px), (pointer: coarse) {
+  input,
+  select,
+  textarea,
+  .retro-input,
+  .retro-field,
+  .retro-search-input,
+  .scope-select {
+    font-size: 16px !important;
+  }
+}
+
