@@ -72,6 +72,47 @@ const mockupBackgroundStyle = computed(() => {
   }
 })
 
+// ── Custom percentage background size helpers ──
+const isCustomSize = computed(() => {
+  const s = draft.value.bg_size || ''
+  return !['cover', 'contain', 'auto', '100% 100%'].includes(s)
+})
+
+const sizeSelectMode = computed(() => {
+  return isCustomSize.value ? 'custom' : (draft.value.bg_size || 'cover')
+})
+
+const customSizePercent = ref<number>(100)
+
+function syncCustomSizeFromDraft() {
+  const val = draft.value.bg_size || ''
+  const m = /^(\d+)%/.exec(val)
+  if (m && m[1]) {
+    customSizePercent.value = parseInt(m[1], 10)
+  } else {
+    customSizePercent.value = 100
+  }
+}
+
+function onSizeSelectChange(e: Event) {
+  const val = (e.target as HTMLSelectElement).value
+  if (val === 'custom') {
+    draft.value.bg_size = `${customSizePercent.value}%`
+  } else {
+    draft.value.bg_size = val
+  }
+}
+
+function onCustomPercentInput() {
+  const safeVal = Math.min(500, Math.max(10, customSizePercent.value || 100))
+  draft.value.bg_size = `${safeVal}%`
+}
+
+function setCustomPercent(p: number) {
+  customSizePercent.value = p
+  draft.value.bg_size = `${p}%`
+}
+
 // ── Sync draft with current saved theme when modal opens ──
 watch(() => props.modelValue, (open) => {
   if (open) {
@@ -88,6 +129,8 @@ watch(() => props.modelValue, (open) => {
       bg_position:  current?.bg_position  ?? DEFAULT_THEME.bg_position,
       color_primary: current?.color_primary ?? DEFAULT_THEME.color_primary,
     }
+
+    syncCustomSizeFromDraft()
 
     bgImageFile.value = null
     bgImagePreviewUrl.value = draft.value.bg_type === 'image' ? draft.value.bg_value : ''
@@ -328,12 +371,54 @@ async function resetAndSave() {
               <!-- bg-size -->
               <div class="select-group">
                 <label class="select-label">Ajuste:</label>
-                <select v-model="draft.bg_size" class="retro-select">
+                <select :value="sizeSelectMode" @change="onSizeSelectChange" class="retro-select">
                   <option value="cover">Cover (Cobrir toda a tela)</option>
                   <option value="contain">Contain (Caber sem cortar)</option>
                   <option value="auto">Auto (Tamanho original)</option>
                   <option value="100% 100%">Esticar (100% x 100%)</option>
+                  <option value="custom">Personalizado em %</option>
                 </select>
+              </div>
+
+              <!-- Manual Percentage Control -->
+              <div v-if="isCustomSize" class="custom-size-box">
+                <div class="custom-size-top">
+                  <span class="custom-size-label">Tamanho manual:</span>
+                  <div class="custom-size-number-wrap">
+                    <input
+                      type="number"
+                      min="10"
+                      max="500"
+                      v-model.number="customSizePercent"
+                      @input="onCustomPercentInput"
+                      class="custom-percent-input"
+                    />
+                    <span class="percent-symbol">%</span>
+                  </div>
+                </div>
+
+                <input
+                  type="range"
+                  min="10"
+                  max="300"
+                  step="5"
+                  v-model.number="customSizePercent"
+                  @input="onCustomPercentInput"
+                  class="custom-size-range"
+                />
+
+                <div class="size-chips-row">
+                  <button
+                    v-for="chip in [25, 50, 75, 100, 150, 200]"
+                    :key="chip"
+                    type="button"
+                    class="size-chip-btn"
+                    :class="{ active: customSizePercent === chip }"
+                    @click="setCustomPercent(chip)"
+                  >
+                    {{ chip }}%
+                  </button>
+                </div>
               </div>
 
               <!-- bg-repeat -->
@@ -546,6 +631,10 @@ async function resetAndSave() {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 .customizer-grid {
@@ -553,11 +642,15 @@ async function resetAndSave() {
   grid-template-columns: 1fr 340px;
   gap: 1.5rem;
   align-items: start;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 @media (max-width: 860px) {
   .customizer-grid {
     grid-template-columns: 1fr;
+    gap: 1.25rem;
   }
 }
 
@@ -582,12 +675,19 @@ async function resetAndSave() {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .section {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .section-title {
@@ -638,6 +738,8 @@ async function resetAndSave() {
   align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .picker-label {
@@ -672,6 +774,8 @@ async function resetAndSave() {
   border-radius: 2px;
   overflow: hidden;
   width: fit-content;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .toggle-btn {
@@ -698,12 +802,20 @@ async function resetAndSave() {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .upload-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .upload-label {
@@ -720,13 +832,23 @@ async function resetAndSave() {
   color: var(--color-primary-800);
   background-color: var(--color-primary-50);
   transition: border-color 0.15s;
-  max-width: 280px;
+  flex: 1 1 140px;
+  min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  box-sizing: border-box;
 }
 .upload-label:hover {
   border-color: var(--color-primary);
+}
+
+.upload-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .file-input-hidden {
@@ -747,6 +869,8 @@ async function resetAndSave() {
   padding: 0.35rem 0.6rem;
   border-radius: 2px;
   cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .clear-btn:hover {
   background-color: #fee2e2;
@@ -756,7 +880,11 @@ async function resetAndSave() {
 .select-group {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.6rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .select-label {
@@ -764,12 +892,16 @@ async function resetAndSave() {
   font-size: 0.8rem;
   font-weight: bold;
   color: var(--color-primary-800);
-  width: 80px;
+  width: 75px;
   flex-shrink: 0;
 }
 
 .retro-select {
   flex: 1;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   padding: 0.4rem 0.6rem;
   font-family: var(--font-body);
   font-size: 0.85rem;
@@ -781,6 +913,109 @@ async function resetAndSave() {
 }
 .retro-select:focus {
   border-color: var(--color-primary);
+}
+
+@media (max-width: 520px) {
+  .select-group {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+  .select-label {
+    width: auto;
+  }
+}
+
+/* ── Custom Size Control ── */
+.custom-size-box {
+  background-color: var(--color-primary-50, #f8f6f1);
+  border: 1px solid var(--color-border, #D8CDC5);
+  border-radius: 2px;
+  padding: 0.65rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.custom-size-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.custom-size-label {
+  font-family: var(--font-heading);
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: var(--color-primary-800);
+}
+
+.custom-size-number-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: 2px;
+  padding: 0.15rem 0.35rem;
+}
+
+.custom-percent-input {
+  width: 48px;
+  border: none;
+  outline: none;
+  font-family: var(--font-heading);
+  font-size: 0.85rem;
+  font-weight: bold;
+  color: var(--color-primary-800);
+  text-align: right;
+  background: transparent;
+}
+
+.percent-symbol {
+  font-family: var(--font-heading);
+  font-size: 0.8rem;
+  color: var(--color-muted);
+  font-weight: bold;
+}
+
+.custom-size-range {
+  width: 100%;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+.size-chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.size-chip-btn {
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  color: var(--color-primary-800);
+  font-family: var(--font-heading);
+  font-size: 0.7rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.size-chip-btn:hover {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary-100);
+}
+.size-chip-btn.active {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #ffffff;
+  font-weight: bold;
 }
 
 /* ── Restore button ── */
@@ -807,6 +1042,10 @@ async function resetAndSave() {
   flex-direction: column;
   align-items: center;
   gap: 0.6rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .preview-header {
@@ -815,6 +1054,7 @@ async function resetAndSave() {
   justify-content: space-between;
   width: 100%;
   padding: 0 0.25rem;
+  box-sizing: border-box;
 }
 
 .preview-title {
@@ -837,7 +1077,7 @@ async function resetAndSave() {
 /* ── Smartphone Mockup Device Frame ── */
 .mockup-frame {
   width: 100%;
-  max-width: 320px;
+  max-width: 300px;
   height: 480px;
   background-color: #1e1e1e;
   border: 3px solid #333333;
@@ -847,6 +1087,14 @@ async function resetAndSave() {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  box-sizing: border-box;
+}
+
+@media (max-width: 480px) {
+  .mockup-frame {
+    max-width: 270px;
+    height: 430px;
+  }
 }
 
 .mockup-top-bar {

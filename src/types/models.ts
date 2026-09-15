@@ -1,7 +1,7 @@
 export interface UserTheme {
   bg_type: 'color' | 'image'
   bg_value: string
-  bg_size?: 'cover' | 'contain' | 'auto' | '100% 100%' | '100% auto'
+  bg_size?: string
   bg_repeat?: 'no-repeat' | 'repeat' | 'repeat-x' | 'repeat-y'
   bg_position?: string
   color_primary?: string

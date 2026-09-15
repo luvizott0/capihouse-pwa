@@ -48,15 +48,24 @@ defineEmits<{ (e: 'update:modelValue', value: boolean): void }>()
   z-index: 9999;
   padding: 1rem;
   overflow-y: auto;
+  overflow-x: hidden;
+}
+
+@media (max-width: 480px) {
+  .modal-overlay {
+    padding: 0.5rem;
+  }
 }
 
 .modal-content {
   width: 100%;
   max-width: 500px;
-  max-height: calc(100vh - 2rem);
+  max-height: calc(100vh - 1.5rem);
   display: flex;
   flex-direction: column;
   margin: auto;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .modal-sm { max-width: 360px; }
