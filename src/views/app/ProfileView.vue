@@ -452,7 +452,9 @@ const userPosts = computed(() => {
 
     <!-- User's Posts Feed -->
     <div class="user-posts-section">
-      <h2 class="user-posts-title">» Publicações de {{ user.name }}</h2>
+      <div class="user-posts-header">
+        <h2 class="user-posts-title">» Publicações de {{ user.name }}</h2>
+      </div>
       <div v-if="userPosts.length" class="posts-stream">
         <PostCard v-for="post in userPosts" :key="post.id" :post="post" />
       </div>
@@ -1018,10 +1020,23 @@ const userPosts = computed(() => {
   gap: 0.75rem;
 }
 
+.user-posts-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: var(--color-primary, #a66130);
+  border: 1px solid var(--color-primary-800, #5f4120);
+  border-radius: 2px;
+  padding: 0.6rem 0.85rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
 .user-posts-title {
-  font-family: var(--font-heading);
-  font-size: 1.1rem;
-  color: var(--color-primary-800);
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
 }
 
 .empty-user-posts {
