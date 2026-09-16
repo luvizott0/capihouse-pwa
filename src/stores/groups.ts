@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { Group, GroupMessage, User } from '@/types/models'
 import * as groupsApi from '@/api/groups'
+import { connectEcho } from '@/services/echo'
 
 export const useGroupsStore = defineStore('groups', () => {
   const myGroups = ref<Group[]>([])
@@ -104,6 +105,31 @@ export const useGroupsStore = defineStore('groups', () => {
     }
   }
 
+  /**
+   * Subscribe to a group's private WebSocket channel to receive messages in real time.
+   * Call this when entering the group chat view.
+   */
+  function subscribeToGroupChat(groupId: number) {
+    const echo = connectEcho()
+    echo.private(`group.${groupId}`)
+      .listen('.GroupMessageSent', (data: { message: GroupMessage }) => {
+        // Avoid duplicates (own message is already added by sendMessage)
+        const exists = messages.value.some(m => m.id === data.message.id)
+        if (!exists) {
+          messages.value.push(data.message)
+        }
+      })
+  }
+
+  /**
+   * Unsubscribe from a group's WebSocket channel.
+   * Call this when leaving the group chat view.
+   */
+  function unsubscribeFromGroupChat(groupId: number) {
+    const echo = connectEcho()
+    echo.leave(`group.${groupId}`)
+  }
+
   return {
     myGroups,
     currentGroup,
@@ -121,5 +147,8 @@ export const useGroupsStore = defineStore('groups', () => {
     fetchMessages,
     sendMessage,
     fetchMembers,
+    subscribeToGroupChat,
+    unsubscribeFromGroupChat,
   }
 })
+

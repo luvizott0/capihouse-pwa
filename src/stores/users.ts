@@ -7,7 +7,6 @@ export const useUsersStore = defineStore('users', () => {
   const allUsers = ref<User[]>([])
   const onlineUsers = ref<User[]>([])
   const isLoading = ref(false)
-  let pollInterval: ReturnType<typeof setInterval> | null = null
 
   async function fetchUsers() {
     isLoading.value = true
@@ -32,18 +31,17 @@ export const useUsersStore = defineStore('users', () => {
     }
   }
 
+  /**
+   * @deprecated Polling replaced by WebSockets.
+   * Now performs a single fetch and does not set up a recurring interval.
+   */
   function startPolling() {
     fetchUsers()
-    if (!pollInterval) {
-      pollInterval = setInterval(fetchUsers, 30000)
-    }
   }
 
+  /** @deprecated No-op. Polling no longer used. */
   function stopPolling() {
-    if (pollInterval) {
-      clearInterval(pollInterval)
-      pollInterval = null
-    }
+    // Nothing to do.
   }
 
   return {
@@ -56,3 +54,4 @@ export const useUsersStore = defineStore('users', () => {
     stopPolling
   }
 })
+

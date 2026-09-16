@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGroupsStore } from '@/stores/groups'
 import { useAuthStore } from '@/stores/auth'
@@ -28,6 +28,15 @@ const errorMsg = ref('')
 
 onMounted(async () => {
   await loadGroupData()
+
+  // Subscribe to real-time group chat messages via WebSocket
+  if (groupsStore.currentGroup?.is_member || authStore.isAdmin) {
+    groupsStore.subscribeToGroupChat(groupId)
+  }
+})
+
+onUnmounted(() => {
+  groupsStore.unsubscribeFromGroupChat(groupId)
 })
 
 async function loadGroupData() {

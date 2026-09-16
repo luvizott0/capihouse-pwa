@@ -21,11 +21,21 @@ const eventsStore = useEventsStore()
 const notificationsStore = useNotificationsStore()
 
 onMounted(() => {
-  notificationsStore.startPolling()
+  // Fetch initial unread count via HTTP (fast, doesn't need WS to be ready)
+  notificationsStore.fetchUnreadCount()
+
+  // Subscribe to real-time notifications via WebSocket
+  const userId = authStore.user?.id
+  if (userId) {
+    notificationsStore.subscribeToNotifications(userId)
+  }
 })
 
 onUnmounted(() => {
-  notificationsStore.stopPolling()
+  const userId = authStore.user?.id
+  if (userId) {
+    notificationsStore.unsubscribeFromNotifications(userId)
+  }
 })
 
 const showPostModal = ref(false)

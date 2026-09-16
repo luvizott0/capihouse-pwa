@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import type { AppNotification } from '@/types/models'
 import * as notifApi from '@/api/notifications'
 import * as groupsApi from '@/api/groups'
+import { connectEcho, disconnectEcho } from '@/services/echo'
 
 export const useNotificationsStore = defineStore('notifications', () => {
   const notifications = ref<AppNotification[]>([])
@@ -10,14 +11,13 @@ export const useNotificationsStore = defineStore('notifications', () => {
   const isLoading = ref(false)
   const currentPage = ref(1)
   const lastPage = ref(1)
-  let pollInterval: ReturnType<typeof setInterval> | null = null
 
   async function fetchUnreadCount() {
     try {
       const res = await notifApi.getUnreadCount()
       unreadCount.value = res.data.unread_count
     } catch {
-      // Ignore network errors on polling
+      // Ignore network errors
     }
   }
 
@@ -83,18 +83,37 @@ export const useNotificationsStore = defineStore('notifications', () => {
     await markAsRead(notificationId)
   }
 
-  function startPolling() {
-    fetchUnreadCount()
-    if (!pollInterval) {
-      pollInterval = setInterval(fetchUnreadCount, 25000)
-    }
+  /**
+   * Subscribe to the user's private channel to receive real-time notifications.
+   * Call this after the user is authenticated and Echo is connected.
+   */
+  function subscribeToNotifications(userId: number) {
+    const echo = connectEcho()
+    echo.private(`App.Models.User.${userId}`)
+      .listen('.NotificationSent', (data: { notification: AppNotification; unread_count: number }) => {
+        // Prepend new notification to the top of the list
+        notifications.value.unshift(data.notification)
+        unreadCount.value = data.unread_count
+      })
   }
 
+  function unsubscribeFromNotifications(userId: number) {
+    const echo = connectEcho()
+    echo.leave(`App.Models.User.${userId}`)
+  }
+
+  /**
+   * @deprecated Use subscribeToNotifications() instead.
+   * Kept for backward compatibility — now is a no-op.
+   */
+  function startPolling() {
+    // Polling replaced by WebSockets. Initial unread count is fetched by fetchUnreadCount().
+    fetchUnreadCount()
+  }
+
+  /** @deprecated No-op. Kept for backward compatibility. */
   function stopPolling() {
-    if (pollInterval) {
-      clearInterval(pollInterval)
-      pollInterval = null
-    }
+    // Nothing to stop — polling no longer used.
   }
 
   return {
@@ -109,7 +128,10 @@ export const useNotificationsStore = defineStore('notifications', () => {
     markAllAsRead,
     acceptGroupInvite,
     declineGroupInvite,
+    subscribeToNotifications,
+    unsubscribeFromNotifications,
     startPolling,
     stopPolling,
   }
 })
+

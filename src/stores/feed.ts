@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { Post } from '@/types/models'
 import * as postsApi from '@/api/posts'
+import { connectEcho } from '@/services/echo'
 
 export const useFeedStore = defineStore('feed', () => {
   const posts = ref<Post[]>([])
@@ -11,6 +12,9 @@ export const useFeedStore = defineStore('feed', () => {
   const lastPage = ref(1)
 
   const activeGroupId = ref<number | undefined>(undefined)
+
+  /** Holds incoming posts that haven't been prepended yet (shown via banner). */
+  const pendingPosts = ref<Post[]>([])
 
   async function fetchPosts(page = 1, groupId?: number) {
     isLoading.value = true
@@ -36,6 +40,8 @@ export const useFeedStore = defineStore('feed', () => {
     isSubmitting.value = true
     try {
       const res = await postsApi.createPost(formData)
+      // The server will broadcast PostCreated; we still add it locally for
+      // the author so they see their own post immediately without waiting for the WS event.
       posts.value.unshift(res.data)
       return res.data
     } finally {
@@ -95,6 +101,87 @@ export const useFeedStore = defineStore('feed', () => {
     }
   }
 
+  /**
+   * Flush pendingPosts into the main posts list (called when user clicks the banner).
+   */
+  function flushPendingPosts() {
+    posts.value.unshift(...pendingPosts.value)
+    pendingPosts.value = []
+  }
+
+  /**
+   * Subscribe to the public feed channel (and optionally a group channel).
+   * @param currentUserId — used to avoid duplicating the author's own posts.
+   * @param groupId — when viewing a group feed, subscribe to the group's private channel.
+   */
+  function subscribeToFeed(currentUserId: number, groupId?: number) {
+    const echo = connectEcho()
+
+    const channelName = groupId ? `group.${groupId}` : 'posts'
+    const channel = groupId
+      ? echo.private(channelName)
+      : echo.channel(channelName)
+
+    channel
+      .listen('.PostCreated', (data: { post: Post }) => {
+        // Don't show banner for the author's own post (already prepended locally)
+        if (data.post.user_id === currentUserId) return
+        // Only add to pending if not already in the list
+        const exists = posts.value.some(p => p.id === data.post.id)
+        if (!exists) {
+          pendingPosts.value.unshift(data.post)
+        }
+      })
+      .listen('.PostUpdated', (data: { post: Post }) => {
+        const index = posts.value.findIndex(p => p.id === data.post.id)
+        const target = posts.value[index]
+        if (index !== -1 && target) {
+          // Preserve client-side is_liked if not present in broadcast payload
+          const currentIsLiked = target.is_liked
+          posts.value[index] = { ...data.post, is_liked: data.post.is_liked ?? currentIsLiked }
+        }
+      })
+      .listen('.PostDeleted', (data: { id: number }) => {
+        posts.value = posts.value.filter(p => p.id !== data.id)
+        pendingPosts.value = pendingPosts.value.filter(p => p.id !== data.id)
+      })
+      .listen('.PostLiked', (data: { post_id: number; is_liked: boolean; likes_count: number; user_id: number }) => {
+        // Only update counts for posts from other users (own post is already optimistically updated)
+        if (data.user_id === currentUserId) return
+        const post = posts.value.find(p => p.id === data.post_id)
+        if (post) {
+          post.likes_count = data.likes_count
+        }
+      })
+      .listen('.CommentCreated', (data: { post_id: number; comment: any; comments_count: number }) => {
+        const post = posts.value.find(p => p.id === data.post_id)
+        if (post) {
+          post.comments_count = data.comments_count
+          if (post.comments) {
+            const exists = post.comments.some(c => c.id === data.comment.id)
+            if (!exists) {
+              post.comments.push(data.comment)
+            }
+          }
+        }
+      })
+      .listen('.CommentDeleted', (data: { comment_id: number; post_id: number; comments_count: number }) => {
+        const post = posts.value.find(p => p.id === data.post_id)
+        if (post) {
+          post.comments_count = data.comments_count
+          if (post.comments) {
+            post.comments = post.comments.filter(c => c.id !== data.comment_id)
+          }
+        }
+      })
+  }
+
+  function unsubscribeFromFeed(groupId?: number) {
+    const echo = connectEcho()
+    const channelName = groupId ? `group.${groupId}` : 'posts'
+    echo.leave(channelName)
+  }
+
   return {
     posts,
     isLoading,
@@ -102,11 +189,16 @@ export const useFeedStore = defineStore('feed', () => {
     currentPage,
     lastPage,
     activeGroupId,
+    pendingPosts,
     fetchPosts,
     createPost,
     updatePost,
     toggleLike,
     addComment,
     deletePost,
+    flushPendingPosts,
+    subscribeToFeed,
+    unsubscribeFromFeed,
   }
 })
+

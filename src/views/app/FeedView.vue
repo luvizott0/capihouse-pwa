@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { useFeedStore } from '@/stores/feed'
 import { useAuthStore } from '@/stores/auth'
 import PostCard from '@/components/feed/PostCard.vue'
 import PostCreateModal from '@/components/feed/PostCreateModal.vue'
+import NewPostsBanner from '@/components/feed/NewPostsBanner.vue'
 import UserAvatar from '@/components/ui/UserAvatar.vue'
 
 const route = useRoute()
@@ -24,11 +25,26 @@ onMounted(async () => {
       }
     }, 100)
   }
+
+  // Subscribe to real-time post updates
+  const userId = authStore.user?.id
+  if (userId) {
+    feedStore.subscribeToFeed(userId)
+  }
+})
+
+onUnmounted(() => {
+  feedStore.unsubscribeFromFeed()
+  // Clear pending posts when leaving the feed
+  feedStore.pendingPosts.splice(0)
 })
 </script>
 
 <template>
   <div class="feed-view-container">
+    <!-- Real-time new posts banner -->
+    <NewPostsBanner />
+
     <!-- Quick Create Post Box -->
     <div class="quick-post-card" @click="showCreateModal = true">
       <div class="quick-post-row">

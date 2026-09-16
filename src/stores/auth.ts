@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import type { User } from '@/types/models'
 import type { LoginRequest, RegisterRequest } from '@/types/api'
 import * as authApi from '@/api/auth'
+import { connectEcho, disconnectEcho } from '@/services/echo'
 
 export const useAuthStore = defineStore('auth', () => {
   // Restore initial state synchronously from localStorage to prevent flash of unauthenticated state
@@ -47,6 +48,7 @@ export const useAuthStore = defineStore('auth', () => {
     if (storedToken) {
       token.value = storedToken
       fetchMe()
+      connectEcho()
     }
   }
 
@@ -73,6 +75,7 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('capihouse_user')
     localStorage.removeItem('capihouse_impersonator_token')
     localStorage.removeItem('capihouse_impersonator_user')
+    disconnectEcho()
   }
 
   async function impersonate(target: { user_id?: number; login?: string }) {
@@ -116,6 +119,7 @@ export const useAuthStore = defineStore('auth', () => {
       const resData = res.data as any
       const rawUser = resData.user || resData.data || resData
       setAuth(resData.token, rawUser)
+      connectEcho()
       return res.data
     } finally {
       isLoading.value = false
