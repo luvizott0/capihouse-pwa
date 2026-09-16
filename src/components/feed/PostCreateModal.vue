@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useFeedStore } from '@/stores/feed'
 import { useGroupsStore } from '@/stores/groups'
 import RetroModal from '@/components/ui/RetroModal.vue'
@@ -13,6 +13,10 @@ const emit = defineEmits<{ (e: 'update:modelValue', value: boolean): void; (e: '
 const feedStore = useFeedStore()
 const groupsStore = useGroupsStore()
 
+const MAX_FILES = 5
+const MAX_FILE_SIZE = 20 * 1024 * 1024 // 20 MB por arquivo
+const MAX_TOTAL_SIZE = 50 * 1024 * 1024 // 50 MB total do lote
+
 const content = ref('')
 const selectedGroupId = ref<number | null>(null)
 const feelingEmoji = ref('😊')
@@ -22,6 +26,25 @@ const hashtags = ref<string[]>([])
 const selectedFiles = ref<File[]>([])
 const filePreviews = ref<string[]>([])
 const errorMsg = ref('')
+const formContainerRef = ref<HTMLElement | null>(null)
+
+const totalFilesSize = computed(() => {
+  return selectedFiles.value.reduce((acc, file) => acc + file.size, 0)
+})
+
+const isOverTotalLimit = computed(() => {
+  return totalFilesSize.value > MAX_TOTAL_SIZE
+})
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B'
+  const mb = bytes / (1024 * 1024)
+  if (mb >= 1) {
+    return `${mb.toFixed(1)} MB`
+  }
+  const kb = bytes / 1024
+  return `${kb.toFixed(0)} KB`
+}
 
 onMounted(() => {
   groupsStore.fetchMyGroups()
@@ -30,8 +53,19 @@ onMounted(() => {
 watch(() => props.modelValue, (isOpen) => {
   if (isOpen) {
     groupsStore.fetchMyGroups()
+    errorMsg.value = ''
+  } else {
+    cleanupPreviews()
   }
 })
+
+onUnmounted(() => {
+  cleanupPreviews()
+})
+
+function cleanupPreviews() {
+  filePreviews.value.forEach(url => URL.revokeObjectURL(url))
+}
 
 function clearFeeling() {
   feelingText.value = ''
@@ -51,27 +85,70 @@ function removeHashtag(tag: string) {
 }
 
 function handleFileSelect(e: Event) {
+  errorMsg.value = ''
   const input = e.target as HTMLInputElement
   if (!input.files) return
 
   const files = Array.from(input.files)
   for (const file of files) {
-    if (selectedFiles.value.length >= 5) break
+    if (selectedFiles.value.length >= MAX_FILES) {
+      errorMsg.value = `Você pode anexar no máximo ${MAX_FILES} arquivos por publicação.`
+      break
+    }
+
+    // Validar tipo de arquivo
+    const isValidType = file.type.startsWith('image/') || file.type.startsWith('video/')
+    if (!isValidType) {
+      errorMsg.value = `O arquivo "${file.name}" não é suportado. Use imagens (JPG, PNG, GIF, WEBP) ou vídeos (MP4, MOV).`
+      continue
+    }
+
+    // Validar tamanho individual (20 MB)
+    if (file.size > MAX_FILE_SIZE) {
+      errorMsg.value = `O arquivo "${file.name}" (${formatBytes(file.size)}) ultrapassa o limite de 20MB por arquivo.`
+      continue
+    }
+
+    // Validar se excede tamanho total seguro de 50 MB
+    if (totalFilesSize.value + file.size > MAX_TOTAL_SIZE) {
+      errorMsg.value = `Adicionar "${file.name}" ultrapassaria o limite total de 50MB para a publicação.`
+      continue
+    }
+
     selectedFiles.value.push(file)
     filePreviews.value.push(URL.createObjectURL(file))
   }
+
   input.value = ''
 }
 
 function removeFile(index: number) {
+  const [removedUrl] = filePreviews.value.splice(index, 1)
+  if (removedUrl) {
+    URL.revokeObjectURL(removedUrl)
+  }
   selectedFiles.value.splice(index, 1)
-  filePreviews.value.splice(index, 1)
+  errorMsg.value = ''
+}
+
+function scrollToError() {
+  if (formContainerRef.value) {
+    formContainerRef.value.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 }
 
 async function handleSubmit() {
   errorMsg.value = ''
+
   if (!content.value.trim() && selectedFiles.value.length === 0) {
     errorMsg.value = 'Escreva algo ou adicione uma imagem para publicar.'
+    scrollToError()
+    return
+  }
+
+  if (isOverTotalLimit.value) {
+    errorMsg.value = `O tamanho total dos arquivos (${formatBytes(totalFilesSize.value)}) ultrapassa o limite seguro de 50MB. Remova algumas imagens.`
+    scrollToError()
     return
   }
 
@@ -101,12 +178,29 @@ async function handleSubmit() {
     feelingText.value = ''
     feelingEmoji.value = '😊'
     hashtags.value = []
+    cleanupPreviews()
     selectedFiles.value = []
     filePreviews.value = []
     emit('created')
     emit('update:modelValue', false)
   } catch (err: any) {
-    errorMsg.value = err.response?.data?.message || 'Erro ao publicar.'
+    if (err.response?.status === 413) {
+      errorMsg.value = 'Os arquivos enviados excedem o limite de tamanho do servidor (413 Payload Too Large). Tente reduzir a resolução ou quantidade das fotos.'
+    } else if (err.response?.status === 422 && err.response?.data?.errors) {
+      const errorObj = err.response.data.errors
+      const messages: string[] = []
+      for (const key of Object.keys(errorObj)) {
+        messages.push(...errorObj[key])
+      }
+      errorMsg.value = messages.join(' ') || err.response?.data?.message || 'Erro de validação dos campos.'
+    } else if (err.response?.data?.message) {
+      errorMsg.value = err.response.data.message
+    } else if (err.code === 'ERR_NETWORK' || !err.response) {
+      errorMsg.value = 'Falha na conexão com o servidor. Verifique sua rede ou se as fotos enviadas excederam o limite do proxy reverso.'
+    } else {
+      errorMsg.value = 'Erro ao publicar. Tente novamente mais tarde.'
+    }
+    scrollToError()
   }
 }
 
@@ -117,9 +211,9 @@ function handleClose() {
 
 <template>
   <RetroModal :modelValue="modelValue" @update:modelValue="handleClose" title="» Nova Publicação" size="md">
-    <div class="post-create-form">
+    <div ref="formContainerRef" class="post-create-form">
       <div v-if="errorMsg" class="error-banner">
-        {{ errorMsg }}
+        ⚠️ {{ errorMsg }}
       </div>
 
       <!-- Audience / Group selector -->
@@ -172,23 +266,32 @@ function handleClose() {
       <div v-if="filePreviews.length" class="media-previews">
         <div v-for="(preview, index) in filePreviews" :key="index" class="preview-item">
           <img :src="preview" alt="Preview" class="preview-thumb" />
-          <button type="button" @click="removeFile(index)" class="remove-thumb-btn">×</button>
+          <span v-if="selectedFiles[index]" class="preview-size-badge">
+            {{ formatBytes(selectedFiles[index].size) }}
+          </span>
+          <button type="button" @click="removeFile(index)" class="remove-thumb-btn" title="Remover">×</button>
         </div>
       </div>
 
       <!-- Actions: Upload media & Hashtags -->
       <div class="media-upload-row">
-        <label class="upload-label-btn">
+        <label class="upload-label-btn" :class="{ 'disabled-btn': selectedFiles.length >= MAX_FILES }">
           <input
             type="file"
-            accept="image/*,video/*"
+            accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/quicktime"
             multiple
+            :disabled="selectedFiles.length >= MAX_FILES"
             class="hidden-file-input"
             @change="handleFileSelect"
           />
           📷 [ Anexar Fotos ]
         </label>
-        <span class="muted-hint">Máx: 5 fotos</span>
+        <span v-if="selectedFiles.length === 0" class="muted-hint">
+          Máx: 5 fotos (até 20MB cada, 50MB total)
+        </span>
+        <span v-else class="media-status-hint" :class="{ 'limit-warning': isOverTotalLimit }">
+          {{ selectedFiles.length }}/{{ MAX_FILES }} fotos • {{ formatBytes(totalFilesSize) }} / 50 MB
+        </span>
       </div>
 
       <!-- Hashtags Section -->
@@ -210,10 +313,15 @@ function handleClose() {
         </div>
       </div>
 
+      <!-- Error banner near submit button for quick visibility when scrolled -->
+      <div v-if="errorMsg" class="error-banner footer-error">
+        ⚠️ {{ errorMsg }}
+      </div>
+
       <!-- Footer Buttons -->
       <div class="modal-footer">
         <RetroButton variant="secondary" @click="handleClose">Cancelar</RetroButton>
-        <RetroButton :loading="feedStore.isSubmitting" @click="handleSubmit">
+        <RetroButton :loading="feedStore.isSubmitting" :disabled="isOverTotalLimit" @click="handleSubmit">
           Publicar
         </RetroButton>
       </div>
@@ -378,11 +486,25 @@ function handleClose() {
   cursor: pointer;
 }
 
+.preview-size-badge {
+  position: absolute;
+  bottom: 2px;
+  left: 2px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #ffffff;
+  font-family: var(--font-heading, monospace);
+  font-size: 0.65rem;
+  padding: 1px 4px;
+  border-radius: 2px;
+  pointer-events: none;
+}
+
 .media-upload-row {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   padding: 0.25rem 0;
+  flex-wrap: wrap;
 }
 .hidden-file-input {
   display: none;
@@ -397,13 +519,33 @@ function handleClose() {
   border: 1px solid var(--color-border, #D8CDC5);
   background-color: var(--color-primary-100, #fdf8f3);
   border-radius: 2px;
+  transition: all 0.15s ease;
 }
-.upload-label-btn:hover {
+.upload-label-btn:hover:not(.disabled-btn) {
   background-color: var(--color-primary-200, #e8c9a5);
+}
+.upload-label-btn.disabled-btn {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: #eee;
 }
 .muted-hint {
   font-size: 0.8rem;
   color: var(--color-muted, #847062);
+}
+.media-status-hint {
+  font-family: var(--font-heading, monospace);
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: var(--color-primary-800);
+}
+.media-status-hint.limit-warning {
+  color: var(--color-danger, #b91c1c);
+}
+
+.footer-error {
+  margin-top: 0.25rem;
+  margin-bottom: -0.25rem;
 }
 
 .hashtag-section {
