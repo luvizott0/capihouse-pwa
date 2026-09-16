@@ -80,7 +80,7 @@ async function handleSubmit() {
     formData.append('content', content.value)
   }
   if (feelingText.value.trim()) {
-    formData.append('feeling_name', feelingText.value.trim().substring(0, 10))
+    formData.append('feeling_name', feelingText.value.trim().substring(0, 15))
     formData.append('feeling_emoji', feelingEmoji.value || '😊')
   }
   hashtags.value.forEach(tag => {
@@ -150,11 +150,11 @@ function handleClose() {
             <input
               v-model="feelingText"
               type="text"
-              maxlength="10"
+              maxlength="15"
               placeholder="Me sentindo..."
               class="feeling-text-input"
             />
-            <span class="char-count">{{ feelingText.length }}/10</span>
+            <span class="char-count">{{ feelingText.length }}/15</span>
           </div>
           <button
             v-if="feelingText"

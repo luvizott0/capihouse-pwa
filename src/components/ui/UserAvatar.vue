@@ -2,17 +2,32 @@
 import type { User } from '@/types/models'
 import { getInitials } from '@/utils/initials'
 import { computed } from 'vue'
+import { useImageViewerStore } from '@/stores/imageViewer'
 
 const props = defineProps<{
   user: User | null
   size?: 'sm' | 'md' | 'lg' | 'xl'
+  zoomable?: boolean
 }>()
 
+const imageViewer = useImageViewerStore()
 const sizeClass = computed(() => `avatar-${props.size || 'md'}`)
 const initials = computed(() => props.user ? getInitials(props.user.name) : '??')
+
+function handleClick(e: MouseEvent) {
+  if (props.zoomable && props.user?.avatar_url) {
+    e.stopPropagation()
+    imageViewer.openImage(props.user.avatar_url, props.user.name, 'Foto de Perfil')
+  }
+}
 </script>
 <template>
-  <div class="user-avatar" :class="sizeClass">
+  <div
+    class="user-avatar"
+    :class="[sizeClass, { 'is-zoomable': zoomable && !!user?.avatar_url }]"
+    :title="zoomable && !!user?.avatar_url ? 'Clique para ampliar foto de perfil' : undefined"
+    @click="handleClick"
+  >
     <img v-if="user?.avatar_url" :src="user.avatar_url" :alt="user.name" class="avatar-img" />
     <div v-else class="avatar-initials">{{ initials }}</div>
   </div>
@@ -29,6 +44,14 @@ const initials = computed(() => props.user ? getInitials(props.user.name) : '??'
   color: var(--color-primary-900);
   font-family: var(--font-heading);
   font-weight: bold;
+}
+.user-avatar.is-zoomable {
+  cursor: zoom-in;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.user-avatar.is-zoomable:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 .avatar-img { width: 100%; height: 100%; object-fit: cover; }
 .avatar-sm { width: 32px; height: 32px; font-size: 0.8rem; }

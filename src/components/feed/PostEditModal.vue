@@ -68,7 +68,7 @@ async function handleSubmit() {
   try {
     await feedStore.updatePost(props.post.id, {
       content: content.value.trim(),
-      feeling_name: feelingText.value.trim() ? feelingText.value.trim().substring(0, 10) : undefined,
+      feeling_name: feelingText.value.trim() ? feelingText.value.trim().substring(0, 15) : undefined,
       feeling_emoji: feelingText.value.trim() ? (feelingEmoji.value || '😊') : undefined,
       hashtags: hashtags.value,
     })
@@ -111,11 +111,11 @@ function handleClose() {
             <input
               v-model="feelingText"
               type="text"
-              maxlength="10"
+              maxlength="15"
               placeholder="Me sentindo..."
               class="feeling-text-input"
             />
-            <span class="char-count">{{ feelingText.length }}/10</span>
+            <span class="char-count">{{ feelingText.length }}/15</span>
           </div>
           <button
             v-if="feelingText"

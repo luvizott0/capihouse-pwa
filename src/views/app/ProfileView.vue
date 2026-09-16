@@ -5,6 +5,7 @@ import { useProfileStore } from '@/stores/profile'
 import { useAuthStore } from '@/stores/auth'
 import { useFeedStore } from '@/stores/feed'
 import { useThemeStore } from '@/stores/theme'
+import { useImageViewerStore } from '@/stores/imageViewer'
 import UserAvatar from '@/components/ui/UserAvatar.vue'
 import RetroModal from '@/components/ui/RetroModal.vue'
 import RetroButton from '@/components/ui/RetroButton.vue'
@@ -20,6 +21,7 @@ const profileStore = useProfileStore()
 const authStore = useAuthStore()
 const feedStore = useFeedStore()
 const themeStore = useThemeStore()
+const imageViewer = useImageViewerStore()
 
 const isOwner = computed(() => {
   return !route.params.username || route.params.username === authStore.user?.username
@@ -142,6 +144,18 @@ async function handleAvatarCropped(blob: Blob) {
   }
 }
 
+function openAvatarPhoto() {
+  if (user.value?.avatar_url) {
+    imageViewer.openImage(user.value.avatar_url, user.value.name, 'Foto de Perfil')
+  }
+}
+
+function openBannerPhoto() {
+  if (user.value?.banner_url) {
+    imageViewer.openImage(user.value.banner_url, user.value.name, 'Banner de Perfil')
+  }
+}
+
 // Inline Bio
 function startEditBio() {
   bioInput.value = user.value?.bio || ''
@@ -249,13 +263,16 @@ const userPosts = computed(() => {
       <!-- Banner -->
       <div
         class="profile-banner"
+        :class="{ 'clickable-banner': !!user.banner_url }"
         :style="user.banner_url ? { backgroundImage: `url(${user.banner_url})` } : {}"
+        :title="user.banner_url ? 'Clique para ampliar o banner' : ''"
+        @click="openBannerPhoto"
       >
         <button
           v-if="isOwner"
           type="button"
           class="banner-edit-btn"
-          @click="showBannerCropper = true"
+          @click.stop="showBannerCropper = true"
         >
           📷 [ Editar banner ]
         </button>
@@ -264,16 +281,24 @@ const userPosts = computed(() => {
       <!-- Avatar & Basic info bar -->
       <div class="profile-bar">
         <div class="avatar-wrapper">
-          <div class="avatar-circle">
+          <div
+            class="avatar-circle"
+            :class="{ 'clickable-avatar': !!user.avatar_url }"
+            :title="user.avatar_url ? 'Clique para ampliar a foto de perfil' : ''"
+            @click="openAvatarPhoto"
+          >
             <img v-if="user.avatar_url" :src="user.avatar_url" alt="Avatar" class="avatar-photo" />
             <div v-else class="avatar-fallback">{{ user.initials || 'CR' }}</div>
+            <div v-if="user.avatar_url" class="avatar-zoom-badge" title="Ampliar">
+              🔍
+            </div>
           </div>
           <button
             v-if="isOwner"
             type="button"
             class="avatar-edit-btn"
             title="Editar foto de perfil"
-            @click="showAvatarCropper = true"
+            @click.stop="showAvatarCropper = true"
           >
             ✏️
           </button>
@@ -627,6 +652,10 @@ const userPosts = computed(() => {
   border-bottom: 2px solid var(--color-primary, #a66130);
 }
 
+.profile-banner.clickable-banner {
+  cursor: zoom-in;
+}
+
 .banner-edit-btn {
   position: absolute;
   top: 8px;
@@ -640,6 +669,7 @@ const userPosts = computed(() => {
   padding: 0.3rem 0.6rem;
   border-radius: 2px;
   cursor: pointer;
+  z-index: 2;
 }
 .banner-edit-btn:hover {
   background-color: #ffffff;
@@ -669,6 +699,36 @@ const userPosts = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.avatar-circle.clickable-avatar {
+  cursor: zoom-in;
+}
+
+.avatar-circle.clickable-avatar:hover {
+  transform: scale(1.03);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  border-color: var(--color-primary-100, #fdf8f3);
+}
+
+.avatar-zoom-badge {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  background-color: rgba(0, 0, 0, 0.65);
+  color: #ffffff;
+  border-radius: 2px;
+  padding: 1px 3px;
+  font-size: 0.65rem;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+.avatar-circle.clickable-avatar:hover .avatar-zoom-badge {
+  opacity: 1;
 }
 
 .avatar-photo {

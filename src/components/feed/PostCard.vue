@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import type { Post, PostComment } from '@/types/models'
 import { useFeedStore } from '@/stores/feed'
 import { useAuthStore } from '@/stores/auth'
+import { useImageViewerStore } from '@/stores/imageViewer'
 import UserAvatar from '@/components/ui/UserAvatar.vue'
 import RetroConfirmModal from '@/components/ui/RetroConfirmModal.vue'
 import PostEditModal from './PostEditModal.vue'
@@ -27,6 +28,7 @@ const emit = defineEmits<{
 
 const feedStore = useFeedStore()
 const authStore = useAuthStore()
+const imageViewer = useImageViewerStore()
 
 const showComments = ref(props.defaultShowComments)
 const commentContent = ref('')
@@ -138,6 +140,28 @@ function prevSlide() {
   }
 }
 
+function openMediaModal(clickedIndex: number) {
+  if (!props.post.media || !props.post.media.length) return
+
+  const imageItems = props.post.media
+    .filter(m => m.type !== 'video')
+    .map(m => ({
+      url: resolveMediaUrl(m.url || m.path),
+      title: `Publicação de ${props.post.user.name}`,
+      subtitle: `@${props.post.user.username}`,
+    }))
+
+  if (!imageItems.length) return
+
+  const clickedMedia = props.post.media[clickedIndex]
+  if (!clickedMedia || clickedMedia.type === 'video') return
+
+  const targetUrl = resolveMediaUrl(clickedMedia.url || clickedMedia.path)
+  const targetIndex = imageItems.findIndex(item => item.url === targetUrl)
+
+  imageViewer.openGallery(imageItems, Math.max(0, targetIndex))
+}
+
 async function handleLike() {
   await feedStore.toggleLike(props.post.id)
 }
@@ -245,8 +269,10 @@ async function confirmDeletePost() {
             v-else
             :src="resolveMediaUrl(item.url || item.path)"
             alt="Mídia da postagem"
-            class="carousel-media"
+            class="carousel-media zoomable-media"
             loading="lazy"
+            title="Clique para ampliar e dar zoom"
+            @click="openMediaModal(index)"
           />
         </div>
       </div>
@@ -644,6 +670,15 @@ async function confirmDeletePost() {
   display: block;
 }
 
+.carousel-media.zoomable-media {
+  cursor: zoom-in;
+  transition: opacity 0.15s ease;
+}
+
+.carousel-media.zoomable-media:hover {
+  opacity: 0.95;
+}
+
 .carousel-counter-badge {
   position: absolute;
   top: 10px;
@@ -947,12 +982,20 @@ async function confirmDeletePost() {
 
 .comment-form {
   display: flex;
+  align-items: stretch;
   gap: 0.5rem;
   margin-top: 0.5rem;
+  width: 100%;
+}
+
+.comment-form :deep(.mention-input-wrapper) {
+  flex: 1 1 0;
+  min-width: 0;
+  width: auto;
 }
 
 .comment-input {
-  flex: 1;
+  width: 100%;
   padding: 0.45rem 0.6rem;
   font-size: 0.85rem;
   font-family: var(--font-body);
@@ -960,6 +1003,7 @@ async function confirmDeletePost() {
   background: #ffffff;
   border-radius: 2px;
   outline: none;
+  box-sizing: border-box;
 }
 .comment-input:focus {
   border-color: var(--color-primary);
@@ -975,9 +1019,25 @@ async function confirmDeletePost() {
   border-radius: 2px;
   padding: 0 0.75rem;
   cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
 }
 .comment-submit-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+@media (max-width: 480px) {
+  .comment-form {
+    gap: 0.35rem;
+  }
+  .comment-submit-btn {
+    font-size: 0.75rem;
+    padding: 0 0.5rem;
+  }
 }
 </style>
