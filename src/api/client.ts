@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { useAuthStore } from '@/stores/auth'
 import router from '@/router'
+import { getEcho } from '@/services/echo'
 
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api',
@@ -14,6 +15,12 @@ apiClient.interceptors.request.use(config => {
   const token = localStorage.getItem('capihouse_token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
+  }
+
+  const echo = getEcho()
+  const socketId = echo?.socketId()
+  if (socketId) {
+    config.headers['X-Socket-ID'] = socketId
   }
 
   // When sending FormData, remove default JSON content-type to allow the browser

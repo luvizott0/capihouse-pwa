@@ -30,6 +30,10 @@ export function addComment(postId: number, content: string) {
   return apiClient.post(`/posts/${postId}/comments`, { content })
 }
 
+export function updateComment(commentId: number, content: string) {
+  return apiClient.put(`/comments/${commentId}`, { content })
+}
+
 export function deleteComment(commentId: number) {
   return apiClient.delete(`/comments/${commentId}`)
 }

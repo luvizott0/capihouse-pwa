@@ -62,6 +62,7 @@ export interface PostComment {
   content: string
   user: User
   created_at: string
+  updated_at?: string
 }
 
 export interface PostLike {

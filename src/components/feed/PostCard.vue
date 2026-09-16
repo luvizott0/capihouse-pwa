@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import type { Post } from '@/types/models'
+import type { Post, PostComment } from '@/types/models'
 import { useFeedStore } from '@/stores/feed'
 import { useAuthStore } from '@/stores/auth'
 import UserAvatar from '@/components/ui/UserAvatar.vue'
@@ -19,6 +19,68 @@ const commentContent = ref('')
 const isSubmittingComment = ref(false)
 const showEditModal = ref(false)
 const isAuthor = authStore.user?.id === props.post.user_id || authStore.isAdmin
+
+// Comment permissions
+function canEditComment(comment: PostComment) {
+  return authStore.user?.id === comment.user_id || authStore.isAdmin
+}
+
+function canDeleteComment(comment: PostComment) {
+  return (
+    authStore.user?.id === comment.user_id ||
+    props.post.user_id === authStore.user?.id ||
+    authStore.isAdmin
+  )
+}
+
+// Inline comment editing
+const editingCommentId = ref<number | null>(null)
+const editingCommentContent = ref('')
+const isUpdatingComment = ref(false)
+
+function startEditComment(comment: PostComment) {
+  editingCommentId.value = comment.id
+  editingCommentContent.value = comment.content
+}
+
+function cancelEditComment() {
+  editingCommentId.value = null
+  editingCommentContent.value = ''
+}
+
+async function saveEditComment(commentId: number) {
+  if (!editingCommentContent.value.trim()) return
+  isUpdatingComment.value = true
+  try {
+    await feedStore.updateComment(props.post.id, commentId, editingCommentContent.value.trim())
+    editingCommentId.value = null
+    editingCommentContent.value = ''
+  } finally {
+    isUpdatingComment.value = false
+  }
+}
+
+// Comment deletion modal
+const commentToDelete = ref<PostComment | null>(null)
+const showDeleteCommentModal = ref(false)
+const isDeletingComment = ref(false)
+
+function promptDeleteComment(comment: PostComment) {
+  commentToDelete.value = comment
+  showDeleteCommentModal.value = true
+}
+
+async function confirmDeleteComment() {
+  if (!commentToDelete.value) return
+  isDeletingComment.value = true
+  try {
+    await feedStore.deleteComment(props.post.id, commentToDelete.value.id)
+    showDeleteCommentModal.value = false
+    commentToDelete.value = null
+  } finally {
+    isDeletingComment.value = false
+  }
+}
 
 const currentSlide = ref(0)
 let touchStartX = 0
@@ -243,13 +305,75 @@ async function confirmDeletePost() {
     <div v-if="showComments" class="comments-section">
       <div v-if="post.comments && post.comments.length" class="comments-list">
         <div v-for="c in post.comments" :key="c.id" class="comment-item">
-          <UserAvatar :user="c.user" size="sm" />
+          <router-link :to="`/profile/${c.user?.username}`" class="comment-avatar-link">
+            <UserAvatar :user="c.user" size="sm" />
+          </router-link>
           <div class="comment-content-box">
             <div class="comment-user-line">
-              <span class="comment-user-name">{{ c.user.name }}</span>
-              <span class="comment-date">{{ formatRelativeTime(c.created_at) }}</span>
+              <router-link :to="`/profile/${c.user?.username}`" class="comment-user-name">
+                {{ c.user?.name }}
+              </router-link>
+              <div class="comment-header-right">
+                <span class="comment-date">
+                  {{ formatRelativeTime(c.created_at) }}
+                  <span v-if="c.updated_at && c.updated_at !== c.created_at" class="comment-edited-tag">(editado)</span>
+                </span>
+                <div v-if="editingCommentId !== c.id && (canEditComment(c) || canDeleteComment(c))" class="comment-actions">
+                  <button
+                    v-if="canEditComment(c)"
+                    type="button"
+                    class="comment-action-btn edit-comment-btn"
+                    title="Editar comentário"
+                    @click="startEditComment(c)"
+                  >
+                    [✎]
+                  </button>
+                  <button
+                    v-if="canDeleteComment(c)"
+                    type="button"
+                    class="comment-action-btn delete-comment-btn"
+                    title="Excluir comentário"
+                    @click="promptDeleteComment(c)"
+                  >
+                    [×]
+                  </button>
+                </div>
+              </div>
             </div>
-            <p class="comment-text">{{ c.content }}</p>
+
+            <!-- Inline Edit Mode -->
+            <div v-if="editingCommentId === c.id" class="comment-inline-edit">
+              <input
+                v-model="editingCommentContent"
+                type="text"
+                class="comment-edit-input"
+                maxlength="500"
+                :disabled="isUpdatingComment"
+                @keydown.enter.prevent="saveEditComment(c.id)"
+                @keydown.esc="cancelEditComment"
+              />
+              <div class="comment-inline-edit-actions">
+                <button
+                  type="button"
+                  class="comment-save-btn"
+                  :disabled="isUpdatingComment || !editingCommentContent.trim()"
+                  @click="saveEditComment(c.id)"
+                >
+                  {{ isUpdatingComment ? '[ Salvando... ]' : '[ Salvar ]' }}
+                </button>
+                <button
+                  type="button"
+                  class="comment-cancel-btn"
+                  :disabled="isUpdatingComment"
+                  @click="cancelEditComment"
+                >
+                  [ Cancelar ]
+                </button>
+              </div>
+            </div>
+
+            <!-- Standard Comment Text -->
+            <p v-else class="comment-text">{{ c.content }}</p>
           </div>
         </div>
       </div>
@@ -282,7 +406,7 @@ async function confirmDeletePost() {
       :post="post"
     />
 
-    <!-- Confirm Delete Modal -->
+    <!-- Confirm Delete Post Modal -->
     <RetroConfirmModal
       v-model="showDeleteModal"
       title="» Excluir Publicação"
@@ -291,6 +415,16 @@ async function confirmDeletePost() {
       confirmText="Excluir"
       :loading="isDeleting"
       @confirm="confirmDeletePost"
+    />
+
+    <!-- Confirm Delete Comment Modal -->
+    <RetroConfirmModal
+      v-model="showDeleteCommentModal"
+      title="» Excluir Comentário"
+      message="Tem certeza que deseja excluir este comentário?"
+      confirmText="Excluir"
+      :loading="isDeletingComment"
+      @confirm="confirmDeleteComment"
     />
   </div>
 </template>
@@ -625,10 +759,18 @@ async function confirmDeletePost() {
   border-radius: 2px;
 }
 
+.comment-avatar-link {
+  flex-shrink: 0;
+  display: flex;
+  text-decoration: none;
+}
+
 .comment-user-line {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   margin-bottom: 0.2rem;
+  gap: 0.5rem;
 }
 
 .comment-user-name {
@@ -636,11 +778,118 @@ async function confirmDeletePost() {
   font-size: 0.8rem;
   font-weight: bold;
   color: var(--color-primary-800);
+  text-decoration: none;
+}
+.comment-user-name:hover {
+  text-decoration: underline;
+}
+
+.comment-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
 }
 
 .comment-date {
   font-size: 0.7rem;
   color: var(--color-muted);
+  white-space: nowrap;
+}
+
+.comment-edited-tag {
+  font-size: 0.65rem;
+  color: var(--color-muted);
+  font-style: italic;
+  margin-left: 0.2rem;
+}
+
+.comment-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.comment-action-btn {
+  background: none;
+  border: none;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.75rem;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0.1rem 0.25rem;
+  line-height: 1;
+  border-radius: 2px;
+}
+
+.edit-comment-btn {
+  color: var(--color-primary-700, #7d5628);
+}
+.edit-comment-btn:hover {
+  background-color: var(--color-primary-100, #fdf8f3);
+}
+
+.delete-comment-btn {
+  color: var(--color-danger, #ef4444);
+}
+.delete-comment-btn:hover {
+  background-color: #fee2e2;
+}
+
+.comment-inline-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+
+.comment-edit-input {
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.85rem;
+  font-family: var(--font-body);
+  border: 1px solid var(--color-primary);
+  background: #ffffff;
+  border-radius: 2px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.comment-inline-edit-actions {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
+
+.comment-save-btn {
+  font-family: var(--font-heading);
+  font-size: 0.75rem;
+  font-weight: bold;
+  background-color: var(--color-primary);
+  color: #ffffff;
+  border: none;
+  border-radius: 2px;
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+}
+.comment-save-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.comment-cancel-btn {
+  font-family: var(--font-heading);
+  font-size: 0.75rem;
+  font-weight: bold;
+  background: none;
+  border: 1px solid var(--color-border);
+  color: var(--color-muted);
+  border-radius: 2px;
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+}
+.comment-cancel-btn:hover {
+  background-color: var(--color-primary-50);
 }
 
 .comment-text {
@@ -648,6 +897,7 @@ async function confirmDeletePost() {
   font-size: 0.85rem;
   line-height: 1.4;
   color: #333333;
+  word-break: break-word;
 }
 
 .no-comments {

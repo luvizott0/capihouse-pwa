@@ -76,10 +76,38 @@ export const useFeedStore = defineStore('feed', () => {
     const res = await postsApi.addComment(postId, content)
     if (post) {
       if (!post.comments) post.comments = []
-      post.comments.push(res.data)
-      post.comments_count = (post.comments_count || 0) + 1
+      const existsIndex = post.comments.findIndex(c => Number(c.id) === Number(res.data.id))
+      if (existsIndex === -1) {
+        post.comments.push(res.data)
+        post.comments_count = (post.comments_count || 0) + 1
+      } else {
+        post.comments[existsIndex] = res.data
+      }
     }
     return res.data
+  }
+
+  async function updateComment(postId: number, commentId: number, content: string) {
+    const res = await postsApi.updateComment(commentId, content)
+    const post = posts.value.find(p => p.id === postId)
+    if (post && post.comments) {
+      const existsIndex = post.comments.findIndex(c => Number(c.id) === Number(commentId))
+      if (existsIndex !== -1) {
+        post.comments[existsIndex] = res.data
+      }
+    }
+    return res.data
+  }
+
+  async function deleteComment(postId: number, commentId: number) {
+    await postsApi.deleteComment(commentId)
+    const post = posts.value.find(p => p.id === postId)
+    if (post) {
+      if (post.comments) {
+        post.comments = post.comments.filter(c => Number(c.id) !== Number(commentId))
+      }
+      post.comments_count = Math.max(0, (post.comments_count || 1) - 1)
+    }
   }
 
   async function deletePost(postId: number) {
@@ -157,11 +185,23 @@ export const useFeedStore = defineStore('feed', () => {
         const post = posts.value.find(p => p.id === data.post_id)
         if (post) {
           post.comments_count = data.comments_count
-          if (post.comments) {
-            const exists = post.comments.some(c => c.id === data.comment.id)
-            if (!exists) {
-              post.comments.push(data.comment)
-            }
+          if (!post.comments) {
+            post.comments = []
+          }
+          const existsIndex = post.comments.findIndex(c => Number(c.id) === Number(data.comment.id))
+          if (existsIndex === -1) {
+            post.comments.push(data.comment)
+          } else {
+            post.comments[existsIndex] = data.comment
+          }
+        }
+      })
+      .listen('.CommentUpdated', (data: { post_id: number; comment: any }) => {
+        const post = posts.value.find(p => p.id === data.post_id)
+        if (post && post.comments) {
+          const existsIndex = post.comments.findIndex(c => Number(c.id) === Number(data.comment.id))
+          if (existsIndex !== -1) {
+            post.comments[existsIndex] = data.comment
           }
         }
       })
@@ -170,7 +210,7 @@ export const useFeedStore = defineStore('feed', () => {
         if (post) {
           post.comments_count = data.comments_count
           if (post.comments) {
-            post.comments = post.comments.filter(c => c.id !== data.comment_id)
+            post.comments = post.comments.filter(c => Number(c.id) !== Number(data.comment_id))
           }
         }
       })
@@ -195,6 +235,8 @@ export const useFeedStore = defineStore('feed', () => {
     updatePost,
     toggleLike,
     addComment,
+    updateComment,
+    deleteComment,
     deletePost,
     flushPendingPosts,
     subscribeToFeed,
