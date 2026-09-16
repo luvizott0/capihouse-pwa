@@ -128,7 +128,16 @@ function onGroupCreated() {
 
       <!-- Center: Main Page Content -->
       <main class="layout-content">
-        <router-view />
+        <router-view v-slot="{ Component, route }">
+          <transition name="tab-fade" mode="out-in">
+            <keep-alive :include="['FeedView', 'EventsView', 'GroupsView']">
+              <component
+                :is="Component"
+                :key="route.name === 'group-detail' || route.name === 'post-detail' || route.name === 'user-profile' ? route.fullPath : undefined"
+              />
+            </keep-alive>
+          </transition>
+        </router-view>
       </main>
 
       <!-- Right Sidebar: Online Users (Desktop only) -->
@@ -297,7 +306,7 @@ function onGroupCreated() {
   }
 
   .layout-main {
-    padding: 0.75rem 0.75rem 6rem; /* Extra padding at bottom to never hide content under mobile bottom nav */
+    padding: 0.75rem 0.75rem calc(5.5rem + env(safe-area-inset-bottom, 0px)); /* Extra padding at bottom to never hide content under mobile bottom nav */
   }
 
   .layout-sidebar-left,
@@ -310,7 +319,7 @@ function onGroupCreated() {
     align-items: center;
     gap: 0.35rem;
     position: fixed;
-    bottom: 4.8rem;
+    bottom: calc(4.8rem + env(safe-area-inset-bottom, 0px));
     right: 1rem;
     z-index: 900;
     background-color: var(--color-primary, #a66130);
@@ -381,5 +390,16 @@ function onGroupCreated() {
 
 .impersonate-exit-btn:hover {
   background-color: #713f12;
+}
+
+/* Transições suaves entre abas mantidas no keep-alive */
+.tab-fade-enter-active,
+.tab-fade-leave-active {
+  transition: opacity 0.12s ease;
+}
+
+.tab-fade-enter-from,
+.tab-fade-leave-to {
+  opacity: 0;
 }
 </style>

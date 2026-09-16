@@ -1,4 +1,8 @@
 <script setup lang="ts">
+defineOptions({
+  name: 'EventsView'
+})
+
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useEventsStore } from '@/stores/events'
@@ -20,7 +24,11 @@ const searchTerms = computed(() => {
 const filterDate = computed(() => (route.query.date as string) || '')
 const filterUserId = computed(() => route.query.user_id ? Number(route.query.user_id) : null)
 
-async function loadEventsForCurrentRoute() {
+async function loadEventsForCurrentRoute(force = false) {
+  if (!force && !hasSearchFilters.value && eventsStore.events.length > 0) {
+    return
+  }
+
   await eventsStore.fetchEvents(1, {
     search: searchTerms.value || undefined,
     date: filterDate.value || undefined,
@@ -31,7 +39,7 @@ async function loadEventsForCurrentRoute() {
 watch(
   () => route.query,
   () => {
-    loadEventsForCurrentRoute()
+    loadEventsForCurrentRoute(true)
   }
 )
 

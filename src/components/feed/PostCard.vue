@@ -271,6 +271,7 @@ async function confirmDeletePost() {
             alt="Mídia da postagem"
             class="carousel-media zoomable-media"
             loading="lazy"
+            decoding="async"
             title="Clique para ampliar e dar zoom"
             @click="openMediaModal(index)"
           />

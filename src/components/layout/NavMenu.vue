@@ -159,6 +159,7 @@ const authStore = useAuthStore()
     border-top: 2px solid var(--color-primary-200, #e8c9a5);
     box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
     z-index: 1000;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .mobile-nav-grid {

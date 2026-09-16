@@ -1,4 +1,8 @@
 <script setup lang="ts">
+defineOptions({
+  name: 'FeedView'
+})
+
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useFeedStore } from '@/stores/feed'
@@ -14,6 +18,14 @@ const feedStore = useFeedStore()
 const authStore = useAuthStore()
 
 const showCreateModal = ref(false)
+const sentinelRef = ref<HTMLElement | null>(null)
+let scrollObserver: IntersectionObserver | null = null
+
+// Pull to refresh state
+const pullDistance = ref(0)
+const isRefreshingFromPull = ref(false)
+let touchStartY = 0
+let isTrackingTouch = false
 
 const hasSearchFilters = computed(() => {
   return !!(route.query.q || route.query.search || route.query.date || route.query.user_id)
@@ -25,7 +37,12 @@ const searchTerms = computed(() => {
 const filterDate = computed(() => (route.query.date as string) || '')
 const filterUserId = computed(() => route.query.user_id ? Number(route.query.user_id) : null)
 
-async function loadPostsForCurrentRoute() {
+async function loadPostsForCurrentRoute(force = false) {
+  // Se já temos posts e não é um reload forçado nem há filtros de busca, reutiliza o cache do Pinia
+  if (!force && !hasSearchFilters.value && feedStore.posts.length > 0) {
+    return
+  }
+
   await feedStore.fetchPosts(1, {
     search: searchTerms.value || undefined,
     date: filterDate.value || undefined,
@@ -33,10 +50,38 @@ async function loadPostsForCurrentRoute() {
   })
 }
 
+function setupScrollObserver() {
+  if (scrollObserver) {
+    scrollObserver.disconnect()
+  }
+
+  scrollObserver = new IntersectionObserver(
+    (entries) => {
+      const first = entries[0]
+      if (
+        first?.isIntersecting &&
+        feedStore.hasMorePages &&
+        !feedStore.isLoading &&
+        !feedStore.isLoadingMore
+      ) {
+        feedStore.loadMorePosts()
+      }
+    },
+    {
+      rootMargin: '300px', // Inicia a busca antes do usuário atingir a linha final
+      threshold: 0.1,
+    }
+  )
+
+  if (sentinelRef.value) {
+    scrollObserver.observe(sentinelRef.value)
+  }
+}
+
 watch(
   () => route.query,
   () => {
-    loadPostsForCurrentRoute()
+    loadPostsForCurrentRoute(true)
   }
 )
 
@@ -44,10 +89,66 @@ function clearSearch() {
   router.push({ path: '/feed' })
 }
 
+// Mobile Pull to Refresh handlers
+function handleTouchStart(e: TouchEvent) {
+  const touch = e.touches[0]
+  if (touch && window.scrollY <= 5 && !isRefreshingFromPull.value) {
+    touchStartY = touch.clientY
+    isTrackingTouch = true
+  } else {
+    isTrackingTouch = false
+  }
+}
+
+function handleTouchMove(e: TouchEvent) {
+  if (!isTrackingTouch || isRefreshingFromPull.value) return
+  const touch = e.touches[0]
+  if (!touch) return
+  const currentY = touch.clientY
+  const diff = currentY - touchStartY
+
+  if (diff > 0 && window.scrollY <= 5) {
+    // Resistência elástica
+    pullDistance.value = Math.min(75, Math.pow(diff, 0.85))
+  } else {
+    pullDistance.value = 0
+  }
+}
+
+async function handleTouchEnd() {
+  if (!isTrackingTouch) return
+  isTrackingTouch = false
+
+  if (pullDistance.value >= 50 && !isRefreshingFromPull.value) {
+    isRefreshingFromPull.value = true
+    pullDistance.value = 50
+
+    try {
+      if ('vibrate' in navigator) {
+        navigator.vibrate(12)
+      }
+      await feedStore.fetchPosts(1, {
+        search: searchTerms.value || undefined,
+        date: filterDate.value || undefined,
+        userId: filterUserId.value || undefined,
+      })
+    } finally {
+      setTimeout(() => {
+        pullDistance.value = 0
+        isRefreshingFromPull.value = false
+      }, 300)
+    }
+  } else {
+    pullDistance.value = 0
+  }
+}
+
 onMounted(async () => {
   await loadPostsForCurrentRoute()
+  await nextTick()
+  setupScrollObserver()
+
   if (route.hash) {
-    await nextTick()
     setTimeout(() => {
       const el = document.querySelector(route.hash)
       if (el) {
@@ -63,16 +164,59 @@ onMounted(async () => {
   }
 })
 
+// Observa o sentinel se o DOM do feed for atualizado
+watch(sentinelRef, (newEl) => {
+  if (newEl && scrollObserver) {
+    scrollObserver.observe(newEl)
+  }
+})
+
 onUnmounted(() => {
+  if (scrollObserver) {
+    scrollObserver.disconnect()
+    scrollObserver = null
+  }
   feedStore.unsubscribeFromFeed()
-  // Clear pending posts when leaving the feed
   feedStore.pendingPosts.splice(0)
   feedStore.clearFilters()
 })
 </script>
 
 <template>
-  <div class="feed-view-container">
+  <div
+    class="feed-view-container"
+    @touchstart="handleTouchStart"
+    @touchmove="handleTouchMove"
+    @touchend="handleTouchEnd"
+  >
+    <!-- Pull-to-refresh indicator box -->
+    <div
+      v-if="pullDistance > 0 || isRefreshingFromPull"
+      class="pull-refresh-bar"
+      :style="{ height: `${pullDistance}px` }"
+    >
+      <div class="pull-refresh-inner" :class="{ 'is-refreshing': isRefreshingFromPull }">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="pull-refresh-icon"
+          :class="{ 'spin': isRefreshingFromPull }"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          stroke-width="2.5"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+          />
+        </svg>
+        <span class="pull-refresh-text">
+          {{ isRefreshingFromPull ? 'Atualizando feed...' : (pullDistance >= 50 ? 'Solte para atualizar' : 'Puxe para atualizar...') }}
+        </span>
+      </div>
+    </div>
+
     <!-- Real-time new posts banner -->
     <NewPostsBanner />
 
@@ -110,7 +254,7 @@ onUnmounted(() => {
         class="refresh-btn"
         :class="{ 'is-refreshing': feedStore.isLoading }"
         :disabled="feedStore.isLoading"
-        @click="loadPostsForCurrentRoute"
+        @click="loadPostsForCurrentRoute(true)"
         title="Recarregar publicações"
       >
         <svg
@@ -155,14 +299,31 @@ onUnmounted(() => {
       Carregando publicações...
     </div>
 
-    <!-- Posts List -->
-    <div v-else-if="feedStore.posts.length" class="posts-stream">
-      <PostCard
-        v-for="post in feedStore.posts"
-        :key="post.id"
-        :post="post"
-      />
-    </div>
+    <!-- Posts List with Infinite Scroll -->
+    <template v-else-if="feedStore.posts.length">
+      <div class="posts-stream">
+        <PostCard
+          v-for="post in feedStore.posts"
+          :key="post.id"
+          :post="post"
+        />
+      </div>
+
+      <!-- Sentinel para Infinite Scroll -->
+      <div ref="sentinelRef" class="sentinel-element"></div>
+
+      <!-- Loading Mais Posts Indicator -->
+      <div v-if="feedStore.isLoadingMore" class="infinite-loading-bar">
+        <span class="refresh-dot"></span>
+        <span>Carregando mais publicações antigas...</span>
+      </div>
+
+      <!-- Final do Feed -->
+      <div v-else-if="!feedStore.hasMorePages" class="infinite-end-card">
+        <span class="end-marker">🐾</span>
+        <span class="end-text">Você visualizou todas as publicações recentes da casa!</span>
+      </div>
+    </template>
 
     <!-- Empty State -->
     <div v-else class="empty-feed-card">
@@ -499,5 +660,73 @@ onUnmounted(() => {
 }
 .clear-search-link:hover {
   color: #b71c1c;
+}
+
+/* Pull to Refresh */
+.pull-refresh-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  transition: height 0.15s ease-out;
+  background-color: var(--color-primary-50, #f8f6f1);
+  border-bottom: 1px dashed var(--color-primary-300, #c4884e);
+}
+
+.pull-refresh-inner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: var(--color-primary-800, #5f4120);
+}
+
+.pull-refresh-icon {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2.5;
+}
+
+/* Sentinel & Infinite Scroll Indicators */
+.sentinel-element {
+  height: 20px;
+  width: 100%;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.infinite-loading-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 1rem;
+  background-color: var(--color-primary-50, #f8f6f1);
+  border: 1px dashed var(--color-primary-300, #c4884e);
+  border-radius: 2px;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.82rem;
+  font-weight: bold;
+  color: var(--color-primary-800, #5f4120);
+}
+
+.infinite-end-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  text-align: center;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.8rem;
+  color: var(--color-muted, #847062);
+  border-top: 1px dashed var(--color-border, #D8CDC5);
+  margin-top: 0.5rem;
+}
+
+.end-marker {
+  font-size: 1rem;
 }
 </style>

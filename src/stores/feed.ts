@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import type { Post } from '@/types/models'
 import * as postsApi from '@/api/posts'
 import { connectEcho } from '@/services/echo'
@@ -7,9 +7,12 @@ import { connectEcho } from '@/services/echo'
 export const useFeedStore = defineStore('feed', () => {
   const posts = ref<Post[]>([])
   const isLoading = ref(false)
+  const isLoadingMore = ref(false)
   const isSubmitting = ref(false)
   const currentPage = ref(1)
   const lastPage = ref(1)
+
+  const hasMorePages = computed(() => currentPage.value < lastPage.value)
 
   const activeGroupId = ref<number | undefined>(undefined)
 
@@ -20,9 +23,14 @@ export const useFeedStore = defineStore('feed', () => {
 
   async function fetchPosts(
     page = 1,
-    options?: { groupId?: number; search?: string; date?: string; userId?: number } | number
+    options?: { groupId?: number; search?: string; date?: string; userId?: number; forceRefresh?: boolean } | number
   ) {
-    isLoading.value = true
+    if (page > 1) {
+      isLoadingMore.value = true
+    } else {
+      isLoading.value = true
+    }
+
     let groupId: number | undefined
     if (typeof options === 'number') {
       groupId = options
@@ -33,9 +41,10 @@ export const useFeedStore = defineStore('feed', () => {
         date: options.date || undefined,
         userId: options.userId || undefined,
       }
-    } else {
+    } else if (page === 1) {
       activeFilters.value = {}
     }
+
     if (groupId !== undefined) {
       activeGroupId.value = groupId || undefined
     }
@@ -51,13 +60,22 @@ export const useFeedStore = defineStore('feed', () => {
       if (page === 1) {
         posts.value = res.data.data
       } else {
-        posts.value.push(...res.data.data)
+        // Evita duplicatas caso algum post já tenha chegado via WebSocket
+        const existingIds = new Set(posts.value.map(p => p.id))
+        const newUniquePosts = res.data.data.filter((p: Post) => !existingIds.has(p.id))
+        posts.value.push(...newUniquePosts)
       }
       currentPage.value = res.data.current_page
       lastPage.value = res.data.last_page
     } finally {
       isLoading.value = false
+      isLoadingMore.value = false
     }
+  }
+
+  async function loadMorePosts() {
+    if (isLoading.value || isLoadingMore.value || !hasMorePages.value) return
+    await fetchPosts(currentPage.value + 1)
   }
 
   function clearFilters() {
@@ -269,6 +287,8 @@ export const useFeedStore = defineStore('feed', () => {
   return {
     posts,
     isLoading,
+    isLoadingMore,
+    hasMorePages,
     isSubmitting,
     currentPage,
     lastPage,
@@ -277,6 +297,7 @@ export const useFeedStore = defineStore('feed', () => {
     activeFilters,
     clearFilters,
     fetchPosts,
+    loadMorePosts,
     fetchSinglePost,
     createPost,
     updatePost,

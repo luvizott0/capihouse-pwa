@@ -6,6 +6,7 @@ import RetroModal from '@/components/ui/RetroModal.vue'
 import RetroButton from '@/components/ui/RetroButton.vue'
 import EmojiPicker from '@/components/ui/EmojiPicker.vue'
 import MentionInput from '@/components/ui/MentionInput.vue'
+import { compressImageFile } from '@/utils/imageCompressor'
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{ (e: 'update:modelValue', value: boolean): void; (e: 'created'): void }>()
@@ -26,6 +27,7 @@ const hashtags = ref<string[]>([])
 const selectedFiles = ref<File[]>([])
 const filePreviews = ref<string[]>([])
 const errorMsg = ref('')
+const isCompressing = ref(false)
 const formContainerRef = ref<HTMLElement | null>(null)
 
 const totalFilesSize = computed(() => {
@@ -84,42 +86,53 @@ function removeHashtag(tag: string) {
   hashtags.value = hashtags.value.filter(t => t !== tag)
 }
 
-function handleFileSelect(e: Event) {
+async function handleFileSelect(e: Event) {
   errorMsg.value = ''
   const input = e.target as HTMLInputElement
-  if (!input.files) return
+  if (!input.files || input.files.length === 0) return
 
   const files = Array.from(input.files)
-  for (const file of files) {
-    if (selectedFiles.value.length >= MAX_FILES) {
-      errorMsg.value = `Você pode anexar no máximo ${MAX_FILES} arquivos por publicação.`
-      break
-    }
+  isCompressing.value = true
 
-    // Validar tipo de arquivo
-    const isValidType = file.type.startsWith('image/') || file.type.startsWith('video/')
-    if (!isValidType) {
-      errorMsg.value = `O arquivo "${file.name}" não é suportado. Use imagens (JPG, PNG, GIF, WEBP) ou vídeos (MP4, MOV).`
-      continue
-    }
+  try {
+    for (const file of files) {
+      if (selectedFiles.value.length >= MAX_FILES) {
+        errorMsg.value = `Você pode anexar no máximo ${MAX_FILES} arquivos por publicação.`
+        break
+      }
 
-    // Validar tamanho individual (20 MB)
-    if (file.size > MAX_FILE_SIZE) {
-      errorMsg.value = `O arquivo "${file.name}" (${formatBytes(file.size)}) ultrapassa o limite de 20MB por arquivo.`
-      continue
-    }
+      // Validar tipo de arquivo
+      const isValidType = file.type.startsWith('image/') || file.type.startsWith('video/')
+      if (!isValidType) {
+        errorMsg.value = `O arquivo "${file.name}" não é suportado. Use imagens (JPG, PNG, GIF, WEBP) ou vídeos (MP4, MOV).`
+        continue
+      }
 
-    // Validar se excede tamanho total seguro de 50 MB
-    if (totalFilesSize.value + file.size > MAX_TOTAL_SIZE) {
-      errorMsg.value = `Adicionar "${file.name}" ultrapassaria o limite total de 50MB para a publicação.`
-      continue
-    }
+      // Validar tamanho individual original (20 MB)
+      if (file.size > MAX_FILE_SIZE) {
+        errorMsg.value = `O arquivo "${file.name}" (${formatBytes(file.size)}) ultrapassa o limite de 20MB por arquivo.`
+        continue
+      }
 
-    selectedFiles.value.push(file)
-    filePreviews.value.push(URL.createObjectURL(file))
+      // Se for imagem, comprime para economizar dados e acelerar upload
+      let finalFile = file
+      if (file.type.startsWith('image/') && file.type !== 'image/gif') {
+        finalFile = await compressImageFile(file)
+      }
+
+      // Validar se excede tamanho total seguro de 50 MB
+      if (totalFilesSize.value + finalFile.size > MAX_TOTAL_SIZE) {
+        errorMsg.value = `Adicionar "${file.name}" ultrapassaria o limite total de 50MB para a publicação.`
+        continue
+      }
+
+      selectedFiles.value.push(finalFile)
+      filePreviews.value.push(URL.createObjectURL(finalFile))
+    }
+  } finally {
+    isCompressing.value = false
+    input.value = ''
   }
-
-  input.value = ''
 }
 
 function removeFile(index: number) {
@@ -286,11 +299,14 @@ function handleClose() {
           />
           📷 [ Anexar Fotos ]
         </label>
-        <span v-if="selectedFiles.length === 0" class="muted-hint">
+        <span v-if="isCompressing" class="compressing-hint">
+          ⚡ Otimizando fotos...
+        </span>
+        <span v-else-if="selectedFiles.length === 0" class="muted-hint">
           Máx: 5 fotos (até 20MB cada, 50MB total)
         </span>
         <span v-else class="media-status-hint" :class="{ 'limit-warning': isOverTotalLimit }">
-          {{ selectedFiles.length }}/{{ MAX_FILES }} fotos • {{ formatBytes(totalFilesSize) }} / 50 MB
+          {{ selectedFiles.length }}/{{ MAX_FILES }} fotos • {{ formatBytes(totalFilesSize) }}
         </span>
       </div>
 
@@ -321,8 +337,12 @@ function handleClose() {
       <!-- Footer Buttons -->
       <div class="modal-footer">
         <RetroButton variant="secondary" @click="handleClose">Cancelar</RetroButton>
-        <RetroButton :loading="feedStore.isSubmitting" :disabled="isOverTotalLimit" @click="handleSubmit">
-          Publicar
+        <RetroButton
+          :loading="feedStore.isSubmitting"
+          :disabled="isOverTotalLimit || isCompressing"
+          @click="handleSubmit"
+        >
+          {{ isCompressing ? 'Otimizando...' : 'Publicar' }}
         </RetroButton>
       </div>
     </div>
@@ -532,6 +552,13 @@ function handleClose() {
 .muted-hint {
   font-size: 0.8rem;
   color: var(--color-muted, #847062);
+}
+.compressing-hint {
+  font-family: var(--font-heading, monospace);
+  font-size: 0.78rem;
+  font-weight: bold;
+  color: var(--color-primary, #a66130);
+  animation: pulse 1s infinite alternate;
 }
 .media-status-hint {
   font-family: var(--font-heading, monospace);

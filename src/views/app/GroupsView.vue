@@ -1,4 +1,8 @@
 <script setup lang="ts">
+defineOptions({
+  name: 'GroupsView'
+})
+
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGroupsStore } from '@/stores/groups'
@@ -20,7 +24,11 @@ const searchTerms = computed(() => {
 const filterDate = computed(() => (route.query.date as string) || '')
 const filterUserId = computed(() => route.query.user_id ? Number(route.query.user_id) : null)
 
-async function loadGroups() {
+async function loadGroups(force = false) {
+  if (!force && !hasSearchFilters.value && groupsStore.myGroups.length > 0) {
+    return
+  }
+
   await groupsStore.fetchMyGroups({
     search: searchTerms.value || undefined,
     date: filterDate.value || undefined,
@@ -31,7 +39,7 @@ async function loadGroups() {
 watch(
   () => route.query,
   () => {
-    loadGroups()
+    loadGroups(true)
   }
 )
 
@@ -48,7 +56,7 @@ onUnmounted(() => {
 })
 
 function onGroupCreated() {
-  loadGroups()
+  loadGroups(true)
 }
 </script>
 
