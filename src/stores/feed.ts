@@ -16,14 +16,38 @@ export const useFeedStore = defineStore('feed', () => {
   /** Holds incoming posts that haven't been prepended yet (shown via banner). */
   const pendingPosts = ref<Post[]>([])
 
-  async function fetchPosts(page = 1, groupId?: number) {
+  const activeFilters = ref<{ search?: string; date?: string; userId?: number }>({})
+
+  async function fetchPosts(
+    page = 1,
+    options?: { groupId?: number; search?: string; date?: string; userId?: number } | number
+  ) {
     isLoading.value = true
+    let groupId: number | undefined
+    if (typeof options === 'number') {
+      groupId = options
+    } else if (options) {
+      groupId = options.groupId
+      activeFilters.value = {
+        search: options.search || undefined,
+        date: options.date || undefined,
+        userId: options.userId || undefined,
+      }
+    } else {
+      activeFilters.value = {}
+    }
     if (groupId !== undefined) {
       activeGroupId.value = groupId || undefined
     }
     const targetGroupId = groupId !== undefined ? (groupId || undefined) : activeGroupId.value
     try {
-      const res = await postsApi.getPosts(page, targetGroupId)
+      const res = await postsApi.getPosts({
+        page,
+        groupId: targetGroupId,
+        search: activeFilters.value.search,
+        date: activeFilters.value.date,
+        userId: activeFilters.value.userId,
+      })
       if (page === 1) {
         posts.value = res.data.data
       } else {
@@ -34,6 +58,10 @@ export const useFeedStore = defineStore('feed', () => {
     } finally {
       isLoading.value = false
     }
+  }
+
+  function clearFilters() {
+    activeFilters.value = {}
   }
 
   async function createPost(formData: FormData) {
@@ -230,6 +258,8 @@ export const useFeedStore = defineStore('feed', () => {
     lastPage,
     activeGroupId,
     pendingPosts,
+    activeFilters,
+    clearFilters,
     fetchPosts,
     createPost,
     updatePost,

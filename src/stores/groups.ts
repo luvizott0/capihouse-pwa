@@ -12,16 +12,35 @@ export const useGroupsStore = defineStore('groups', () => {
   const isLoading = ref(false)
   const isSending = ref(false)
 
-  async function fetchMyGroups() {
+  const activeFilters = ref<{ search?: string; date?: string; userId?: number }>({})
+
+  async function fetchMyGroups(options?: { search?: string; date?: string; userId?: number }) {
     isLoading.value = true
+    if (options) {
+      activeFilters.value = {
+        search: options.search || undefined,
+        date: options.date || undefined,
+        userId: options.userId || undefined,
+      }
+    } else {
+      activeFilters.value = {}
+    }
     try {
-      const res = await groupsApi.getGroups()
+      const res = await groupsApi.getGroups({
+        search: activeFilters.value.search,
+        date: activeFilters.value.date,
+        user_id: activeFilters.value.userId,
+      })
       myGroups.value = res.data.data
     } catch (err) {
       console.error('Erro ao buscar meus grupos:', err)
     } finally {
       isLoading.value = false
     }
+  }
+
+  function clearFilters() {
+    activeFilters.value = {}
   }
 
   async function fetchGroup(id: number) {
@@ -135,6 +154,8 @@ export const useGroupsStore = defineStore('groups', () => {
     currentGroup,
     messages,
     members,
+    activeFilters,
+    clearFilters,
     isLoading,
     isSending,
     fetchMyGroups,

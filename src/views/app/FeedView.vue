@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useFeedStore } from '@/stores/feed'
 import { useAuthStore } from '@/stores/auth'
 import PostCard from '@/components/feed/PostCard.vue'
@@ -9,13 +9,43 @@ import NewPostsBanner from '@/components/feed/NewPostsBanner.vue'
 import UserAvatar from '@/components/ui/UserAvatar.vue'
 
 const route = useRoute()
+const router = useRouter()
 const feedStore = useFeedStore()
 const authStore = useAuthStore()
 
 const showCreateModal = ref(false)
 
+const hasSearchFilters = computed(() => {
+  return !!(route.query.q || route.query.search || route.query.date || route.query.user_id)
+})
+
+const searchTerms = computed(() => {
+  return (route.query.q as string) || (route.query.search as string) || ''
+})
+const filterDate = computed(() => (route.query.date as string) || '')
+const filterUserId = computed(() => route.query.user_id ? Number(route.query.user_id) : null)
+
+async function loadPostsForCurrentRoute() {
+  await feedStore.fetchPosts(1, {
+    search: searchTerms.value || undefined,
+    date: filterDate.value || undefined,
+    userId: filterUserId.value || undefined,
+  })
+}
+
+watch(
+  () => route.query,
+  () => {
+    loadPostsForCurrentRoute()
+  }
+)
+
+function clearSearch() {
+  router.push({ path: '/feed' })
+}
+
 onMounted(async () => {
-  await feedStore.fetchPosts()
+  await loadPostsForCurrentRoute()
   if (route.hash) {
     await nextTick()
     setTimeout(() => {
@@ -37,6 +67,7 @@ onUnmounted(() => {
   feedStore.unsubscribeFromFeed()
   // Clear pending posts when leaving the feed
   feedStore.pendingPosts.splice(0)
+  feedStore.clearFilters()
 })
 </script>
 
@@ -73,13 +104,13 @@ onUnmounted(() => {
 
     <!-- Feed Header Title -->
     <div class="feed-header-line">
-      <h2 class="feed-title">» Publicações recentes</h2>
+      <h2 class="feed-title">» {{ hasSearchFilters ? 'Resultados da pesquisa' : 'Publicações recentes' }}</h2>
       <button
         type="button"
         class="refresh-btn"
         :class="{ 'is-refreshing': feedStore.isLoading }"
         :disabled="feedStore.isLoading"
-        @click="feedStore.fetchPosts(1)"
+        @click="loadPostsForCurrentRoute"
         title="Recarregar publicações"
       >
         <svg
@@ -98,6 +129,19 @@ onUnmounted(() => {
           />
         </svg>
         <span>{{ feedStore.isLoading ? 'Atualizando...' : 'Atualizar feed' }}</span>
+      </button>
+    </div>
+
+    <!-- Search Results Banner -->
+    <div v-if="hasSearchFilters" class="search-filter-banner">
+      <div class="search-filter-info">
+        <span class="search-filter-title">🔍 Filtro de busca:</span>
+        <span v-if="searchTerms" class="search-tag">Texto: "{{ searchTerms }}"</span>
+        <span v-if="filterDate" class="search-tag">Data: {{ filterDate }}</span>
+        <span v-if="filterUserId" class="search-tag">Usuário ID: {{ filterUserId }}</span>
+      </div>
+      <button type="button" class="clear-search-link" @click="clearSearch">
+        [✕ Limpar busca]
       </button>
     </div>
 
@@ -124,9 +168,14 @@ onUnmounted(() => {
     <!-- Empty State -->
     <div v-else class="empty-feed-card">
       <img src="/capihouse-logo.png" alt="Capivara" class="empty-capivara-logo" />
-      <h3 class="empty-title">Nenhuma publicação ainda</h3>
-      <p class="empty-subtitle">Seja o primeiro a compartilhar algo com os amigos da casa!</p>
-      <button type="button" class="empty-create-btn" @click="showCreateModal = true">
+      <h3 class="empty-title">{{ hasSearchFilters ? 'Nenhuma publicação encontrada' : 'Nenhuma publicação ainda' }}</h3>
+      <p class="empty-subtitle">
+        {{ hasSearchFilters ? 'Tente ajustar os filtros ou pesquisar por outros termos.' : 'Seja o primeiro a compartilhar algo com os amigos da casa!' }}
+      </p>
+      <button v-if="hasSearchFilters" type="button" class="empty-create-btn" @click="clearSearch">
+        [ Limpar busca ]
+      </button>
+      <button v-else type="button" class="empty-create-btn" @click="showCreateModal = true">
         [ Criar primeira publicação ]
       </button>
     </div>
@@ -393,5 +442,56 @@ onUnmounted(() => {
 }
 .empty-create-btn:hover {
   background-color: var(--color-primary-600);
+}
+
+/* Search Results Banner */
+.search-filter-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  background-color: var(--color-primary-50, #FFFBF7);
+  border: 1px dashed var(--color-primary, #6B3E26);
+  border-radius: 2px;
+  padding: 0.6rem 0.8rem;
+  font-family: var(--font-body, monospace);
+  font-size: 0.82rem;
+}
+
+.search-filter-info {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.search-filter-title {
+  font-weight: bold;
+  color: var(--color-primary-900, #3E2723);
+}
+
+.search-tag {
+  background-color: var(--color-primary-100, #F5EBE1);
+  border: 1px solid var(--color-border, #D8CDC5);
+  padding: 0.15rem 0.45rem;
+  border-radius: 2px;
+  font-weight: bold;
+  color: var(--color-primary-800, #3E2723);
+}
+
+.clear-search-link {
+  background: none;
+  border: none;
+  color: #c62828;
+  font-family: var(--font-heading, monospace);
+  font-size: 0.78rem;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+.clear-search-link:hover {
+  color: #b71c1c;
 }
 </style>

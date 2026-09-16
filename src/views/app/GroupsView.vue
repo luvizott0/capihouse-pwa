@@ -1,19 +1,51 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useGroupsStore } from '@/stores/groups'
 import GroupCreateModal from '@/components/groups/GroupCreateModal.vue'
 import RetroButton from '@/components/ui/RetroButton.vue'
 
+const route = useRoute()
+const router = useRouter()
 const groupsStore = useGroupsStore()
 const showCreateModal = ref(false)
+
+const hasSearchFilters = computed(() => {
+  return !!(route.query.q || route.query.search || route.query.date || route.query.user_id)
+})
+
+const searchTerms = computed(() => {
+  return (route.query.q as string) || (route.query.search as string) || ''
+})
+const filterDate = computed(() => (route.query.date as string) || '')
+const filterUserId = computed(() => route.query.user_id ? Number(route.query.user_id) : null)
+
+async function loadGroups() {
+  await groupsStore.fetchMyGroups({
+    search: searchTerms.value || undefined,
+    date: filterDate.value || undefined,
+    userId: filterUserId.value || undefined,
+  })
+}
+
+watch(
+  () => route.query,
+  () => {
+    loadGroups()
+  }
+)
+
+function clearSearch() {
+  router.push({ path: '/groups' })
+}
 
 onMounted(async () => {
   await loadGroups()
 })
 
-async function loadGroups() {
-  await groupsStore.fetchMyGroups()
-}
+onUnmounted(() => {
+  groupsStore.clearFilters()
+})
 
 function onGroupCreated() {
   loadGroups()
@@ -24,10 +56,23 @@ function onGroupCreated() {
   <div class="groups-view-container">
     <!-- Header with Action -->
     <div class="groups-header-line">
-      <h2 class="section-marker">Meus Grupos</h2>
+      <h2 class="section-marker">{{ hasSearchFilters ? 'Grupos Encontrados' : 'Meus Grupos' }}</h2>
       <RetroButton @click="showCreateModal = true">
         + Criar Grupo
       </RetroButton>
+    </div>
+
+    <!-- Search Results Banner -->
+    <div v-if="hasSearchFilters" class="search-filter-banner">
+      <div class="search-filter-info">
+        <span class="search-filter-title">🔍 Filtro de grupos:</span>
+        <span v-if="searchTerms" class="search-tag">Texto: "{{ searchTerms }}"</span>
+        <span v-if="filterDate" class="search-tag">Data: {{ filterDate }}</span>
+        <span v-if="filterUserId" class="search-tag">Criador ID: {{ filterUserId }}</span>
+      </div>
+      <button type="button" class="clear-search-link" @click="clearSearch">
+        [✕ Limpar busca]
+      </button>
     </div>
 
     <!-- Loading State -->
@@ -73,12 +118,15 @@ function onGroupCreated() {
     <!-- Empty State -->
     <div v-else class="empty-groups-box">
       <img src="/capihouse-logo.png" alt="Capivara" class="empty-capivara-logo" />
-      <h3 class="empty-title">Você ainda não participa de nenhum grupo</h3>
+      <h3 class="empty-title">{{ hasSearchFilters ? 'Nenhum grupo encontrado' : 'Você ainda não participa de nenhum grupo' }}</h3>
       <p class="empty-subtitle">
-        Os grupos no CapiHouse funcionam apenas por convite. Crie o seu próprio grupo para reunir os amigos da casa ou aguarde um convite!
+        {{ hasSearchFilters ? 'Nenhum grupo correspondeu aos filtros de busca aplicados.' : 'Os grupos no CapiHouse funcionam apenas por convite. Crie o seu próprio grupo para reunir os amigos da casa ou aguarde um convite!' }}
       </p>
       <div class="empty-actions">
-        <RetroButton @click="showCreateModal = true">
+        <button v-if="hasSearchFilters" type="button" class="btn-clear-empty" @click="clearSearch">
+          [ Limpar busca ]
+        </button>
+        <RetroButton v-else @click="showCreateModal = true">
           + Criar Primeiro Grupo
         </RetroButton>
       </div>
@@ -105,6 +153,72 @@ function onGroupCreated() {
   align-items: center;
 }
 
+/* Search Results Banner */
+.search-filter-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  background-color: var(--color-primary-50, #FFFBF7);
+  border: 1px dashed var(--color-primary, #6B3E26);
+  border-radius: 2px;
+  padding: 0.6rem 0.8rem;
+  font-family: var(--font-body, monospace);
+  font-size: 0.82rem;
+}
+
+.search-filter-info {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.search-filter-title {
+  font-weight: bold;
+  color: var(--color-primary-900, #3E2723);
+}
+
+.search-tag {
+  background-color: var(--color-primary-100, #F5EBE1);
+  border: 1px solid var(--color-border, #D8CDC5);
+  padding: 0.15rem 0.45rem;
+  border-radius: 2px;
+  font-weight: bold;
+  color: var(--color-primary-800, #3E2723);
+}
+
+.clear-search-link {
+  background: none;
+  border: none;
+  color: #c62828;
+  font-family: var(--font-heading, monospace);
+  font-size: 0.78rem;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+.clear-search-link:hover {
+  color: #b71c1c;
+}
+
+.btn-clear-empty {
+  background-color: var(--color-primary, #6B3E26);
+  color: white;
+  border: none;
+  font-family: var(--font-heading, monospace);
+  font-size: 0.85rem;
+  font-weight: bold;
+  padding: 0.5rem 1rem;
+  border-radius: 2px;
+  cursor: pointer;
+}
+.btn-clear-empty:hover {
+  background-color: var(--color-primary-600, #54311e);
+}
+
 .loading-state {
   text-align: center;
   padding: 3rem 1rem;
@@ -120,64 +234,63 @@ function onGroupCreated() {
 
 .group-card {
   display: flex;
-  gap: 0.75rem;
-  padding: 0.85rem;
+  flex-direction: column;
   background-color: #ffffff;
-  border: 2px solid var(--color-border);
+  border: 1px solid var(--color-border);
   border-radius: 2px;
+  overflow: hidden;
   text-decoration: none;
   color: inherit;
-  transition: all 0.15s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
+
 .group-card:hover {
-  border-color: var(--color-primary-400);
-  text-decoration: none;
   transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 12px rgba(62, 39, 35, 0.08);
+  border-color: var(--color-primary);
 }
 
 .group-photo-box {
-  width: 64px;
-  height: 64px;
-  border: 2px solid var(--color-border);
-  border-radius: 2px;
-  overflow: hidden;
+  width: 100%;
+  height: 120px;
   background-color: var(--color-primary-100);
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
+  overflow: hidden;
 }
+
 .group-photo-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
+
 .group-photo-fallback {
-  font-size: 1.75rem;
+  font-size: 2.5rem;
+  opacity: 0.5;
 }
 
 .group-info {
-  flex: 1;
-  min-width: 0;
+  padding: 0.85rem;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  gap: 0.35rem;
+  gap: 0.4rem;
+  flex: 1;
 }
 
 .group-title-row {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
-  gap: 0.35rem;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .group-name {
   font-family: var(--font-heading);
+  font-weight: bold;
   font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--color-primary-800);
+  color: var(--color-primary-900);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

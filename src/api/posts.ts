@@ -1,8 +1,25 @@
 import apiClient from './client'
 
-export function getPosts(page = 1, groupId?: number) {
-  const params: Record<string, unknown> = { page }
-  if (groupId) params.group_id = groupId
+export interface GetPostsParams {
+  page?: number
+  groupId?: number
+  search?: string
+  date?: string
+  userId?: number
+}
+
+export function getPosts(paramsOrPage: number | GetPostsParams = 1, groupId?: number) {
+  const params: Record<string, unknown> = {}
+  if (typeof paramsOrPage === 'number') {
+    params.page = paramsOrPage
+    if (groupId) params.group_id = groupId
+  } else {
+    if (paramsOrPage.page) params.page = paramsOrPage.page
+    if (paramsOrPage.groupId) params.group_id = paramsOrPage.groupId
+    if (paramsOrPage.search) params.search = paramsOrPage.search
+    if (paramsOrPage.date) params.date = paramsOrPage.date
+    if (paramsOrPage.userId) params.user_id = paramsOrPage.userId
+  }
   return apiClient.get('/posts', { params })
 }
 

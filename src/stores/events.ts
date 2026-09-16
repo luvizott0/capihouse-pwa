@@ -9,14 +9,37 @@ export const useEventsStore = defineStore('events', () => {
   const isLoading = ref(false)
   const isSubmitting = ref(false)
 
-  async function fetchEvents(page = 1) {
+  const activeFilters = ref<{ search?: string; date?: string; userId?: number }>({})
+
+  async function fetchEvents(
+    page = 1,
+    options?: { search?: string; date?: string; userId?: number }
+  ) {
     isLoading.value = true
+    if (options) {
+      activeFilters.value = {
+        search: options.search || undefined,
+        date: options.date || undefined,
+        userId: options.userId || undefined,
+      }
+    } else {
+      activeFilters.value = {}
+    }
     try {
-      const res = await eventsApi.getEvents(page)
+      const res = await eventsApi.getEvents({
+        page,
+        search: activeFilters.value.search,
+        date: activeFilters.value.date,
+        userId: activeFilters.value.userId,
+      })
       events.value = res.data.data
     } finally {
       isLoading.value = false
     }
+  }
+
+  function clearFilters() {
+    activeFilters.value = {}
   }
 
   async function fetchUpcoming() {
@@ -69,6 +92,8 @@ export const useEventsStore = defineStore('events', () => {
   return {
     events,
     upcomingEvents,
+    activeFilters,
+    clearFilters,
     isLoading,
     isSubmitting,
     fetchEvents,

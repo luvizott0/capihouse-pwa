@@ -1,7 +1,23 @@
 import apiClient from './client'
 
-export function getEvents(page = 1) {
-  return apiClient.get(`/events?page=${page}`)
+export interface GetEventsParams {
+  page?: number
+  search?: string
+  date?: string
+  userId?: number
+}
+
+export function getEvents(paramsOrPage: number | GetEventsParams = 1) {
+  const params: Record<string, unknown> = {}
+  if (typeof paramsOrPage === 'number') {
+    params.page = paramsOrPage
+  } else {
+    if (paramsOrPage.page) params.page = paramsOrPage.page
+    if (paramsOrPage.search) params.search = paramsOrPage.search
+    if (paramsOrPage.date) params.date = paramsOrPage.date
+    if (paramsOrPage.userId) params.user_id = paramsOrPage.userId
+  }
+  return apiClient.get('/events', { params })
 }
 
 export function getUpcomingEvents() {
