@@ -75,7 +75,7 @@ jobs:
           docker pull "$IMAGE_NAME"
           docker tag "$IMAGE_NAME" capihouse-pwa:latest
 
-      - name: Deploy no Docker Compose
+      - name: Executar Deploy Zero-Downtime Blue-Green
         run: |
           TARGET_DIR="${{ vars.CAPIHOUSE_DIR }}"
           if [ -z "$TARGET_DIR" ]; then
@@ -94,82 +94,49 @@ jobs:
             fi
           fi
 
-          echo "🚀 Atualizando serviço capihouse-pwa no Docker Compose em: $TARGET_DIR"
-          if [ -f "$TARGET_DIR/docker-compose.yml" ]; then
-            docker compose --project-directory "$TARGET_DIR" -f "$TARGET_DIR/docker-compose.yml" up -d --no-deps capihouse-pwa
+          if [ -f "$TARGET_DIR/scripts/deploy-blue-green.sh" ]; then
+            echo "🚀 Executando Deploy Zero-Downtime via scripts/deploy-blue-green.sh..."
+            chmod +x "$TARGET_DIR/scripts/deploy-blue-green.sh"
+            bash "$TARGET_DIR/scripts/deploy-blue-green.sh" pwa
           else
-            echo "⚠️ docker-compose.yml não encontrado em $TARGET_DIR. Tentando reiniciar contêiner capihouse-pwa diretamente..."
-            docker restart capihouse-pwa || echo "Contêiner não estava em execução."
-          fi
-
-      - name: Verificar Integridade com Rollback Automático
-        run: |
-          echo "🩺 Verificando status do frontend..."
-          PWA_PORT=$(docker port capihouse-pwa 80/tcp 2>/dev/null | head -n 1 | awk -F: '{print $NF}' || echo "80")
-          PWA_PORT="${PWA_PORT:-80}"
-          echo "Porta pública detectada: $PWA_PORT"
-
-          HEALTHY=false
-          for i in {1..12}; do
-            STATUS=$(docker inspect --format='{{.State.Status}}' capihouse-pwa 2>/dev/null || echo "not_found")
-            echo "Tentativa $i/12 - Status do container: $STATUS"
-            if [ "$STATUS" = "running" ]; then
-              if command -v curl >/dev/null 2>&1; then
-                HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${PWA_PORT}/" || echo "000")
-                if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "304" ]; then
-                  echo "✅ Frontend respondendo com sucesso (HTTP $HTTP_CODE)!"
-                  HEALTHY=true
-                  break
-                fi
-              else
-                echo "✅ Contêiner frontend rodando com sucesso!"
-                HEALTHY=true
-                break
-              fi
-            fi
-            sleep 3
-          done
-
-          if [ "$HEALTHY" = true ]; then
-            echo "🎉 Deploy do PWA concluído e validado com sucesso!"
-            exit 0
-          fi
-
-          echo "🚨 FALHA CRÍTICA: A nova versão do PWA não respondeu com sucesso dentro do tempo limite!"
-          echo "📋 Últimos logs do container frontend:"
-          docker logs --tail 40 capihouse-pwa || true
-
-          TARGET_DIR="${{ vars.CAPIHOUSE_DIR }}"
-          if [ -z "$TARGET_DIR" ]; then
-            if [ -n "$CAPIHOUSE_DIR" ]; then
-              TARGET_DIR="$CAPIHOUSE_DIR"
-            elif [ -f "$HOME/homelab/capihouse/docker-compose.yml" ]; then
-              TARGET_DIR="$HOME/homelab/capihouse"
-            elif [ -f "/opt/capihouse/docker-compose.yml" ]; then
-              TARGET_DIR="/opt/capihouse"
-            elif [ -f "$HOME/capihouse/docker-compose.yml" ]; then
-              TARGET_DIR="$HOME/capihouse"
-            elif [ -f "../docker-compose.yml" ]; then
-              TARGET_DIR=".."
-            else
-              TARGET_DIR="."
-            fi
-          fi
-
-          if docker image inspect capihouse-pwa:rollback-backup >/dev/null 2>&1; then
-            echo "⏪ Iniciando ROLLBACK AUTOMÁTICO para a versão anterior estável do PWA..."
-            docker tag capihouse-pwa:rollback-backup capihouse-pwa:latest
+            echo "ℹ️ Modo legado: scripts/deploy-blue-green.sh não encontrado em $TARGET_DIR. Atualizando via docker compose..."
             if [ -f "$TARGET_DIR/docker-compose.yml" ]; then
               docker compose --project-directory "$TARGET_DIR" -f "$TARGET_DIR/docker-compose.yml" up -d --no-deps capihouse-pwa
             else
-              docker restart capihouse-pwa || true
+              docker restart capihouse-pwa || echo "Contêiner não estava em execução."
             fi
-            echo "🛡️ Rollback executado com sucesso! A versão anterior do PWA está ativa no ar."
-          else
-            echo "⚠️ Imagem de backup 'capihouse-pwa:rollback-backup' não encontrada para restaurar."
-          fi
 
-          exit 1
+            echo "🩺 Verificando status no modo legado..."
+            PWA_PORT=$(docker port capihouse-pwa 80/tcp 2>/dev/null | head -n 1 | awk -F: '{print $NF}' || echo "80")
+            PWA_PORT="${PWA_PORT:-80}"
+            HEALTHY=false
+            for i in {1..12}; do
+              STATUS=$(docker inspect --format='{{.State.Status}}' capihouse-pwa 2>/dev/null || echo "not_found")
+              if [ "$STATUS" = "running" ]; then
+                if command -v curl >/dev/null 2>&1; then
+                  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${PWA_PORT}/" || echo "000")
+                  if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "304" ]; then
+                    HEALTHY=true
+                    break
+                  fi
+                else
+                  HEALTHY=true
+                  break
+                fi
+              fi
+              sleep 3
+            done
+
+            if [ "$HEALTHY" = false ]; then
+              echo "🚨 Falha na verificação de integridade do frontend! Executando rollback..."
+              docker logs --tail 30 capihouse-pwa || true
+              if docker image inspect capihouse-pwa:rollback-backup >/dev/null 2>&1; then
+                docker tag capihouse-pwa:rollback-backup capihouse-pwa:latest
+                docker compose --project-directory "$TARGET_DIR" -f "$TARGET_DIR/docker-compose.yml" up -d --no-deps capihouse-pwa
+              fi
+              exit 1
+            fi
+          fi
 
       - name: Limpeza de Imagens Antigas (Prune)
         if: always()
