@@ -11,12 +11,24 @@ import MentionInput from '@/components/ui/MentionInput.vue'
 import { formatRelativeTime } from '@/utils/date'
 import { resolveMediaUrl } from '@/utils/media'
 
-const props = defineProps<{ post: Post }>()
+const props = withDefaults(
+  defineProps<{
+    post: Post
+    defaultShowComments?: boolean
+  }>(),
+  {
+    defaultShowComments: false,
+  }
+)
+
+const emit = defineEmits<{
+  (e: 'deleted', postId: number): void
+}>()
 
 const feedStore = useFeedStore()
 const authStore = useAuthStore()
 
-const showComments = ref(false)
+const showComments = ref(props.defaultShowComments)
 const commentContent = ref('')
 const isSubmittingComment = ref(false)
 const showEditModal = ref(false)
@@ -149,6 +161,7 @@ async function confirmDeletePost() {
   try {
     await feedStore.deletePost(props.post.id)
     showDeleteModal.value = false
+    emit('deleted', props.post.id)
   } finally {
     isDeleting.value = false
   }

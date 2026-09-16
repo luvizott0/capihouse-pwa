@@ -54,12 +54,9 @@ function onGroupCreated() {
 
 <template>
   <div class="groups-view-container">
-    <!-- Header with Action -->
+    <!-- Header -->
     <div class="groups-header-line">
-      <h2 class="section-marker">{{ hasSearchFilters ? 'Grupos Encontrados' : 'Meus Grupos' }}</h2>
-      <RetroButton @click="showCreateModal = true">
-        + Criar Grupo
-      </RetroButton>
+      <h2 class="section-marker">» {{ hasSearchFilters ? 'Grupos Encontrados' : 'Meus Grupos' }}</h2>
     </div>
 
     <!-- Search Results Banner -->
@@ -151,6 +148,19 @@ function onGroupCreated() {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  background-color: var(--color-primary, #a66130);
+  border: 1px solid var(--color-primary-800, #5f4120);
+  border-radius: 2px;
+  padding: 0.6rem 0.85rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.section-marker {
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
 }
 
 /* Search Results Banner */

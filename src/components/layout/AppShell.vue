@@ -13,11 +13,14 @@ import MobileUsersSidebar from '@/components/sidebar/MobileUsersSidebar.vue'
 import EventsSidebar from '@/components/sidebar/EventsSidebar.vue'
 import PostCreateModal from '@/components/feed/PostCreateModal.vue'
 import EventCreateModal from '@/components/events/EventCreateModal.vue'
+import GroupCreateModal from '@/components/groups/GroupCreateModal.vue'
+import { useGroupsStore } from '@/stores/groups'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const feedStore = useFeedStore()
 const eventsStore = useEventsStore()
+const groupsStore = useGroupsStore()
 const notificationsStore = useNotificationsStore()
 
 onMounted(() => {
@@ -40,6 +43,7 @@ onUnmounted(() => {
 
 const showPostModal = ref(false)
 const showEventModal = ref(false)
+const showGroupModal = ref(false)
 const showMobileUsersDrawer = ref(false)
 
 function handleStopImpersonating() {
@@ -54,6 +58,10 @@ function onPostCreated() {
 function onEventCreated() {
   eventsStore.fetchEvents(1)
   eventsStore.fetchUpcoming()
+}
+
+function onGroupCreated() {
+  groupsStore.fetchMyGroups()
 }
 </script>
 
@@ -104,6 +112,7 @@ function onEventCreated() {
       <SearchBar
         @open-create-post="showPostModal = true"
         @open-create-event="showEventModal = true"
+        @open-create-group="showGroupModal = true"
       />
 
       <!-- Navigation Menu (Desktop tabs) -->
@@ -150,6 +159,11 @@ function onEventCreated() {
     <EventCreateModal
       v-model="showEventModal"
       @created="onEventCreated"
+    />
+
+    <GroupCreateModal
+      v-model="showGroupModal"
+      @created="onGroupCreated"
     />
   </div>
 </template>

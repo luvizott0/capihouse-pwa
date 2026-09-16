@@ -58,7 +58,7 @@ async function handleItemClick(item: any) {
     await notifStore.markAsRead(item.id)
   }
   if (item.data?.post_id) {
-    router.push(`/feed#post-${item.data.post_id}`)
+    router.push(`/posts/${item.data.post_id}`)
   }
 }
 </script>

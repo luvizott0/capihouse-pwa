@@ -37,6 +37,12 @@ const router = createRouter({
           meta: { requiresApproved: true }
         },
         {
+          path: 'posts/:id',
+          name: 'post-detail',
+          component: () => import('@/views/app/PostDetailView.vue'),
+          meta: { requiresApproved: true }
+        },
+        {
           path: 'profile',
           name: 'profile',
           component: () => import('@/views/app/ProfileView.vue'),

@@ -50,17 +50,14 @@ onUnmounted(() => {
 
 <template>
   <div class="events-view-container">
-    <!-- Header with Action -->
+    <!-- Header -->
     <div class="events-header">
       <div>
         <h2 class="section-title">» {{ hasSearchFilters ? 'Eventos Encontrados' : 'Eventos da Casa' }}</h2>
         <p class="section-subtitle">
-          {{ hasSearchFilters ? 'Resultados filtrados da sua busca de eventos.' : 'Encontros, churrascos e comemorações dos amigos.' }}
+          {{ hasSearchFilters ? 'Resultados filtrados da sua busca de eventos.' : '' }}
         </p>
       </div>
-      <button type="button" class="btn-create-event" @click="showCreateModal = true">
-        [ + Novo Evento ]
-      </button>
     </div>
 
     <!-- Search Results Banner -->
@@ -124,39 +121,25 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background-color: #ffffff;
-  border: 1px solid var(--color-border);
+  background-color: var(--color-primary, #a66130);
+  border: 1px solid var(--color-primary-800, #5f4120);
   border-radius: 2px;
-  padding: 0.75rem 1rem;
+  padding: 0.6rem 0.85rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .section-title {
-  font-family: var(--font-heading);
-  font-size: 1.1rem;
-  color: var(--color-primary-800);
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #ffffff;
   margin: 0;
 }
 
 .section-subtitle {
   font-size: 0.8rem;
-  color: var(--color-muted);
-  margin: 0.15rem 0 0 0;
-}
-
-.btn-create-event {
-  background-color: var(--color-primary);
-  color: white;
-  border: none;
-  font-family: var(--font-heading);
-  font-size: 0.85rem;
-  font-weight: bold;
-  padding: 0.45rem 0.8rem;
-  border-radius: 2px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.btn-create-event:hover {
-  background-color: var(--color-primary-600);
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0.2rem 0 0 0;
 }
 
 /* Search Results Banner */

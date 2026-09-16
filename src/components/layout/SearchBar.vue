@@ -3,7 +3,11 @@ import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import SearchFilterModal, { type SearchScope, type SearchFilterState } from './SearchFilterModal.vue'
 
-const emit = defineEmits<{ (e: 'open-create-post'): void; (e: 'open-create-event'): void }>()
+const emit = defineEmits<{
+  (e: 'open-create-post'): void
+  (e: 'open-create-event'): void
+  (e: 'open-create-group'): void
+}>()
 
 const route = useRoute()
 const router = useRouter()
@@ -96,6 +100,9 @@ const currentAction = computed(() => {
   }
   if (currentScope === 'events') {
     return { label: '[ + Novo Evento ]', action: () => emit('open-create-event') }
+  }
+  if (currentScope === 'groups') {
+    return { label: '[ + Criar Grupo ]', action: () => emit('open-create-group') }
   }
   return null
 })

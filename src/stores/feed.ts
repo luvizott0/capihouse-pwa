@@ -64,6 +64,22 @@ export const useFeedStore = defineStore('feed', () => {
     activeFilters.value = {}
   }
 
+  async function fetchSinglePost(postId: number) {
+    isLoading.value = true
+    try {
+      const res = await postsApi.getPost(postId)
+      const existingIndex = posts.value.findIndex(p => p.id === postId)
+      if (existingIndex !== -1) {
+        posts.value[existingIndex] = res.data
+      } else {
+        posts.value.push(res.data)
+      }
+      return res.data
+    } finally {
+      isLoading.value = false
+    }
+  }
+
   async function createPost(formData: FormData) {
     isSubmitting.value = true
     try {
@@ -261,6 +277,7 @@ export const useFeedStore = defineStore('feed', () => {
     activeFilters,
     clearFilters,
     fetchPosts,
+    fetchSinglePost,
     createPost,
     updatePost,
     toggleLike,

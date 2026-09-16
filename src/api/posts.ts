@@ -23,6 +23,10 @@ export function getPosts(paramsOrPage: number | GetPostsParams = 1, groupId?: nu
   return apiClient.get('/posts', { params })
 }
 
+export function getPost(postId: number) {
+  return apiClient.get(`/posts/${postId}`)
+}
+
 export function createPost(formData: FormData) {
   return apiClient.post('/posts', formData, {
     headers: {

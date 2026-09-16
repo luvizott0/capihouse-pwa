@@ -128,7 +128,6 @@ onUnmounted(() => {
             d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
           />
         </svg>
-        <span>{{ feedStore.isLoading ? 'Atualizando...' : 'Atualizar feed' }}</span>
       </button>
     </div>
 
@@ -308,34 +307,41 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  background-color: var(--color-primary, #a66130);
+  border: 1px solid var(--color-primary-800, #5f4120);
+  border-radius: 2px;
+  padding: 0.6rem 0.85rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   margin-top: 0.25rem;
 }
 
 .feed-title {
   font-family: var(--font-heading, 'Space Mono', monospace);
-  font-size: 1.1rem;
-  color: var(--color-primary-800, #5f4120);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
 }
 
 .refresh-btn {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  background-color: var(--color-primary-50, #f8f6f1);
-  border: 1px solid var(--color-border, #D8CDC5);
+  background-color: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.4);
   border-radius: 2px;
-  padding: 0.35rem 0.65rem;
+  padding: 0.3rem 0.6rem;
   font-family: var(--font-heading, 'Space Mono', monospace);
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-weight: 700;
-  color: var(--color-primary-800, #5f4120);
+  color: #ffffff;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 .refresh-btn:hover:not(:disabled) {
-  background-color: var(--color-primary-100, #eedfd4);
-  border-color: var(--color-primary, #a66130);
-  color: var(--color-primary, #a66130);
+  background-color: rgba(255, 255, 255, 0.25);
+  border-color: #ffffff;
+  color: #ffffff;
 }
 .refresh-btn:disabled {
   opacity: 0.7;

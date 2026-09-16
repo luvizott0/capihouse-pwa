@@ -12,14 +12,14 @@ const authStore = useAuthStore()
           <router-link to="/feed" class="nav-tab" active-class="active">
             Feed
           </router-link>
-          <router-link to="/profile" class="nav-tab" active-class="active">
-            Perfil
-          </router-link>
           <router-link to="/events" class="nav-tab" active-class="active">
             Eventos
           </router-link>
           <router-link to="/groups" class="nav-tab" active-class="active">
             Grupos
+          </router-link>
+          <router-link to="/profile" class="nav-tab" active-class="active">
+            Perfil
           </router-link>
           <router-link v-if="authStore.isAdmin" to="/admin/users" class="nav-tab" active-class="active">
             Admin
@@ -42,12 +42,12 @@ const authStore = useAuthStore()
           <span class="tab-label">Feed</span>
         </router-link>
 
-        <!-- Profile Tab -->
-        <router-link to="/profile" class="mobile-tab" active-class="active">
+        <!-- Events Tab -->
+        <router-link to="/events" class="mobile-tab" active-class="active">
           <svg xmlns="http://www.w3.org/2000/svg" class="tab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
-          <span class="tab-label">Perfil</span>
+          <span class="tab-label">Eventos</span>
         </router-link>
 
         <!-- Groups Tab -->
@@ -58,12 +58,12 @@ const authStore = useAuthStore()
           <span class="tab-label">Grupos</span>
         </router-link>
 
-        <!-- Events Tab -->
-        <router-link to="/events" class="mobile-tab" active-class="active">
+        <!-- Profile Tab -->
+        <router-link to="/profile" class="mobile-tab" active-class="active">
           <svg xmlns="http://www.w3.org/2000/svg" class="tab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           </svg>
-          <span class="tab-label">Eventos</span>
+          <span class="tab-label">Perfil</span>
         </router-link>
 
         <!-- Admin Tab (Only if admin) -->
