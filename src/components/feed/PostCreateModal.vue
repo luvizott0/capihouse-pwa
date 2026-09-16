@@ -5,6 +5,7 @@ import { useGroupsStore } from '@/stores/groups'
 import RetroModal from '@/components/ui/RetroModal.vue'
 import RetroButton from '@/components/ui/RetroButton.vue'
 import EmojiPicker from '@/components/ui/EmojiPicker.vue'
+import MentionInput from '@/components/ui/MentionInput.vue'
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{ (e: 'update:modelValue', value: boolean): void; (e: 'created'): void }>()
@@ -132,13 +133,12 @@ function handleClose() {
         </select>
       </div>
 
-      <textarea
+      <MentionInput
         v-model="content"
-        rows="4"
-        placeholder="O que está acontecendo na casa hoje?..."
-        class="retro-textarea"
-        maxlength="2000"
-      ></textarea>
+        :rows="4"
+        placeholder="O que está acontecendo na casa hoje? Use @ para marcar amigos..."
+        :maxlength="2000"
+      />
 
       <!-- Feelings Section with EmojiPicker -->
       <div class="feelings-section">

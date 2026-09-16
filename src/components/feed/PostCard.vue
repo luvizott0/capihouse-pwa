@@ -6,6 +6,8 @@ import { useAuthStore } from '@/stores/auth'
 import UserAvatar from '@/components/ui/UserAvatar.vue'
 import RetroConfirmModal from '@/components/ui/RetroConfirmModal.vue'
 import PostEditModal from './PostEditModal.vue'
+import FormattedContent from '@/components/ui/FormattedContent.vue'
+import MentionInput from '@/components/ui/MentionInput.vue'
 import { formatRelativeTime } from '@/utils/date'
 import { resolveMediaUrl } from '@/utils/media'
 
@@ -180,6 +182,9 @@ async function confirmDeletePost() {
             <span v-if="post.feeling" class="feeling-indicator">
               • se sentindo <strong>{{ post.feeling.name }}</strong> {{ post.feeling.emoji }}
             </span>
+            <span v-if="post.mentions && post.mentions.length" class="mentions-indicator">
+              • com <template v-for="(m, mi) in post.mentions" :key="m.id"><router-link :to="`/profile/${m.username}`" class="post-mention-tag">@{{ m.username }}</router-link><span v-if="mi < post.mentions.length - 1">, </span></template>
+            </span>
           </div>
         </div>
       </div>
@@ -197,7 +202,7 @@ async function confirmDeletePost() {
 
     <!-- Post Content -->
     <div v-if="post.content" class="post-body">
-      {{ post.content }}
+      <FormattedContent :content="post.content" />
     </div>
 
     <!-- Media Carousel -->
@@ -343,14 +348,15 @@ async function confirmDeletePost() {
 
             <!-- Inline Edit Mode -->
             <div v-if="editingCommentId === c.id" class="comment-inline-edit">
-              <input
+              <MentionInput
                 v-model="editingCommentContent"
-                type="text"
-                class="comment-edit-input"
-                maxlength="500"
+                type="input"
+                :maxlength="500"
                 :disabled="isUpdatingComment"
-                @keydown.enter.prevent="saveEditComment(c.id)"
-                @keydown.esc="cancelEditComment"
+                inputClass="comment-edit-input"
+                popupPosition="top"
+                @submit="saveEditComment(c.id)"
+                @cancel="cancelEditComment"
               />
               <div class="comment-inline-edit-actions">
                 <button
@@ -373,7 +379,9 @@ async function confirmDeletePost() {
             </div>
 
             <!-- Standard Comment Text -->
-            <p v-else class="comment-text">{{ c.content }}</p>
+            <p v-else class="comment-text">
+              <FormattedContent :content="c.content" />
+            </p>
           </div>
         </div>
       </div>
@@ -383,12 +391,14 @@ async function confirmDeletePost() {
 
       <!-- Add Comment Input -->
       <form @submit.prevent="handleAddComment" class="comment-form">
-        <input
+        <MentionInput
           v-model="commentContent"
-          type="text"
-          placeholder="Escreva um comentário..."
-          class="comment-input"
-          maxlength="500"
+          type="input"
+          placeholder="Escreva um comentário... (use @ para marcar)"
+          inputClass="comment-input"
+          :maxlength="500"
+          popupPosition="top"
+          @submit="handleAddComment"
         />
         <button
           type="submit"
@@ -501,6 +511,21 @@ async function confirmDeletePost() {
 
 .feeling-indicator {
   color: var(--color-primary-700, #7d5628);
+}
+
+.mentions-indicator {
+  color: var(--color-primary-700, #7d5628);
+}
+
+.post-mention-tag {
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-primary, #a66130);
+  text-decoration: none;
+}
+.post-mention-tag:hover {
+  text-decoration: underline;
 }
 
 .post-group-link {

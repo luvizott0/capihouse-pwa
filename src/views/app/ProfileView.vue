@@ -81,6 +81,8 @@ async function loadProfile() {
     settingsUsername.value = user.value.username
     bioInput.value = user.value.bio || ''
     birthInput.value = user.value.birth ? user.value.birth.substring(0, 10) : ''
+    // Fetch posts for this user profile (authored posts and tagged posts)
+    await feedStore.fetchPosts(1, { userId: user.value.id })
   }
 }
 
@@ -89,11 +91,11 @@ onUnmounted(() => {
   if (wasVisitingOther.value) {
     themeStore.loadThemeFromUser(authStore.user)
   }
+  feedStore.clearFilters()
 })
 
-onMounted(() => {
-  loadProfile()
-  feedStore.fetchPosts()
+onMounted(async () => {
+  await loadProfile()
 })
 
 watch(() => route.params.username, loadProfile)
@@ -232,10 +234,11 @@ async function saveSettings() {
   }
 }
 
-// User's own posts
+// User's own posts and posts where user is tagged
 const userPosts = computed(() => {
   if (!user.value) return []
-  return feedStore.posts.filter(p => p.user_id === user.value?.id)
+  const uid = user.value.id
+  return feedStore.posts.filter(p => p.user_id === uid || p.mentions?.some(m => m.id === uid))
 })
 </script>
 

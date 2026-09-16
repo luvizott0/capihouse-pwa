@@ -61,6 +61,7 @@ export interface PostComment {
   user_id: number
   content: string
   user: User
+  mentions?: User[]
   created_at: string
   updated_at?: string
 }
@@ -84,6 +85,7 @@ export interface Post {
   media: Media[]
   feeling: Feeling | null
   hashtags: Hashtag[]
+  mentions?: User[]
   comments: PostComment[]
   likes?: PostLike[]
   is_liked?: boolean

@@ -5,6 +5,7 @@ import { useFeedStore } from '@/stores/feed'
 import RetroModal from '@/components/ui/RetroModal.vue'
 import RetroButton from '@/components/ui/RetroButton.vue'
 import EmojiPicker from '@/components/ui/EmojiPicker.vue'
+import MentionInput from '@/components/ui/MentionInput.vue'
 
 const props = defineProps<{
   modelValue: boolean
@@ -92,13 +93,12 @@ function handleClose() {
 
       <div class="form-group">
         <label class="form-label">Conteúdo do Post</label>
-        <textarea
+        <MentionInput
           v-model="content"
-          rows="4"
-          placeholder="O que está acontecendo na casa hoje?..."
-          class="retro-textarea"
-          maxlength="2000"
-        ></textarea>
+          :rows="4"
+          placeholder="O que está acontecendo na casa hoje? Use @ para marcar amigos..."
+          :maxlength="2000"
+        />
       </div>
 
       <!-- Feelings Section with EmojiPicker -->
