@@ -55,13 +55,28 @@ export interface Hashtag {
   name: string
 }
 
+export interface PostCommentParent {
+  id: number
+  content: string
+  user_id: number
+  user?: {
+    id: number
+    name: string
+    username: string
+  }
+}
+
 export interface PostComment {
   id: number
   post_id: number
+  parent_id?: number | null
+  parent?: PostCommentParent | null
   user_id: number
   content: string
   user: User
   mentions?: User[]
+  likes_count?: number
+  is_liked?: boolean
   created_at: string
   updated_at?: string
 }

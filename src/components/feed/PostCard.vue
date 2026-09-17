@@ -165,6 +165,28 @@ function openMediaModal(clickedIndex: number) {
   imageViewer.openGallery(imageItems, Math.max(0, targetIndex))
 }
 
+const replyingTo = ref<PostComment | null>(null)
+
+function startReply(comment: PostComment) {
+  replyingTo.value = comment
+  showComments.value = true
+  setTimeout(() => {
+    const inputEl = document.querySelector(`#post-${props.post.id} .comment-form-row input, #post-${props.post.id} .comment-form-row textarea`) as HTMLElement | null
+    if (inputEl) {
+      inputEl.focus()
+      inputEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
+  }, 60)
+}
+
+function cancelReply() {
+  replyingTo.value = null
+}
+
+async function handleToggleCommentLike(comment: PostComment) {
+  await feedStore.toggleCommentLike(props.post.id, comment.id)
+}
+
 async function handleLike() {
   await feedStore.toggleLike(props.post.id)
 }
@@ -172,9 +194,11 @@ async function handleLike() {
 async function handleAddComment() {
   if (!commentContent.value.trim()) return
   isSubmittingComment.value = true
+  const parentId = replyingTo.value?.id || null
   try {
-    await feedStore.addComment(props.post.id, commentContent.value.trim())
+    await feedStore.addComment(props.post.id, commentContent.value.trim(), parentId)
     commentContent.value = ''
+    replyingTo.value = null
   } finally {
     isSubmittingComment.value = false
   }
@@ -352,11 +376,33 @@ async function confirmDeletePost() {
     <!-- Comments Section (Collapsible) -->
     <div v-if="showComments" class="comments-section">
       <div v-if="post.comments && post.comments.length" class="comments-list">
-        <div v-for="c in post.comments" :key="c.id" class="comment-item">
+        <div
+          v-for="c in post.comments"
+          :key="c.id"
+          :id="'comment-' + c.id"
+          class="comment-item"
+          :class="{ 'is-reply': !!c.parent_id }"
+        >
           <router-link :to="`/profile/${c.user?.username}`" class="comment-avatar-link">
             <UserAvatar :user="c.user" size="sm" />
           </router-link>
           <div class="comment-content-box">
+            <!-- Parent comment quotation header if this comment is a reply -->
+            <div v-if="c.parent" class="comment-reply-context">
+              <span class="reply-symbol">↳</span>
+              <span class="reply-to-text">Em resposta a</span>
+              <router-link
+                v-if="c.parent.user?.username"
+                :to="`/profile/${c.parent.user.username}`"
+                class="reply-user-link"
+              >
+                @{{ c.parent.user.username }}
+              </router-link>
+              <span class="reply-quote-preview">
+                "{{ c.parent.content.length > 50 ? c.parent.content.substring(0, 50) + '...' : c.parent.content }}"
+              </span>
+            </div>
+
             <div class="comment-user-line">
               <router-link :to="`/profile/${c.user?.username}`" class="comment-user-name">
                 {{ c.user?.name }}
@@ -421,10 +467,35 @@ async function confirmDeletePost() {
               </div>
             </div>
 
-            <!-- Standard Comment Text -->
-            <p v-else class="comment-text">
-              <FormattedContent :content="c.content" />
-            </p>
+            <!-- Standard Comment Text & Footer -->
+            <template v-else>
+              <p class="comment-text">
+                <FormattedContent :content="c.content" />
+              </p>
+
+              <!-- Comment Footer: Like & Reply -->
+              <div class="comment-footer">
+                <button
+                  type="button"
+                  class="comment-like-btn"
+                  :class="{ liked: c.is_liked }"
+                  :title="c.is_liked ? 'Descurtir comentário' : 'Curtir comentário'"
+                  @click="handleToggleCommentLike(c)"
+                >
+                  <span class="like-heart-icon">{{ c.is_liked ? '❤️' : '🤍' }}</span>
+                  <span class="comment-like-count">{{ c.likes_count || 0 }}</span>
+                </button>
+
+                <button
+                  type="button"
+                  class="comment-reply-btn"
+                  title="Responder a este comentário"
+                  @click="startReply(c)"
+                >
+                  <span class="reply-arrow-icon">↩</span> Responder
+                </button>
+              </div>
+            </template>
           </div>
         </div>
       </div>
@@ -432,24 +503,45 @@ async function confirmDeletePost() {
         Nenhum comentário ainda. Seja o primeiro a comentar!
       </div>
 
-      <!-- Add Comment Input -->
-      <form @submit.prevent="handleAddComment" class="comment-form">
-        <MentionInput
-          v-model="commentContent"
-          type="input"
-          placeholder="Escreva um comentário... (use @ para marcar)"
-          inputClass="comment-input"
-          :maxlength="500"
-          popupPosition="top"
-          @submit="handleAddComment"
-        />
-        <button
-          type="submit"
-          class="comment-submit-btn"
-          :disabled="isSubmittingComment || !commentContent.trim()"
-        >
-          [ Comentar ]
-        </button>
+      <!-- Add Comment Input Form -->
+      <form @submit.prevent="handleAddComment" class="comment-form-container">
+        <!-- Replying context banner -->
+        <div v-if="replyingTo" class="replying-to-banner">
+          <div class="replying-to-info">
+            <span class="replying-arrow">↳</span>
+            <span class="replying-label">Respondendo a <strong>@{{ replyingTo.user?.username || replyingTo.user?.name }}</strong>:</span>
+            <span class="replying-snippet">
+              "{{ replyingTo.content.length > 45 ? replyingTo.content.substring(0, 45) + '...' : replyingTo.content }}"
+            </span>
+          </div>
+          <button
+            type="button"
+            class="cancel-reply-btn"
+            title="Cancelar resposta"
+            @click="cancelReply"
+          >
+            [ × Cancelar ]
+          </button>
+        </div>
+
+        <div class="comment-form-row">
+          <MentionInput
+            v-model="commentContent"
+            type="input"
+            :placeholder="replyingTo ? `Responder a @${replyingTo.user?.username || replyingTo.user?.name}...` : 'Escreva um comentário... (use @ para marcar)'"
+            inputClass="comment-input"
+            :maxlength="500"
+            popupPosition="top"
+            @submit="handleAddComment"
+          />
+          <button
+            type="submit"
+            class="comment-submit-btn"
+            :disabled="isSubmittingComment || !commentContent.trim()"
+          >
+            {{ replyingTo ? '[ Responder ]' : '[ Comentar ]' }}
+          </button>
+        </div>
       </form>
     </div>
 
@@ -828,6 +920,68 @@ async function confirmDeletePost() {
   display: flex;
   gap: 0.6rem;
   align-items: flex-start;
+  transition: margin-left 0.2s ease;
+}
+
+.comment-item.is-reply {
+  margin-left: 1.6rem;
+  position: relative;
+}
+
+.comment-item.is-reply::before {
+  content: '';
+  position: absolute;
+  left: -1rem;
+  top: -0.75rem;
+  width: 0.75rem;
+  height: calc(0.75rem + 16px);
+  border-left: 2px solid var(--color-primary-300, #c89d70);
+  border-bottom: 2px solid var(--color-primary-300, #c89d70);
+  border-bottom-left-radius: 4px;
+  pointer-events: none;
+}
+
+.comment-reply-context {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.4rem;
+  padding: 0.2rem 0.45rem;
+  background: var(--color-primary-50, #f8f6f1);
+  border: 1px solid var(--color-border, #d8cdc5);
+  border-radius: 2px;
+  font-size: 0.72rem;
+  color: var(--color-muted, #847062);
+  line-height: 1.3;
+}
+
+.reply-symbol {
+  font-weight: bold;
+  color: var(--color-primary, #a66130);
+}
+
+.reply-to-text {
+  font-family: var(--font-body);
+}
+
+.reply-user-link {
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-weight: 700;
+  color: var(--color-primary-800, #5f4120);
+  text-decoration: none;
+}
+.reply-user-link:hover {
+  text-decoration: underline;
+}
+
+.reply-quote-preview {
+  font-style: italic;
+  color: var(--color-muted, #847062);
+  max-width: 250px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .comment-content-box {
@@ -836,6 +990,7 @@ async function confirmDeletePost() {
   border: 1px solid var(--color-border);
   padding: 0.5rem 0.75rem;
   border-radius: 2px;
+  min-width: 0;
 }
 
 .comment-avatar-link {
@@ -979,6 +1134,77 @@ async function confirmDeletePost() {
   word-break: break-word;
 }
 
+.comment-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.45rem;
+  padding-top: 0.35rem;
+  border-top: 1px dotted var(--color-border, #e5ddd5);
+}
+
+.comment-like-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  padding: 0.15rem 0.35rem;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.72rem;
+  color: var(--color-muted, #847062);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+.comment-like-btn:hover {
+  border-color: var(--color-border, #d8cdc5);
+  background: var(--color-primary-50, #fdf8f3);
+}
+.comment-like-btn.liked {
+  color: #dc2626;
+  font-weight: 700;
+}
+.comment-like-btn.liked:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+
+.like-heart-icon {
+  font-size: 0.75rem;
+}
+
+.comment-like-count {
+  font-weight: bold;
+}
+
+.comment-reply-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  padding: 0.15rem 0.35rem;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-primary-700, #7d5628);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+.comment-reply-btn:hover {
+  border-color: var(--color-border, #d8cdc5);
+  background: var(--color-primary-50, #fdf8f3);
+  color: var(--color-primary, #a66130);
+}
+
+.reply-arrow-icon {
+  font-size: 0.72rem;
+}
+
 .no-comments {
   font-size: 0.8rem;
   color: var(--color-muted);
@@ -986,15 +1212,75 @@ async function confirmDeletePost() {
   padding: 0.5rem;
 }
 
-.comment-form {
+.comment-form-container {
   display: flex;
-  align-items: stretch;
-  gap: 0.5rem;
+  flex-direction: column;
+  gap: 0.4rem;
   margin-top: 0.5rem;
   width: 100%;
 }
 
-.comment-form :deep(.mention-input-wrapper) {
+.replying-to-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.6rem;
+  background: var(--color-primary-100, #f6eee4);
+  border: 1px solid var(--color-primary-300, #d5bba2);
+  border-radius: 2px;
+  font-size: 0.75rem;
+  color: var(--color-primary-900, #463018);
+}
+
+.replying-to-info {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.replying-arrow {
+  font-weight: 700;
+  color: var(--color-primary, #a66130);
+}
+
+.replying-snippet {
+  font-style: italic;
+  color: var(--color-muted, #847062);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+}
+
+.cancel-reply-btn {
+  background: none;
+  border: none;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-danger, #dc2626);
+  cursor: pointer;
+  padding: 0.1rem 0.3rem;
+  border-radius: 2px;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+.cancel-reply-btn:hover {
+  background-color: #fee2e2;
+}
+
+.comment-form-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.comment-form-row :deep(.mention-input-wrapper) {
   flex: 1 1 0;
   min-width: 0;
   width: auto;
@@ -1038,7 +1324,18 @@ async function confirmDeletePost() {
 }
 
 @media (max-width: 480px) {
-  .comment-form {
+  .comment-item.is-reply {
+    margin-left: 1.1rem;
+  }
+  .comment-item.is-reply::before {
+    left: -0.75rem;
+    width: 0.55rem;
+  }
+  .reply-quote-preview,
+  .replying-snippet {
+    max-width: 130px;
+  }
+  .comment-form-row {
     gap: 0.35rem;
   }
   .comment-submit-btn {

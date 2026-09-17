@@ -236,10 +236,57 @@ export const useFeedStore = defineStore('feed', () => {
     }
   }
 
-  async function addComment(postId: number, content: string) {
+  async function toggleCommentLike(postId: number, commentId: number) {
     const postInFeed = posts.value.find(p => p.id === postId)
     const postInUser = userPosts.value.find(p => p.id === postId)
-    const res = await postsApi.addComment(postId, content)
+
+    const commentInFeed = postInFeed?.comments?.find(c => Number(c.id) === Number(commentId))
+    const commentInUser = postInUser?.comments?.find(c => Number(c.id) === Number(commentId))
+
+    const targetComment = commentInFeed || commentInUser
+    if (!targetComment) return
+
+    const prevLiked = !!targetComment.is_liked
+    const prevCount = targetComment.likes_count ?? 0
+    const nextLiked = !prevLiked
+    const nextCount = Math.max(0, prevCount + (nextLiked ? 1 : -1))
+
+    if (commentInFeed) {
+      commentInFeed.is_liked = nextLiked
+      commentInFeed.likes_count = nextCount
+    }
+    if (commentInUser) {
+      commentInUser.is_liked = nextLiked
+      commentInUser.likes_count = nextCount
+    }
+
+    try {
+      const res = await postsApi.toggleCommentLike(commentId)
+      if (commentInFeed) {
+        commentInFeed.is_liked = res.data.is_liked
+        commentInFeed.likes_count = res.data.likes_count
+      }
+      if (commentInUser) {
+        commentInUser.is_liked = res.data.is_liked
+        commentInUser.likes_count = res.data.likes_count
+      }
+    } catch {
+      // Revert on error
+      if (commentInFeed) {
+        commentInFeed.is_liked = prevLiked
+        commentInFeed.likes_count = prevCount
+      }
+      if (commentInUser) {
+        commentInUser.is_liked = prevLiked
+        commentInUser.likes_count = prevCount
+      }
+    }
+  }
+
+  async function addComment(postId: number, content: string, parentId?: number | null) {
+    const postInFeed = posts.value.find(p => p.id === postId)
+    const postInUser = userPosts.value.find(p => p.id === postId)
+    const res = await postsApi.addComment(postId, content, parentId)
 
     const applyComment = (post: Post) => {
       if (!post.comments) post.comments = []
@@ -420,6 +467,20 @@ export const useFeedStore = defineStore('feed', () => {
         const postInUser = userPosts.value.find(p => p.id === data.post_id)
         if (postInUser) updateComments(postInUser)
       })
+      .listen('.CommentLiked', (data: { post_id: number; comment_id: number; is_liked: boolean; likes_count: number; user_id: number }) => {
+        if (data.user_id === currentUserId) return
+        const updateCommentLikes = (post: Post) => {
+          if (!post || !post.comments) return
+          const comment = post.comments.find(c => Number(c.id) === Number(data.comment_id))
+          if (comment) {
+            comment.likes_count = data.likes_count
+          }
+        }
+        const postInFeed = posts.value.find(p => p.id === data.post_id)
+        if (postInFeed) updateCommentLikes(postInFeed)
+        const postInUser = userPosts.value.find(p => p.id === data.post_id)
+        if (postInUser) updateCommentLikes(postInUser)
+      })
   }
 
   function unsubscribeFromFeed(groupId?: number) {
@@ -455,6 +516,7 @@ export const useFeedStore = defineStore('feed', () => {
     createPost,
     updatePost,
     toggleLike,
+    toggleCommentLike,
     addComment,
     updateComment,
     deleteComment,

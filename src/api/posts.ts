@@ -47,8 +47,15 @@ export function toggleLike(postId: number) {
   return apiClient.post(`/posts/${postId}/like`)
 }
 
-export function addComment(postId: number, content: string) {
-  return apiClient.post(`/posts/${postId}/comments`, { content })
+export function toggleCommentLike(commentId: number) {
+  return apiClient.post(`/comments/${commentId}/like`)
+}
+
+export function addComment(postId: number, content: string, parentId?: number | null) {
+  return apiClient.post(`/posts/${postId}/comments`, {
+    content,
+    parent_id: parentId || undefined,
+  })
 }
 
 export function updateComment(commentId: number, content: string) {

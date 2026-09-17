@@ -1,4 +1,5 @@
 /* oxlint-disable vitest/require-mock-type-parameters */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useFeedStore } from '@/stores/feed'
@@ -164,5 +165,47 @@ describe('Feed Store', () => {
     expect(store.posts[0]!.comments).toHaveLength(1)
     expect(store.userPosts[0]!.comments_count).toBe(1)
     expect(store.userPosts[0]!.comments).toHaveLength(1)
+  })
+
+  it('addComment passes parentId when replying', async () => {
+    const store = useFeedStore()
+    store.posts = [{ ...mockPost1, comments: [] }]
+
+    vi.mocked(postsApi.addComment).mockResolvedValueOnce({
+      data: {
+        id: 100,
+        post_id: 1,
+        parent_id: 99,
+        user_id: 10,
+        content: 'Resposta ao comentário 99',
+      },
+    } as any)
+
+    await store.addComment(1, 'Resposta ao comentário 99', 99)
+
+    expect(postsApi.addComment).toHaveBeenCalledWith(1, 'Resposta ao comentário 99', 99)
+    expect(store.posts[0]!.comments[0]!.parent_id).toBe(99)
+  })
+
+  it('toggleCommentLike updates is_liked and likes_count in both feed and userPosts', async () => {
+    const store = useFeedStore()
+    const comment = { id: 50, post_id: 1, user_id: 10, content: 'Comentário teste', is_liked: false, likes_count: 0 } as any
+    store.posts = [{ ...mockPost1, comments: [{ ...comment }] }]
+    store.userPosts = [{ ...mockPost1, comments: [{ ...comment }] }]
+
+    vi.mocked(postsApi.toggleCommentLike).mockResolvedValueOnce({
+      data: {
+        comment_id: 50,
+        is_liked: true,
+        likes_count: 1,
+      },
+    } as any)
+
+    await store.toggleCommentLike(1, 50)
+
+    expect(store.posts[0]!.comments[0]!.is_liked).toBe(true)
+    expect(store.posts[0]!.comments[0]!.likes_count).toBe(1)
+    expect(store.userPosts[0]!.comments[0]!.is_liked).toBe(true)
+    expect(store.userPosts[0]!.comments[0]!.likes_count).toBe(1)
   })
 })

@@ -109,8 +109,8 @@ async function handleItemClick(item: any) {
             <!-- Notification Icon: Group, Like, Comment, Mention or General -->
             <div class="notif-icon-col">
               <span v-if="item.type === 'group_invite'" class="type-icon">👥</span>
-              <span v-else-if="item.type === 'post_like'" class="type-icon">❤️</span>
-              <span v-else-if="item.type === 'post_comment'" class="type-icon">💬</span>
+              <span v-else-if="item.type === 'post_like' || item.type === 'comment_like'" class="type-icon">❤️</span>
+              <span v-else-if="item.type === 'post_comment' || item.type === 'comment_reply'" class="type-icon">💬</span>
               <span v-else-if="item.type === 'post_mention'" class="type-icon">🏷️</span>
               <span v-else-if="item.type === 'comment_mention'" class="type-icon">💬</span>
               <span v-else class="type-icon">🔔</span>
