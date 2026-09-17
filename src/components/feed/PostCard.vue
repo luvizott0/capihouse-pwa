@@ -143,12 +143,15 @@ function prevSlide() {
 function openMediaModal(clickedIndex: number) {
   if (!props.post.media || !props.post.media.length) return
 
+  const authorUsername = props.post.user?.username
+    ? `@${props.post.user.username}`
+    : (props.post.user?.name || '')
+
   const imageItems = props.post.media
     .filter(m => m.type !== 'video')
     .map(m => ({
       url: resolveMediaUrl(m.url || m.path),
-      title: `Publicação de ${props.post.user.name}`,
-      subtitle: `@${props.post.user.username}`,
+      title: authorUsername,
     }))
 
   if (!imageItems.length) return

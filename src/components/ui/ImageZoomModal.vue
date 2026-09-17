@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useImageViewerStore } from '@/stores/imageViewer'
 
@@ -413,12 +413,15 @@ const canNext = computed(() => imageViewer.currentIndex < imageViewer.items.leng
   border-bottom: 2px solid var(--color-primary-900, #422d16);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
   z-index: 10;
+  gap: 0.5rem;
 }
 
 .header-left {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  min-width: 0;
+  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -427,12 +430,14 @@ const canNext = computed(() => imageViewer.currentIndex < imageViewer.items.leng
 .header-prefix {
   font-family: var(--font-heading, monospace);
   font-weight: bold;
+  flex-shrink: 0;
 }
 
 .header-title {
   font-family: var(--font-heading, monospace);
   font-weight: bold;
   font-size: 0.9rem;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -441,6 +446,10 @@ const canNext = computed(() => imageViewer.currentIndex < imageViewer.items.leng
 .header-subtitle {
   font-size: 0.8rem;
   opacity: 0.85;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .header-counter {
@@ -449,12 +458,15 @@ const canNext = computed(() => imageViewer.currentIndex < imageViewer.items.leng
   background: rgba(0, 0, 0, 0.25);
   padding: 0.1rem 0.4rem;
   border-radius: 2px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .header-actions {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex-shrink: 0;
 }
 
 .header-btn {
@@ -468,6 +480,8 @@ const canNext = computed(() => imageViewer.currentIndex < imageViewer.items.leng
   padding: 0.2rem 0.5rem;
   border-radius: 2px;
   transition: background 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .header-btn:hover {
@@ -476,6 +490,8 @@ const canNext = computed(() => imageViewer.currentIndex < imageViewer.items.leng
 
 .close-btn {
   color: #ffd8a8;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* Stage */
