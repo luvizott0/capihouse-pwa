@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useImageViewerStore } from '@/stores/imageViewer'
 
@@ -618,11 +618,29 @@ const canNext = computed(() => imageViewer.currentIndex < imageViewer.items.leng
     right: 0.3rem;
   }
   .viewer-toolbar {
-    gap: 0.5rem;
-    padding: 0 0.5rem;
+    height: auto;
+    flex-direction: column;
+    gap: 0.45rem;
+    padding: 0.5rem 0.75rem;
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  }
+  .zoom-group {
+    width: 100%;
+    justify-content: center;
   }
   .extras-group {
-    display: none; /* Keep essential zoom buttons visible on very small screens */
+    display: flex;
+    width: 100%;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+  .image-wrapper {
+    max-height: calc(100vh - 145px);
+    max-height: calc(100dvh - 145px);
+  }
+  .viewer-image {
+    max-height: calc(100vh - 155px);
+    max-height: calc(100dvh - 155px);
   }
 }
 </style>
