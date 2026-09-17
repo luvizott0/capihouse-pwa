@@ -196,6 +196,29 @@ function openMediaModal(clickedIndex: number) {
 interface ThreadedCommentItem {
   comment: PostComment
   depth: number
+  rootId: number
+  repliesCount?: number
+}
+
+const expandedThreadIds = ref<Set<number>>(new Set())
+
+function toggleThread(rootCommentId: number) {
+  const next = new Set(expandedThreadIds.value)
+  if (next.has(rootCommentId)) {
+    next.delete(rootCommentId)
+  } else {
+    next.add(rootCommentId)
+  }
+  expandedThreadIds.value = next
+}
+
+function isThreadExpanded(rootCommentId: number): boolean {
+  return expandedThreadIds.value.has(rootCommentId)
+}
+
+function findRootId(commentId: number): number {
+  const item = threadedComments.value.find(tc => tc.comment.id === commentId)
+  return item ? item.rootId : commentId
 }
 
 const threadedComments = computed<ThreadedCommentItem[]>(() => {
@@ -228,30 +251,51 @@ const threadedComments = computed<ThreadedCommentItem[]>(() => {
     list.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
   }
 
+  function countDescendants(commentId: number): number {
+    const children = childrenMap.get(commentId)
+    if (!children || !children.length) return 0
+    let count = children.length
+    for (const child of children) {
+      count += countDescendants(child.id)
+    }
+    return count
+  }
+
   const result: ThreadedCommentItem[] = []
   const visited = new Set<number>()
 
-  function traverse(comment: PostComment, depth: number) {
+  function traverse(comment: PostComment, depth: number, rootId: number) {
     if (visited.has(comment.id)) return
     visited.add(comment.id)
-    result.push({ comment, depth })
+
+    const item: ThreadedCommentItem = {
+      comment,
+      depth,
+      rootId,
+    }
+
+    if (depth === 0) {
+      item.repliesCount = countDescendants(comment.id)
+    }
+
+    result.push(item)
 
     const children = childrenMap.get(comment.id)
     if (children) {
       for (const child of children) {
-        traverse(child, depth + 1)
+        traverse(child, depth + 1, rootId)
       }
     }
   }
 
   for (const root of rootComments) {
-    traverse(root, 0)
+    traverse(root, 0, root.id)
   }
 
   // Fallback in case of cycle or orphaned reference
   for (const c of comments) {
     if (!visited.has(c.id)) {
-      result.push({ comment: c, depth: 0 })
+      result.push({ comment: c, depth: 0, rootId: c.id, repliesCount: 0 })
     }
   }
 
@@ -270,6 +314,15 @@ function startReply(comment: PostComment) {
   replyingToCommentId.value = comment.id
   replyContent.value = ''
   showComments.value = true
+
+  // Auto-expand thread so user sees the conversation context
+  const rootId = findRootId(comment.id)
+  if (rootId) {
+    const next = new Set(expandedThreadIds.value)
+    next.add(rootId)
+    expandedThreadIds.value = next
+  }
+
   nextTick(() => {
     const inputEl = document.querySelector(
       `#reply-box-${comment.id} input, #reply-box-${comment.id} textarea`
@@ -292,6 +345,14 @@ async function submitReply(parentId: number) {
     await feedStore.addComment(props.post.id, replyContent.value.trim(), parentId)
     replyContent.value = ''
     replyingToCommentId.value = null
+
+    // Ensure thread is expanded so new reply is visible
+    const rootId = findRootId(parentId)
+    if (rootId) {
+      const next = new Set(expandedThreadIds.value)
+      next.add(rootId)
+      expandedThreadIds.value = next
+    }
   } finally {
     isSubmittingReply.value = false
   }
@@ -511,189 +572,214 @@ async function confirmDeletePost() {
 
       <!-- Comments List -->
       <div v-if="threadedComments.length" class="comments-list">
-        <div
-          v-for="{ comment: c, depth } in threadedComments"
-          :key="c.id"
-          :id="'comment-' + c.id"
-          class="comment-item"
-          :class="{
-            'is-reply': depth > 0,
-            'is-deep-reply': depth > 1,
-          }"
+        <template
+          v-for="item in threadedComments"
+          :key="item.comment.id"
         >
-          <router-link :to="`/profile/${c.user?.username}`" class="comment-avatar-link">
-            <UserAvatar :user="c.user" size="sm" />
-          </router-link>
-          <div class="comment-content-box">
-            <!-- Parent comment quotation header if this comment is a reply -->
-            <div v-if="c.parent" class="comment-reply-context">
-              <span class="reply-symbol">↳</span>
-              <span class="reply-to-text">Em resposta a</span>
-              <router-link
-                v-if="c.parent.user?.username"
-                :to="`/profile/${c.parent.user.username}`"
-                class="reply-user-link"
-              >
-                @{{ c.parent.user.username }}
-              </router-link>
-              <span class="reply-quote-preview">
-                "{{ c.parent.content.length > 50 ? c.parent.content.substring(0, 50) + '...' : c.parent.content }}"
-              </span>
-            </div>
-
-            <div class="comment-user-line">
-              <router-link :to="`/profile/${c.user?.username}`" class="comment-user-name">
-                {{ c.user?.name }}
-              </router-link>
-              <div class="comment-header-right">
-                <span class="comment-date">
-                  {{ formatRelativeTime(c.created_at) }}
-                  <span v-if="c.updated_at && c.updated_at !== c.created_at" class="comment-edited-tag">(editado)</span>
-                </span>
-                <div
-                  v-if="editingCommentId !== c.id && (canEditComment(c) || canDeleteComment(c))"
-                  class="comment-menu-wrapper"
+          <!-- Comment Item (shown if root or if thread is expanded) -->
+          <div
+            v-if="item.depth === 0 || isThreadExpanded(item.rootId)"
+            :id="'comment-' + item.comment.id"
+            class="comment-item"
+            :class="{
+              'is-reply': item.depth > 0,
+              'is-deep-reply': item.depth > 1,
+            }"
+          >
+            <router-link :to="`/profile/${item.comment.user?.username}`" class="comment-avatar-link">
+              <UserAvatar :user="item.comment.user" size="sm" />
+            </router-link>
+            <div class="comment-content-box">
+              <!-- Parent comment quotation header if this comment is a reply -->
+              <div v-if="item.comment.parent" class="comment-reply-context">
+                <span class="reply-symbol">↳</span>
+                <span class="reply-to-text">Em resposta a</span>
+                <router-link
+                  v-if="item.comment.parent.user?.username"
+                  :to="`/profile/${item.comment.parent.user.username}`"
+                  class="reply-user-link"
                 >
-                  <button
-                    type="button"
-                    class="comment-menu-trigger"
-                    title="Mais opções"
-                    aria-label="Mais opções"
-                    @click.stop="toggleCommentMenu(c.id)"
-                  >
-                    ⋮
-                  </button>
+                  @{{ item.comment.parent.user.username }}
+                </router-link>
+                <span class="reply-quote-preview">
+                  "{{ item.comment.parent.content.length > 50 ? item.comment.parent.content.substring(0, 50) + '...' : item.comment.parent.content }}"
+                </span>
+              </div>
+
+              <div class="comment-user-line">
+                <router-link :to="`/profile/${item.comment.user?.username}`" class="comment-user-name">
+                  {{ item.comment.user?.name }}
+                </router-link>
+                <div class="comment-header-right">
+                  <span class="comment-date">
+                    {{ formatRelativeTime(item.comment.created_at) }}
+                    <span v-if="item.comment.updated_at && item.comment.updated_at !== item.comment.created_at" class="comment-edited-tag">(editado)</span>
+                  </span>
                   <div
-                    v-if="activeCommentMenuId === c.id"
-                    class="comment-dropdown-menu"
-                    @click.stop
+                    v-if="editingCommentId !== item.comment.id && (canEditComment(item.comment) || canDeleteComment(item.comment))"
+                    class="comment-menu-wrapper"
                   >
                     <button
-                      v-if="canEditComment(c)"
                       type="button"
-                      class="comment-menu-item edit-item"
-                      @click="startEditComment(c)"
+                      class="comment-menu-trigger"
+                      title="Mais opções"
+                      aria-label="Mais opções"
+                      @click.stop="toggleCommentMenu(item.comment.id)"
                     >
-                      <span class="item-icon">✎</span> Editar
+                      ⋮
                     </button>
-                    <button
-                      v-if="canDeleteComment(c)"
-                      type="button"
-                      class="comment-menu-item delete-item"
-                      @click="promptDeleteComment(c)"
+                    <div
+                      v-if="activeCommentMenuId === item.comment.id"
+                      class="comment-dropdown-menu"
+                      @click.stop
                     >
-                      <span class="item-icon">×</span> Excluir
-                    </button>
+                      <button
+                        v-if="canEditComment(item.comment)"
+                        type="button"
+                        class="comment-menu-item edit-item"
+                        @click="startEditComment(item.comment)"
+                      >
+                        <span class="item-icon">✎</span> Editar
+                      </button>
+                      <button
+                        v-if="canDeleteComment(item.comment)"
+                        type="button"
+                        class="comment-menu-item delete-item"
+                        @click="promptDeleteComment(item.comment)"
+                      >
+                        <span class="item-icon">×</span> Excluir
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <!-- Inline Edit Mode -->
-            <div v-if="editingCommentId === c.id" class="comment-inline-edit">
-              <MentionInput
-                v-model="editingCommentContent"
-                type="input"
-                :maxlength="500"
-                :disabled="isUpdatingComment"
-                inputClass="comment-edit-input"
-                popupPosition="top"
-                @submit="saveEditComment(c.id)"
-                @cancel="cancelEditComment"
-              />
-              <div class="comment-inline-edit-actions">
-                <button
-                  type="button"
-                  class="comment-save-btn"
-                  :disabled="isUpdatingComment || !editingCommentContent.trim()"
-                  @click="saveEditComment(c.id)"
-                >
-                  {{ isUpdatingComment ? '[ Salvando... ]' : '[ Salvar ]' }}
-                </button>
-                <button
-                  type="button"
-                  class="comment-cancel-btn"
+              <!-- Inline Edit Mode -->
+              <div v-if="editingCommentId === item.comment.id" class="comment-inline-edit">
+                <MentionInput
+                  v-model="editingCommentContent"
+                  type="input"
+                  :maxlength="500"
                   :disabled="isUpdatingComment"
-                  @click="cancelEditComment"
-                >
-                  [ Cancelar ]
-                </button>
+                  inputClass="comment-edit-input"
+                  popupPosition="top"
+                  @submit="saveEditComment(item.comment.id)"
+                  @cancel="cancelEditComment"
+                />
+                <div class="comment-inline-edit-actions">
+                  <button
+                    type="button"
+                    class="comment-save-btn"
+                    :disabled="isUpdatingComment || !editingCommentContent.trim()"
+                    @click="saveEditComment(item.comment.id)"
+                  >
+                    {{ isUpdatingComment ? '[ Salvando... ]' : '[ Salvar ]' }}
+                  </button>
+                  <button
+                    type="button"
+                    class="comment-cancel-btn"
+                    :disabled="isUpdatingComment"
+                    @click="cancelEditComment"
+                  >
+                    [ Cancelar ]
+                  </button>
+                </div>
               </div>
+
+              <!-- Standard Comment Text & Footer -->
+              <template v-else>
+                <p class="comment-text">
+                  <FormattedContent :content="item.comment.content" />
+                </p>
+
+                <!-- Comment Footer: Like & Reply -->
+                <div class="comment-footer">
+                  <button
+                    type="button"
+                    class="comment-like-btn"
+                    :class="{ liked: item.comment.is_liked }"
+                    :title="item.comment.is_liked ? 'Descurtir comentário' : 'Curtir comentário'"
+                    @click="handleToggleCommentLike(item.comment)"
+                  >
+                    <span class="like-heart-icon">{{ item.comment.is_liked ? '❤️' : '🤍' }}</span>
+                    <span class="comment-like-count">{{ item.comment.likes_count || 0 }}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    class="comment-reply-btn"
+                    :class="{ active: replyingToCommentId === item.comment.id }"
+                    title="Responder a este comentário"
+                    @click="startReply(item.comment)"
+                  >
+                    <span class="reply-arrow-icon">↩</span> Responder
+                  </button>
+                </div>
+
+                <!-- Inline Reply Form under the comment -->
+                <div
+                  v-if="replyingToCommentId === item.comment.id"
+                  :id="'reply-box-' + item.comment.id"
+                  class="comment-inline-reply"
+                >
+                  <div class="inline-reply-header">
+                    <span class="inline-reply-label">
+                      ↳ Respondendo a <strong>@{{ item.comment.user?.username || item.comment.user?.name }}</strong>:
+                    </span>
+                    <button
+                      type="button"
+                      class="inline-reply-cancel-btn"
+                      title="Cancelar resposta"
+                      @click="cancelReply"
+                    >
+                      [ × Cancelar ]
+                    </button>
+                  </div>
+                  <div class="inline-reply-row">
+                    <MentionInput
+                      v-model="replyContent"
+                      type="input"
+                      :placeholder="`Responder a @${item.comment.user?.username || item.comment.user?.name}...`"
+                      inputClass="inline-reply-input"
+                      :maxlength="500"
+                      popupPosition="top"
+                      @submit="submitReply(item.comment.id)"
+                      @cancel="cancelReply"
+                    />
+                    <button
+                      type="button"
+                      class="inline-reply-submit-btn"
+                      :disabled="isSubmittingReply || !replyContent.trim()"
+                      @click="submitReply(item.comment.id)"
+                    >
+                      {{ isSubmittingReply ? '[ ... ]' : '[ Responder ]' }}
+                    </button>
+                  </div>
+                </div>
+              </template>
             </div>
-
-            <!-- Standard Comment Text & Footer -->
-            <template v-else>
-              <p class="comment-text">
-                <FormattedContent :content="c.content" />
-              </p>
-
-              <!-- Comment Footer: Like & Reply -->
-              <div class="comment-footer">
-                <button
-                  type="button"
-                  class="comment-like-btn"
-                  :class="{ liked: c.is_liked }"
-                  :title="c.is_liked ? 'Descurtir comentário' : 'Curtir comentário'"
-                  @click="handleToggleCommentLike(c)"
-                >
-                  <span class="like-heart-icon">{{ c.is_liked ? '❤️' : '🤍' }}</span>
-                  <span class="comment-like-count">{{ c.likes_count || 0 }}</span>
-                </button>
-
-                <button
-                  type="button"
-                  class="comment-reply-btn"
-                  :class="{ active: replyingToCommentId === c.id }"
-                  title="Responder a este comentário"
-                  @click="startReply(c)"
-                >
-                  <span class="reply-arrow-icon">↩</span> Responder
-                </button>
-              </div>
-
-              <!-- Inline Reply Form under the comment -->
-              <div
-                v-if="replyingToCommentId === c.id"
-                :id="'reply-box-' + c.id"
-                class="comment-inline-reply"
-              >
-                <div class="inline-reply-header">
-                  <span class="inline-reply-label">
-                    ↳ Respondendo a <strong>@{{ c.user?.username || c.user?.name }}</strong>:
-                  </span>
-                  <button
-                    type="button"
-                    class="inline-reply-cancel-btn"
-                    title="Cancelar resposta"
-                    @click="cancelReply"
-                  >
-                    [ × Cancelar ]
-                  </button>
-                </div>
-                <div class="inline-reply-row">
-                  <MentionInput
-                    v-model="replyContent"
-                    type="input"
-                    :placeholder="`Responder a @${c.user?.username || c.user?.name}...`"
-                    inputClass="inline-reply-input"
-                    :maxlength="500"
-                    popupPosition="top"
-                    @submit="submitReply(c.id)"
-                    @cancel="cancelReply"
-                  />
-                  <button
-                    type="button"
-                    class="inline-reply-submit-btn"
-                    :disabled="isSubmittingReply || !replyContent.trim()"
-                    @click="submitReply(c.id)"
-                  >
-                    {{ isSubmittingReply ? '[ ... ]' : '[ Responder ]' }}
-                  </button>
-                </div>
-              </div>
-            </template>
           </div>
-        </div>
+
+          <!-- Thread replies toggle button right below root comment -->
+          <div
+            v-if="item.depth === 0 && item.repliesCount && item.repliesCount > 0"
+            class="thread-toggle-wrapper"
+          >
+            <button
+              type="button"
+              class="toggle-replies-btn"
+              @click="toggleThread(item.comment.id)"
+            >
+              <span class="toggle-icon">{{ isThreadExpanded(item.comment.id) ? '▾' : '▸' }}</span>
+              <span>
+                {{ isThreadExpanded(item.comment.id)
+                  ? 'Ocultar respostas'
+                  : (item.repliesCount === 1 ? 'Ver 1 resposta' : `Ver ${item.repliesCount} respostas`)
+                }}
+              </span>
+            </button>
+          </div>
+        </template>
       </div>
       <div v-else class="no-comments">
         Nenhum comentário ainda. Seja o primeiro a comentar!
@@ -1592,6 +1678,40 @@ async function confirmDeletePost() {
   cursor: not-allowed;
 }
 
+/* Thread Replies Toggle Button */
+.thread-toggle-wrapper {
+  margin-left: 2.1rem;
+  margin-top: -0.35rem;
+  margin-bottom: 0.25rem;
+}
+
+.toggle-replies-btn {
+  background: none;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.73rem;
+  font-weight: 700;
+  color: var(--color-primary, #a66130);
+  cursor: pointer;
+  padding: 0.2rem 0.45rem;
+  border-radius: 2px;
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+
+.toggle-replies-btn:hover {
+  background-color: var(--color-primary-50, #fdf8f3);
+  color: var(--color-primary-800, #5f4120);
+}
+
+.toggle-icon {
+  font-size: 0.8rem;
+  font-weight: bold;
+}
+
 @media (max-width: 480px) {
   .comment-item.is-reply {
     margin-left: 1.0rem;
@@ -1620,6 +1740,13 @@ async function confirmDeletePost() {
   .inline-reply-submit-btn {
     font-size: 0.72rem;
     padding: 0 0.45rem;
+  }
+  .thread-toggle-wrapper {
+    margin-left: 1.1rem;
+  }
+  .toggle-replies-btn {
+    font-size: 0.7rem;
+    padding: 0.15rem 0.35rem;
   }
 }
 </style>
