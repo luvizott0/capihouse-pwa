@@ -4,14 +4,34 @@ import type { Group, GroupMessage, User } from '@/types/models'
 import * as groupsApi from '@/api/groups'
 import { connectEcho } from '@/services/echo'
 
+const GROUPS_CACHE_KEY = 'capihouse_groups_cache'
+
+function loadInitialGroupsCache(): Group[] {
+  try {
+    const stored = localStorage.getItem(GROUPS_CACHE_KEY)
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      if (Array.isArray(parsed)) return parsed
+    }
+  } catch {}
+  return []
+}
+
+function saveGroupsCache(data: Group[]) {
+  try {
+    localStorage.setItem(GROUPS_CACHE_KEY, JSON.stringify(data.slice(0, 20)))
+  } catch {}
+}
+
 export const useGroupsStore = defineStore('groups', () => {
-  const myGroups = ref<Group[]>([])
+  const initialGroups = loadInitialGroupsCache()
+  const myGroups = ref<Group[]>(initialGroups)
   const currentGroup = ref<Group | null>(null)
   const messages = ref<GroupMessage[]>([])
   const members = ref<User[]>([])
   const isLoading = ref(false)
   const isSending = ref(false)
-  const hasLoaded = ref(false)
+  const hasLoaded = ref(initialGroups.length > 0)
 
   const activeFilters = ref<{ search?: string; date?: string; userId?: number }>({})
 
@@ -34,6 +54,9 @@ export const useGroupsStore = defineStore('groups', () => {
       })
       myGroups.value = res.data.data
       hasLoaded.value = true
+      if (!activeFilters.value.search && !activeFilters.value.date && !activeFilters.value.userId) {
+        saveGroupsCache(res.data.data)
+      }
     } catch (err) {
       console.error('Erro ao buscar meus grupos:', err)
     } finally {

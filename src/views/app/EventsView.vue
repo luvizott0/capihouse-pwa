@@ -68,9 +68,18 @@ function setupScrollObserver() {
 }
 
 watch(
-  () => route.query,
-  () => {
-    loadEventsForCurrentRoute(true)
+  () => [
+    route.name,
+    route.query.q,
+    route.query.search,
+    route.query.date,
+    route.query.user_id,
+  ],
+  ([name, q, search, date, userId], [oldName, oldQ, oldSearch, oldDate, oldUserId]) => {
+    if (name !== 'events') return
+    if (q !== oldQ || search !== oldSearch || date !== oldDate || userId !== oldUserId) {
+      loadEventsForCurrentRoute(true)
+    }
   }
 )
 

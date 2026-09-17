@@ -6,6 +6,7 @@ defineOptions({
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGroupsStore } from '@/stores/groups'
+import GroupCardSkeleton from '@/components/groups/GroupCardSkeleton.vue'
 import GroupCreateModal from '@/components/groups/GroupCreateModal.vue'
 import RetroButton from '@/components/ui/RetroButton.vue'
 
@@ -37,9 +38,18 @@ async function loadGroups(force = false) {
 }
 
 watch(
-  () => route.query,
-  () => {
-    loadGroups(true)
+  () => [
+    route.name,
+    route.query.q,
+    route.query.search,
+    route.query.date,
+    route.query.user_id,
+  ],
+  ([name, q, search, date, userId], [oldName, oldQ, oldSearch, oldDate, oldUserId]) => {
+    if (name !== 'groups') return
+    if (q !== oldQ || search !== oldSearch || date !== oldDate || userId !== oldUserId) {
+      loadGroups(true)
+    }
   }
 )
 
@@ -80,9 +90,9 @@ function onGroupCreated() {
       </button>
     </div>
 
-    <!-- Loading State -->
-    <div v-if="groupsStore.isLoading && groupsStore.myGroups.length === 0" class="loading-state">
-      Carregando seus grupos...
+    <!-- Loading State com Skeletons Shimmer -->
+    <div v-if="groupsStore.isLoading && groupsStore.myGroups.length === 0" class="groups-grid">
+      <GroupCardSkeleton v-for="i in 4" :key="i" />
     </div>
 
     <!-- User's Groups Grid -->

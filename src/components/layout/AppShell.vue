@@ -132,7 +132,7 @@ function onGroupCreated() {
           <keep-alive :include="['FeedView', 'EventsView', 'GroupsView']">
             <component
               :is="Component"
-              :key="route.name === 'group-detail' || route.name === 'post-detail' || route.name === 'user-profile' ? route.fullPath : undefined"
+              :key="route.name === 'group-detail' || route.name === 'post-detail' || route.name === 'user-profile' ? route.fullPath : (route.name as string || undefined)"
             />
           </keep-alive>
         </router-view>

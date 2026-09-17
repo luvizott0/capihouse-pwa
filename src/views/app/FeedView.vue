@@ -80,9 +80,18 @@ function setupScrollObserver() {
 }
 
 watch(
-  () => route.query,
-  () => {
-    loadPostsForCurrentRoute(true)
+  () => [
+    route.name,
+    route.query.q,
+    route.query.search,
+    route.query.date,
+    route.query.user_id,
+  ],
+  ([name, q, search, date, userId], [oldName, oldQ, oldSearch, oldDate, oldUserId]) => {
+    if (name !== 'feed') return
+    if (q !== oldQ || search !== oldSearch || date !== oldDate || userId !== oldUserId) {
+      loadPostsForCurrentRoute(true)
+    }
   }
 )
 
@@ -289,11 +298,6 @@ onUnmounted(() => {
       </button>
     </div>
 
-    <!-- Background refreshing indicator if posts already exist -->
-    <div v-if="feedStore.isLoading && feedStore.posts.length > 0" class="refresh-indicator-bar">
-      <span class="refresh-dot"></span>
-      <span>Recarregando publicações...</span>
-    </div>
 
     <!-- Loading State com Skeletons Shimmer -->
     <div v-if="feedStore.isLoading && feedStore.posts.length === 0" class="posts-stream">

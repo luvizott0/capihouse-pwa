@@ -3,13 +3,33 @@ import { ref, computed } from 'vue'
 import type { Event } from '@/types/models'
 import * as eventsApi from '@/api/events'
 
+const EVENTS_CACHE_KEY = 'capihouse_events_cache'
+
+function loadInitialEventsCache(): Event[] {
+  try {
+    const stored = localStorage.getItem(EVENTS_CACHE_KEY)
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      if (Array.isArray(parsed)) return parsed
+    }
+  } catch {}
+  return []
+}
+
+function saveEventsCache(data: Event[]) {
+  try {
+    localStorage.setItem(EVENTS_CACHE_KEY, JSON.stringify(data.slice(0, 20)))
+  } catch {}
+}
+
 export const useEventsStore = defineStore('events', () => {
-  const events = ref<Event[]>([])
+  const initialEvents = loadInitialEventsCache()
+  const events = ref<Event[]>(initialEvents)
   const upcomingEvents = ref<Event[]>([])
   const isLoading = ref(false)
   const isLoadingMore = ref(false)
   const isSubmitting = ref(false)
-  const hasLoaded = ref(false)
+  const hasLoaded = ref(initialEvents.length > 0)
   const currentPage = ref(1)
   const lastPage = ref(1)
 
@@ -46,6 +66,9 @@ export const useEventsStore = defineStore('events', () => {
       if (page === 1) {
         events.value = res.data.data
         hasLoaded.value = true
+        if (!activeFilters.value.search && !activeFilters.value.date && !activeFilters.value.userId) {
+          saveEventsCache(res.data.data)
+        }
       } else {
         const existingIds = new Set(events.value.map(e => e.id))
         const newEvents = res.data.data.filter((e: Event) => !existingIds.has(e.id))
