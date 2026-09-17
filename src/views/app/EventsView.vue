@@ -3,16 +3,19 @@ defineOptions({
   name: 'EventsView'
 })
 
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useEventsStore } from '@/stores/events'
 import EventCard from '@/components/events/EventCard.vue'
+import EventCardSkeleton from '@/components/events/EventCardSkeleton.vue'
 import EventCreateModal from '@/components/events/EventCreateModal.vue'
 
 const route = useRoute()
 const router = useRouter()
 const eventsStore = useEventsStore()
 const showCreateModal = ref(false)
+const sentinelRef = ref<HTMLElement | null>(null)
+let scrollObserver: IntersectionObserver | null = null
 
 const hasSearchFilters = computed(() => {
   return !!(route.query.q || route.query.search || route.query.date || route.query.user_id)
@@ -36,6 +39,34 @@ async function loadEventsForCurrentRoute(force = false) {
   })
 }
 
+function setupScrollObserver() {
+  if (scrollObserver) {
+    scrollObserver.disconnect()
+  }
+
+  scrollObserver = new IntersectionObserver(
+    (entries) => {
+      const first = entries[0]
+      if (
+        first?.isIntersecting &&
+        eventsStore.hasMorePages &&
+        !eventsStore.isLoading &&
+        !eventsStore.isLoadingMore
+      ) {
+        eventsStore.loadMoreEvents()
+      }
+    },
+    {
+      rootMargin: '300px',
+      threshold: 0.1,
+    }
+  )
+
+  if (sentinelRef.value) {
+    scrollObserver.observe(sentinelRef.value)
+  }
+}
+
 watch(
   () => route.query,
   () => {
@@ -47,11 +78,23 @@ function clearSearch() {
   router.push({ path: '/events' })
 }
 
-onMounted(() => {
-  loadEventsForCurrentRoute()
+onMounted(async () => {
+  await loadEventsForCurrentRoute()
+  await nextTick()
+  setupScrollObserver()
+})
+
+watch(sentinelRef, (newEl) => {
+  if (newEl && scrollObserver) {
+    scrollObserver.observe(newEl)
+  }
 })
 
 onUnmounted(() => {
+  if (scrollObserver) {
+    scrollObserver.disconnect()
+    scrollObserver = null
+  }
   eventsStore.clearFilters()
 })
 </script>
@@ -81,19 +124,36 @@ onUnmounted(() => {
       </button>
     </div>
 
-    <!-- Loading State -->
-    <div v-if="eventsStore.isLoading && eventsStore.events.length === 0" class="loading-state">
-      Carregando eventos...
+    <!-- Loading State com Skeletons Shimmer -->
+    <div v-if="eventsStore.isLoading && eventsStore.events.length === 0" class="events-grid">
+      <EventCardSkeleton v-for="i in 4" :key="i" />
     </div>
 
-    <!-- Events Grid -->
-    <div v-else-if="eventsStore.events.length" class="events-grid">
-      <EventCard
-        v-for="event in eventsStore.events"
-        :key="event.id"
-        :event="event"
-      />
-    </div>
+    <!-- Events Grid with Infinite Scroll -->
+    <template v-else-if="eventsStore.events.length">
+      <div class="events-grid">
+        <EventCard
+          v-for="event in eventsStore.events"
+          :key="event.id"
+          :event="event"
+        />
+      </div>
+
+      <!-- Sentinel para Infinite Scroll -->
+      <div ref="sentinelRef" class="sentinel-element"></div>
+
+      <!-- Loading Mais Eventos Indicator -->
+      <div v-if="eventsStore.isLoadingMore" class="infinite-loading-bar">
+        <span class="refresh-dot"></span>
+        <span>Carregando mais eventos...</span>
+      </div>
+
+      <!-- Final dos Eventos -->
+      <div v-else-if="!eventsStore.hasMorePages" class="infinite-end-card">
+        <span class="end-marker">📅</span>
+        <span class="end-text">Todos os eventos da casa foram carregados!</span>
+      </div>
+    </template>
 
     <!-- Empty State -->
     <div v-else class="empty-events-card">
@@ -255,5 +315,46 @@ onUnmounted(() => {
   padding: 0.5rem 1rem;
   border-radius: 2px;
   cursor: pointer;
+}
+
+.sentinel-element {
+  height: 20px;
+  width: 100%;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.infinite-loading-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 1rem;
+  background-color: var(--color-primary-50, #f8f6f1);
+  border: 1px dashed var(--color-primary-300, #c4884e);
+  border-radius: 2px;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.82rem;
+  font-weight: bold;
+  color: var(--color-primary-800, #5f4120);
+  margin-top: 0.75rem;
+}
+
+.infinite-end-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  text-align: center;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.8rem;
+  color: var(--color-muted, #847062);
+  border-top: 1px dashed var(--color-border, #D8CDC5);
+  margin-top: 0.75rem;
+}
+
+.end-marker {
+  font-size: 1rem;
 }
 </style>

@@ -486,6 +486,8 @@ async function confirmDeletePost() {
   border-radius: 2px;
   overflow: hidden;
   margin-bottom: 1rem;
+  content-visibility: auto;
+  contain-intrinsic-size: 0 350px;
 }
 
 .post-header {

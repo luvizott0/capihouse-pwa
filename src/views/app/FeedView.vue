@@ -8,6 +8,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useFeedStore } from '@/stores/feed'
 import { useAuthStore } from '@/stores/auth'
 import PostCard from '@/components/feed/PostCard.vue'
+import PostCardSkeleton from '@/components/feed/PostCardSkeleton.vue'
 import PostCreateModal from '@/components/feed/PostCreateModal.vue'
 import NewPostsBanner from '@/components/feed/NewPostsBanner.vue'
 import UserAvatar from '@/components/ui/UserAvatar.vue'
@@ -294,9 +295,9 @@ onUnmounted(() => {
       <span>Recarregando publicações...</span>
     </div>
 
-    <!-- Loading State -->
-    <div v-if="feedStore.isLoading && feedStore.posts.length === 0" class="loading-state">
-      Carregando publicações...
+    <!-- Loading State com Skeletons Shimmer -->
+    <div v-if="feedStore.isLoading && feedStore.posts.length === 0" class="posts-stream">
+      <PostCardSkeleton v-for="i in 3" :key="i" />
     </div>
 
     <!-- Posts List with Infinite Scroll -->

@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import type { Event } from '@/types/models'
 import * as eventsApi from '@/api/events'
 
@@ -7,7 +7,12 @@ export const useEventsStore = defineStore('events', () => {
   const events = ref<Event[]>([])
   const upcomingEvents = ref<Event[]>([])
   const isLoading = ref(false)
+  const isLoadingMore = ref(false)
   const isSubmitting = ref(false)
+  const currentPage = ref(1)
+  const lastPage = ref(1)
+
+  const hasMorePages = computed(() => currentPage.value < lastPage.value)
 
   const activeFilters = ref<{ search?: string; date?: string; userId?: number }>({})
 
@@ -15,14 +20,19 @@ export const useEventsStore = defineStore('events', () => {
     page = 1,
     options?: { search?: string; date?: string; userId?: number }
   ) {
-    isLoading.value = true
+    if (page > 1) {
+      isLoadingMore.value = true
+    } else {
+      isLoading.value = true
+    }
+
     if (options) {
       activeFilters.value = {
         search: options.search || undefined,
         date: options.date || undefined,
         userId: options.userId || undefined,
       }
-    } else {
+    } else if (page === 1) {
       activeFilters.value = {}
     }
     try {
@@ -32,10 +42,24 @@ export const useEventsStore = defineStore('events', () => {
         date: activeFilters.value.date,
         userId: activeFilters.value.userId,
       })
-      events.value = res.data.data
+      if (page === 1) {
+        events.value = res.data.data
+      } else {
+        const existingIds = new Set(events.value.map(e => e.id))
+        const newEvents = res.data.data.filter((e: Event) => !existingIds.has(e.id))
+        events.value.push(...newEvents)
+      }
+      currentPage.value = res.data.current_page
+      lastPage.value = res.data.last_page
     } finally {
       isLoading.value = false
+      isLoadingMore.value = false
     }
+  }
+
+  async function loadMoreEvents() {
+    if (isLoading.value || isLoadingMore.value || !hasMorePages.value) return
+    await fetchEvents(currentPage.value + 1)
   }
 
   function clearFilters() {
@@ -95,8 +119,13 @@ export const useEventsStore = defineStore('events', () => {
     activeFilters,
     clearFilters,
     isLoading,
+    isLoadingMore,
+    currentPage,
+    lastPage,
+    hasMorePages,
     isSubmitting,
     fetchEvents,
+    loadMoreEvents,
     fetchUpcoming,
     createEvent,
     updateEvent,
