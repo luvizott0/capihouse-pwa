@@ -9,6 +9,7 @@ export const useEventsStore = defineStore('events', () => {
   const isLoading = ref(false)
   const isLoadingMore = ref(false)
   const isSubmitting = ref(false)
+  const hasLoaded = ref(false)
   const currentPage = ref(1)
   const lastPage = ref(1)
 
@@ -44,6 +45,7 @@ export const useEventsStore = defineStore('events', () => {
       })
       if (page === 1) {
         events.value = res.data.data
+        hasLoaded.value = true
       } else {
         const existingIds = new Set(events.value.map(e => e.id))
         const newEvents = res.data.data.filter((e: Event) => !existingIds.has(e.id))
@@ -120,6 +122,7 @@ export const useEventsStore = defineStore('events', () => {
     clearFilters,
     isLoading,
     isLoadingMore,
+    hasLoaded,
     currentPage,
     lastPage,
     hasMorePages,

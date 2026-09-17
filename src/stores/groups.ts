@@ -11,6 +11,7 @@ export const useGroupsStore = defineStore('groups', () => {
   const members = ref<User[]>([])
   const isLoading = ref(false)
   const isSending = ref(false)
+  const hasLoaded = ref(false)
 
   const activeFilters = ref<{ search?: string; date?: string; userId?: number }>({})
 
@@ -32,6 +33,7 @@ export const useGroupsStore = defineStore('groups', () => {
         user_id: activeFilters.value.userId,
       })
       myGroups.value = res.data.data
+      hasLoaded.value = true
     } catch (err) {
       console.error('Erro ao buscar meus grupos:', err)
     } finally {
@@ -158,6 +160,7 @@ export const useGroupsStore = defineStore('groups', () => {
     clearFilters,
     isLoading,
     isSending,
+    hasLoaded,
     fetchMyGroups,
     fetchGroup,
     createGroup,

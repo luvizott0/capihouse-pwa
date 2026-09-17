@@ -28,7 +28,7 @@ const filterDate = computed(() => (route.query.date as string) || '')
 const filterUserId = computed(() => route.query.user_id ? Number(route.query.user_id) : null)
 
 async function loadEventsForCurrentRoute(force = false) {
-  if (!force && !hasSearchFilters.value && eventsStore.events.length > 0) {
+  if (!force && !hasSearchFilters.value && (eventsStore.hasLoaded || eventsStore.events.length > 0)) {
     return
   }
 

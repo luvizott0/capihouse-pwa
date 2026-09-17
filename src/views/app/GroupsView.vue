@@ -25,7 +25,7 @@ const filterDate = computed(() => (route.query.date as string) || '')
 const filterUserId = computed(() => route.query.user_id ? Number(route.query.user_id) : null)
 
 async function loadGroups(force = false) {
-  if (!force && !hasSearchFilters.value && groupsStore.myGroups.length > 0) {
+  if (!force && !hasSearchFilters.value && (groupsStore.hasLoaded || groupsStore.myGroups.length > 0)) {
     return
   }
 

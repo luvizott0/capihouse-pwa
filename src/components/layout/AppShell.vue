@@ -129,14 +129,12 @@ function onGroupCreated() {
       <!-- Center: Main Page Content -->
       <main class="layout-content">
         <router-view v-slot="{ Component, route }">
-          <transition name="tab-fade" mode="out-in">
-            <keep-alive :include="['FeedView', 'EventsView', 'GroupsView']">
-              <component
-                :is="Component"
-                :key="route.name === 'group-detail' || route.name === 'post-detail' || route.name === 'user-profile' ? route.fullPath : undefined"
-              />
-            </keep-alive>
-          </transition>
+          <keep-alive :include="['FeedView', 'EventsView', 'GroupsView']">
+            <component
+              :is="Component"
+              :key="route.name === 'group-detail' || route.name === 'post-detail' || route.name === 'user-profile' ? route.fullPath : undefined"
+            />
+          </keep-alive>
         </router-view>
       </main>
 
@@ -293,6 +291,7 @@ function onGroupCreated() {
 .layout-content {
   flex: 1;
   min-width: 0;
+  min-height: calc(100vh - 160px);
 }
 
 /* Floating Action Button on mobile for Users */
@@ -390,16 +389,5 @@ function onGroupCreated() {
 
 .impersonate-exit-btn:hover {
   background-color: #713f12;
-}
-
-/* Transições suaves entre abas mantidas no keep-alive */
-.tab-fade-enter-active,
-.tab-fade-leave-active {
-  transition: opacity 0.12s ease;
-}
-
-.tab-fade-enter-from,
-.tab-fade-leave-to {
-  opacity: 0;
 }
 </style>
