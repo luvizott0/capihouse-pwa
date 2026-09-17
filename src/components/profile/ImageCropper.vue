@@ -58,15 +58,16 @@ function onFileSelect(event: Event) {
 function handleCrop() {
   if (cropperInstance) {
     const canvas = cropperInstance.getCroppedCanvas({
-      maxWidth: props.maxWidth || 2048,
-      maxHeight: props.maxHeight || 2048,
+      maxWidth: props.maxWidth || 1200,
+      maxHeight: props.maxHeight || 1200,
+      imageSmoothingQuality: 'high',
     })
     canvas.toBlob((blob: Blob | null) => {
       if (blob) {
         emit('cropped', blob)
         handleClose()
       }
-    }, 'image/jpeg', 0.88)
+    }, 'image/webp', 0.85)
   }
 }
 

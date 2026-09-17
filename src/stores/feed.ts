@@ -4,8 +4,28 @@ import type { Post } from '@/types/models'
 import * as postsApi from '@/api/posts'
 import { connectEcho } from '@/services/echo'
 
+const FEED_CACHE_KEY = 'capihouse_feed_cache'
+
+function loadInitialFeedCache(): Post[] {
+  try {
+    const stored = localStorage.getItem(FEED_CACHE_KEY)
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      if (Array.isArray(parsed)) return parsed
+    }
+  } catch {}
+  return []
+}
+
+function saveFeedCache(data: Post[]) {
+  try {
+    // Mantém no máximo 15 posts no storage local para ser leve e rápido
+    localStorage.setItem(FEED_CACHE_KEY, JSON.stringify(data.slice(0, 15)))
+  } catch {}
+}
+
 export const useFeedStore = defineStore('feed', () => {
-  const posts = ref<Post[]>([])
+  const posts = ref<Post[]>(loadInitialFeedCache())
   const isLoading = ref(false)
   const isLoadingMore = ref(false)
   const isSubmitting = ref(false)
@@ -28,6 +48,7 @@ export const useFeedStore = defineStore('feed', () => {
     if (page > 1) {
       isLoadingMore.value = true
     } else {
+      // Se já temos posts do cache, não bloqueia a tela inteira com spinner
       isLoading.value = true
     }
 
@@ -59,6 +80,10 @@ export const useFeedStore = defineStore('feed', () => {
       })
       if (page === 1) {
         posts.value = res.data.data
+        // Salva no cache local offline-first apenas se for o feed geral sem filtros
+        if (!targetGroupId && !activeFilters.value.search && !activeFilters.value.date && !activeFilters.value.userId) {
+          saveFeedCache(res.data.data)
+        }
       } else {
         // Evita duplicatas caso algum post já tenha chegado via WebSocket
         const existingIds = new Set(posts.value.map(p => p.id))

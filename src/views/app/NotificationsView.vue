@@ -178,6 +178,18 @@ async function handleItemClick(item: any) {
               </template>
             </div>
           </div>
+
+          <!-- Carregar mais notificações -->
+          <div v-if="notifStore.currentPage < notifStore.lastPage" class="load-more-notifs-box">
+            <RetroButton
+              variant="secondary"
+              size="sm"
+              :loading="notifStore.isLoading"
+              @click="notifStore.fetchNotifications(notifStore.currentPage + 1)"
+            >
+              [ Carregar notificações mais antigas ]
+            </RetroButton>
+          </div>
         </div>
       </div>
     </div>
@@ -393,5 +405,11 @@ async function handleItemClick(item: any) {
 
 .notif-item:hover .post-link-text {
   text-decoration: underline;
+}
+
+.load-more-notifs-box {
+  display: flex;
+  justify-content: center;
+  padding: 1.25rem 0 0.5rem;
 }
 </style>

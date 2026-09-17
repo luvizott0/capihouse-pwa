@@ -127,9 +127,35 @@ router.beforeEach(async (to, from, next) => {
   next()
 })
 
+let hasPrefetchedViews = false
+
+function prefetchMainAppViews() {
+  if (hasPrefetchedViews) return
+  hasPrefetchedViews = true
+
+  const executePrefetch = () => {
+    // Pré-carrega os chunks JS em segundo plano no navegador
+    import('@/views/app/EventsView.vue')
+    import('@/views/app/GroupsView.vue')
+    import('@/views/app/ProfileView.vue')
+    import('@/views/app/NotificationsView.vue')
+  }
+
+  if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+    ;(window as Window & { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback(executePrefetch, { timeout: 3000 })
+  } else {
+    setTimeout(executePrefetch, 1500)
+  }
+}
+
 router.afterEach((to) => {
   const auth = useAuthStore()
   const themeStore = useThemeStore()
+
+  // Se o usuário estiver autenticado, pré-carrega os outros módulos para troca de abas instantânea
+  if (auth.isAuthenticated) {
+    prefetchMainAppViews()
+  }
 
   // Se a rota NÃO for perfil de outro usuário, garante a restauração do tema do usuário logado
   const isVisitingOtherUser =
