@@ -11,9 +11,14 @@ let echoInstance: Echo<'reverb'> | null = null
  * Must be called after the user is authenticated and the token is in localStorage.
  */
 export function connectEcho(): Echo<'reverb'> {
-  if (echoInstance) return echoInstance
-
   const token = localStorage.getItem('capihouse_token')
+
+  if (echoInstance) {
+    if (token && (echoInstance as any).options?.auth?.headers) {
+      (echoInstance as any).options.auth.headers.Authorization = `Bearer ${token}`
+    }
+    return echoInstance
+  }
 
   echoInstance = new Echo({
     broadcaster: 'reverb',
@@ -36,6 +41,18 @@ export function connectEcho(): Echo<'reverb'> {
       },
     },
   })
+
+  if (import.meta.env.DEV) {
+    const pusherClient = (echoInstance as any).connector?.pusher
+    if (pusherClient?.connection) {
+      pusherClient.connection.bind('state_change', (states: { previous: string; current: string }) => {
+        console.log(`%c[WebSocket] ${states.previous} → ${states.current}`, 'color: #00c896; font-weight: bold')
+      })
+      pusherClient.connection.bind('error', (err: any) => {
+        console.warn('[WebSocket] Connection status:', err)
+      })
+    }
+  }
 
   return echoInstance
 }
