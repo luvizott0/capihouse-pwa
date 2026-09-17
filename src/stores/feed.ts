@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { Post } from '@/types/models'
+import type { Post, PostComment } from '@/types/models'
 import * as postsApi from '@/api/posts'
 import { connectEcho } from '@/services/echo'
 
@@ -40,6 +40,16 @@ export const useFeedStore = defineStore('feed', () => {
   const pendingPosts = ref<Post[]>([])
 
   const activeFilters = ref<{ search?: string; date?: string; userId?: number }>({})
+  const isFiltered = ref(false)
+
+  // Profile-specific posts to avoid polluting the main feed
+  const userPosts = ref<Post[]>([])
+  const isLoadingUserPosts = ref(false)
+  const isLoadingMoreUserPosts = ref(false)
+  const userPostsCurrentPage = ref(1)
+  const userPostsLastPage = ref(1)
+  const hasMoreUserPosts = computed(() => userPostsCurrentPage.value < userPostsLastPage.value)
+  const activeProfileUserId = ref<number | null>(null)
 
   async function fetchPosts(
     page = 1,
@@ -70,6 +80,14 @@ export const useFeedStore = defineStore('feed', () => {
       activeGroupId.value = groupId || undefined
     }
     const targetGroupId = groupId !== undefined ? (groupId || undefined) : activeGroupId.value
+
+    const hasAnyFilter = Boolean(
+      targetGroupId ||
+      activeFilters.value.search ||
+      activeFilters.value.date ||
+      activeFilters.value.userId
+    )
+
     try {
       const res = await postsApi.getPosts({
         page,
@@ -80,8 +98,9 @@ export const useFeedStore = defineStore('feed', () => {
       })
       if (page === 1) {
         posts.value = res.data.data
+        isFiltered.value = hasAnyFilter
         // Salva no cache local offline-first apenas se for o feed geral sem filtros
-        if (!targetGroupId && !activeFilters.value.search && !activeFilters.value.date && !activeFilters.value.userId) {
+        if (!hasAnyFilter) {
           saveFeedCache(res.data.data)
         }
       } else {
@@ -101,6 +120,40 @@ export const useFeedStore = defineStore('feed', () => {
   async function loadMorePosts() {
     if (isLoading.value || isLoadingMore.value || !hasMorePages.value) return
     await fetchPosts(currentPage.value + 1)
+  }
+
+  async function fetchUserPosts(userId: number, page = 1) {
+    if (page > 1) {
+      isLoadingMoreUserPosts.value = true
+    } else {
+      isLoadingUserPosts.value = true
+      activeProfileUserId.value = userId
+    }
+
+    try {
+      const res = await postsApi.getPosts({
+        page,
+        userId,
+      })
+      if (page === 1) {
+        userPosts.value = res.data.data
+      } else {
+        const existingIds = new Set(userPosts.value.map(p => p.id))
+        const newUniquePosts = res.data.data.filter((p: Post) => !existingIds.has(p.id))
+        userPosts.value.push(...newUniquePosts)
+      }
+      userPostsCurrentPage.value = res.data.current_page
+      userPostsLastPage.value = res.data.last_page
+      return res.data
+    } finally {
+      isLoadingUserPosts.value = false
+      isLoadingMoreUserPosts.value = false
+    }
+  }
+
+  async function loadMoreUserPosts() {
+    if (isLoadingUserPosts.value || isLoadingMoreUserPosts.value || !hasMoreUserPosts.value || !activeProfileUserId.value) return
+    await fetchUserPosts(activeProfileUserId.value, userPostsCurrentPage.value + 1)
   }
 
   function clearFilters() {
@@ -130,6 +183,9 @@ export const useFeedStore = defineStore('feed', () => {
       // The server will broadcast PostCreated; we still add it locally for
       // the author so they see their own post immediately without waiting for the WS event.
       posts.value.unshift(res.data)
+      if (activeProfileUserId.value && res.data.user_id === activeProfileUserId.value) {
+        userPosts.value.unshift(res.data)
+      }
       return res.data
     } finally {
       isSubmitting.value = false
@@ -137,31 +193,55 @@ export const useFeedStore = defineStore('feed', () => {
   }
 
   async function toggleLike(postId: number) {
-    const post = posts.value.find(p => p.id === postId)
-    if (!post) return
+    const postInFeed = posts.value.find(p => p.id === postId)
+    const postInUser = userPosts.value.find(p => p.id === postId)
+    if (!postInFeed && !postInUser) return
 
+    const targetPost = postInFeed || postInUser!
     // Optimistic update
-    const previousLiked = post.is_liked
-    const previousCount = post.likes_count
+    const previousLiked = targetPost.is_liked
+    const previousCount = targetPost.likes_count
+    const nextLiked = !previousLiked
+    const nextCount = previousCount + (nextLiked ? 1 : -1)
 
-    post.is_liked = !post.is_liked
-    post.likes_count += post.is_liked ? 1 : -1
+    if (postInFeed) {
+      postInFeed.is_liked = nextLiked
+      postInFeed.likes_count = nextCount
+    }
+    if (postInUser) {
+      postInUser.is_liked = nextLiked
+      postInUser.likes_count = nextCount
+    }
 
     try {
       const res = await postsApi.toggleLike(postId)
-      post.is_liked = res.data.is_liked
-      post.likes_count = res.data.likes_count
+      if (postInFeed) {
+        postInFeed.is_liked = res.data.is_liked
+        postInFeed.likes_count = res.data.likes_count
+      }
+      if (postInUser) {
+        postInUser.is_liked = res.data.is_liked
+        postInUser.likes_count = res.data.likes_count
+      }
     } catch {
       // Revert if error
-      post.is_liked = previousLiked
-      post.likes_count = previousCount
+      if (postInFeed) {
+        postInFeed.is_liked = previousLiked
+        postInFeed.likes_count = previousCount
+      }
+      if (postInUser) {
+        postInUser.is_liked = previousLiked
+        postInUser.likes_count = previousCount
+      }
     }
   }
 
   async function addComment(postId: number, content: string) {
-    const post = posts.value.find(p => p.id === postId)
+    const postInFeed = posts.value.find(p => p.id === postId)
+    const postInUser = userPosts.value.find(p => p.id === postId)
     const res = await postsApi.addComment(postId, content)
-    if (post) {
+
+    const applyComment = (post: Post) => {
       if (!post.comments) post.comments = []
       const existsIndex = post.comments.findIndex(c => Number(c.id) === Number(res.data.id))
       if (existsIndex === -1) {
@@ -171,44 +251,61 @@ export const useFeedStore = defineStore('feed', () => {
         post.comments[existsIndex] = res.data
       }
     }
+
+    if (postInFeed) applyComment(postInFeed)
+    if (postInUser) applyComment(postInUser)
+
     return res.data
   }
 
   async function updateComment(postId: number, commentId: number, content: string) {
     const res = await postsApi.updateComment(commentId, content)
-    const post = posts.value.find(p => p.id === postId)
-    if (post && post.comments) {
-      const existsIndex = post.comments.findIndex(c => Number(c.id) === Number(commentId))
-      if (existsIndex !== -1) {
-        post.comments[existsIndex] = res.data
+    const applyUpdate = (post: Post) => {
+      if (post && post.comments) {
+        const existsIndex = post.comments.findIndex(c => Number(c.id) === Number(commentId))
+        if (existsIndex !== -1) {
+          post.comments[existsIndex] = res.data
+        }
       }
     }
+    const postInFeed = posts.value.find(p => p.id === postId)
+    const postInUser = userPosts.value.find(p => p.id === postId)
+    if (postInFeed) applyUpdate(postInFeed)
+    if (postInUser) applyUpdate(postInUser)
     return res.data
   }
 
   async function deleteComment(postId: number, commentId: number) {
     await postsApi.deleteComment(commentId)
-    const post = posts.value.find(p => p.id === postId)
-    if (post) {
-      if (post.comments) {
+    const applyDelete = (post: Post) => {
+      if (post && post.comments) {
         post.comments = post.comments.filter(c => Number(c.id) !== Number(commentId))
+        post.comments_count = Math.max(0, (post.comments_count || 1) - 1)
       }
-      post.comments_count = Math.max(0, (post.comments_count || 1) - 1)
     }
+    const postInFeed = posts.value.find(p => p.id === postId)
+    const postInUser = userPosts.value.find(p => p.id === postId)
+    if (postInFeed) applyDelete(postInFeed)
+    if (postInUser) applyDelete(postInUser)
   }
 
   async function deletePost(postId: number) {
     await postsApi.deletePost(postId)
     posts.value = posts.value.filter(p => p.id !== postId)
+    userPosts.value = userPosts.value.filter(p => p.id !== postId)
   }
 
   async function updatePost(postId: number, data: { content?: string | null, feeling_name?: string, feeling_emoji?: string, hashtags?: string[] }) {
     isSubmitting.value = true
     try {
       const res = await postsApi.updatePost(postId, data)
-      const index = posts.value.findIndex(p => p.id === postId)
-      if (index !== -1) {
-        posts.value[index] = res.data
+      const feedIndex = posts.value.findIndex(p => p.id === postId)
+      if (feedIndex !== -1) {
+        posts.value[feedIndex] = res.data
+      }
+      const userIndex = userPosts.value.findIndex(p => p.id === postId)
+      if (userIndex !== -1) {
+        userPosts.value[userIndex] = res.data
       }
       return res.data
     } finally {
@@ -248,29 +345,37 @@ export const useFeedStore = defineStore('feed', () => {
         }
       })
       .listen('.PostUpdated', (data: { post: Post }) => {
-        const index = posts.value.findIndex(p => p.id === data.post.id)
-        const target = posts.value[index]
-        if (index !== -1 && target) {
-          // Preserve client-side is_liked if not present in broadcast payload
-          const currentIsLiked = target.is_liked
-          posts.value[index] = { ...data.post, is_liked: data.post.is_liked ?? currentIsLiked }
+        const updateInList = (list: Post[]) => {
+          const index = list.findIndex(p => p.id === data.post.id)
+          const target = list[index]
+          if (index !== -1 && target) {
+            // Preserve client-side is_liked if not present in broadcast payload
+            const currentIsLiked = target.is_liked
+            list[index] = { ...data.post, is_liked: data.post.is_liked ?? currentIsLiked }
+          }
         }
+        updateInList(posts.value)
+        updateInList(userPosts.value)
       })
       .listen('.PostDeleted', (data: { id: number }) => {
         posts.value = posts.value.filter(p => p.id !== data.id)
+        userPosts.value = userPosts.value.filter(p => p.id !== data.id)
         pendingPosts.value = pendingPosts.value.filter(p => p.id !== data.id)
       })
       .listen('.PostLiked', (data: { post_id: number; is_liked: boolean; likes_count: number; user_id: number }) => {
         // Only update counts for posts from other users (own post is already optimistically updated)
         if (data.user_id === currentUserId) return
-        const post = posts.value.find(p => p.id === data.post_id)
-        if (post) {
-          post.likes_count = data.likes_count
+        const postInFeed = posts.value.find(p => p.id === data.post_id)
+        if (postInFeed) {
+          postInFeed.likes_count = data.likes_count
+        }
+        const postInUser = userPosts.value.find(p => p.id === data.post_id)
+        if (postInUser) {
+          postInUser.likes_count = data.likes_count
         }
       })
-      .listen('.CommentCreated', (data: { post_id: number; comment: any; comments_count: number }) => {
-        const post = posts.value.find(p => p.id === data.post_id)
-        if (post) {
+      .listen('.CommentCreated', (data: { post_id: number; comment: PostComment; comments_count: number }) => {
+        const updateComments = (post: Post) => {
           post.comments_count = data.comments_count
           if (!post.comments) {
             post.comments = []
@@ -282,24 +387,38 @@ export const useFeedStore = defineStore('feed', () => {
             post.comments[existsIndex] = data.comment
           }
         }
+        const postInFeed = posts.value.find(p => p.id === data.post_id)
+        if (postInFeed) updateComments(postInFeed)
+        const postInUser = userPosts.value.find(p => p.id === data.post_id)
+        if (postInUser) updateComments(postInUser)
       })
-      .listen('.CommentUpdated', (data: { post_id: number; comment: any }) => {
-        const post = posts.value.find(p => p.id === data.post_id)
-        if (post && post.comments) {
-          const existsIndex = post.comments.findIndex(c => Number(c.id) === Number(data.comment.id))
-          if (existsIndex !== -1) {
-            post.comments[existsIndex] = data.comment
+      .listen('.CommentUpdated', (data: { post_id: number; comment: PostComment }) => {
+        const updateComments = (post: Post) => {
+          if (post && post.comments) {
+            const existsIndex = post.comments.findIndex(c => Number(c.id) === Number(data.comment.id))
+            if (existsIndex !== -1) {
+              post.comments[existsIndex] = data.comment
+            }
           }
         }
+        const postInFeed = posts.value.find(p => p.id === data.post_id)
+        if (postInFeed) updateComments(postInFeed)
+        const postInUser = userPosts.value.find(p => p.id === data.post_id)
+        if (postInUser) updateComments(postInUser)
       })
       .listen('.CommentDeleted', (data: { comment_id: number; post_id: number; comments_count: number }) => {
-        const post = posts.value.find(p => p.id === data.post_id)
-        if (post) {
-          post.comments_count = data.comments_count
-          if (post.comments) {
-            post.comments = post.comments.filter(c => Number(c.id) !== Number(data.comment_id))
+        const updateComments = (post: Post) => {
+          if (post) {
+            post.comments_count = data.comments_count
+            if (post.comments) {
+              post.comments = post.comments.filter(c => Number(c.id) !== Number(data.comment_id))
+            }
           }
         }
+        const postInFeed = posts.value.find(p => p.id === data.post_id)
+        if (postInFeed) updateComments(postInFeed)
+        const postInUser = userPosts.value.find(p => p.id === data.post_id)
+        if (postInUser) updateComments(postInUser)
       })
   }
 
@@ -311,18 +430,27 @@ export const useFeedStore = defineStore('feed', () => {
 
   return {
     posts,
+    userPosts,
     isLoading,
     isLoadingMore,
+    isLoadingUserPosts,
+    isLoadingMoreUserPosts,
     hasMorePages,
+    hasMoreUserPosts,
     isSubmitting,
     currentPage,
     lastPage,
+    userPostsCurrentPage,
+    userPostsLastPage,
     activeGroupId,
     pendingPosts,
     activeFilters,
+    isFiltered,
     clearFilters,
     fetchPosts,
+    fetchUserPosts,
     loadMorePosts,
+    loadMoreUserPosts,
     fetchSinglePost,
     createPost,
     updatePost,

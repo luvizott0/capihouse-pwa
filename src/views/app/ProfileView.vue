@@ -6,13 +6,13 @@ import { useAuthStore } from '@/stores/auth'
 import { useFeedStore } from '@/stores/feed'
 import { useThemeStore } from '@/stores/theme'
 import { useImageViewerStore } from '@/stores/imageViewer'
-import UserAvatar from '@/components/ui/UserAvatar.vue'
 import RetroModal from '@/components/ui/RetroModal.vue'
 import RetroButton from '@/components/ui/RetroButton.vue'
 import RetroConfirmModal from '@/components/ui/RetroConfirmModal.vue'
 import ImageCropper from '@/components/profile/ImageCropper.vue'
 import ThemeCustomizerModal from '@/components/profile/ThemeCustomizerModal.vue'
 import PostCard from '@/components/feed/PostCard.vue'
+import PostCardSkeleton from '@/components/feed/PostCardSkeleton.vue'
 import { formatBirthDate } from '@/utils/date'
 
 const route = useRoute()
@@ -84,7 +84,7 @@ async function loadProfile() {
     bioInput.value = user.value.bio || ''
     birthInput.value = user.value.birth ? user.value.birth.substring(0, 10) : ''
     // Fetch posts for this user profile (authored posts and tagged posts)
-    await feedStore.fetchPosts(1, { userId: user.value.id })
+    await feedStore.fetchUserPosts(user.value.id)
   }
 }
 
@@ -93,7 +93,6 @@ onUnmounted(() => {
   if (wasVisitingOther.value) {
     themeStore.loadThemeFromUser(authStore.user)
   }
-  feedStore.clearFilters()
 })
 
 onMounted(async () => {
@@ -249,11 +248,7 @@ async function saveSettings() {
 }
 
 // User's own posts and posts where user is tagged
-const userPosts = computed(() => {
-  if (!user.value) return []
-  const uid = user.value.id
-  return feedStore.posts.filter(p => p.user_id === uid || p.mentions?.some(m => m.id === uid))
-})
+const userPosts = computed(() => feedStore.userPosts)
 </script>
 
 <template>
@@ -455,9 +450,24 @@ const userPosts = computed(() => {
       <div class="user-posts-header">
         <h2 class="user-posts-title">» Publicações de {{ user.name }}</h2>
       </div>
-      <div v-if="userPosts.length" class="posts-stream">
-        <PostCard v-for="post in userPosts" :key="post.id" :post="post" />
+      <div v-if="feedStore.isLoadingUserPosts && !userPosts.length" class="posts-stream">
+        <PostCardSkeleton v-for="i in 2" :key="i" />
       </div>
+      <template v-else-if="userPosts.length">
+        <div class="posts-stream">
+          <PostCard v-for="post in userPosts" :key="post.id" :post="post" />
+        </div>
+        <div v-if="feedStore.hasMoreUserPosts" class="load-more-container">
+          <button
+            type="button"
+            class="retro-load-more-btn"
+            :disabled="feedStore.isLoadingMoreUserPosts"
+            @click="feedStore.loadMoreUserPosts()"
+          >
+            {{ feedStore.isLoadingMoreUserPosts ? 'Carregando mais publicações...' : '[ Carregar mais publicações ]' }}
+          </button>
+        </div>
+      </template>
       <div v-else class="retro-box empty-user-posts">
         <p>Nenhuma publicação feita ainda por este usuário.</p>
       </div>
@@ -1118,5 +1128,34 @@ const userPosts = computed(() => {
   gap: 0.75rem;
   border-top: 1px solid var(--color-border);
   padding-top: 0.75rem;
+}
+
+.load-more-container {
+  display: flex;
+  justify-content: center;
+  padding: 0.75rem 0;
+}
+
+.retro-load-more-btn {
+  background: none;
+  border: 1px dashed var(--color-primary-400, #c4884e);
+  color: var(--color-primary-800, #5f4120);
+  font-family: var(--font-heading, monospace);
+  font-size: 0.85rem;
+  font-weight: bold;
+  padding: 0.5rem 1rem;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.retro-load-more-btn:hover:not(:disabled) {
+  background-color: var(--color-primary-50, #f8f6f1);
+  border-color: var(--color-primary);
+}
+
+.retro-load-more-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 </style>

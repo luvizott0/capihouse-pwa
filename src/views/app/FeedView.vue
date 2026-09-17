@@ -39,8 +39,8 @@ const filterDate = computed(() => (route.query.date as string) || '')
 const filterUserId = computed(() => route.query.user_id ? Number(route.query.user_id) : null)
 
 async function loadPostsForCurrentRoute(force = false) {
-  // Se já temos posts e não é um reload forçado nem há filtros de busca, reutiliza o cache do Pinia
-  if (!force && !hasSearchFilters.value && feedStore.posts.length > 0) {
+  // Se já temos posts e não é um reload forçado nem há filtros de busca ativos, reutiliza o cache do Pinia
+  if (!force && !hasSearchFilters.value && feedStore.posts.length > 0 && !feedStore.isFiltered) {
     return
   }
 
@@ -87,7 +87,7 @@ watch(
     route.query.date,
     route.query.user_id,
   ],
-  ([name, q, search, date, userId], [oldName, oldQ, oldSearch, oldDate, oldUserId]) => {
+  ([name, q, search, date, userId], [, oldQ, oldSearch, oldDate, oldUserId]) => {
     if (name !== 'feed') return
     if (q !== oldQ || search !== oldSearch || date !== oldDate || userId !== oldUserId) {
       loadPostsForCurrentRoute(true)

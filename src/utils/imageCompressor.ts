@@ -49,7 +49,9 @@ export async function compressImageFile(
           width = maxWidth
         } else {
           width = Math.round((width * maxHeight) / height)
-          maxHeight && (height = maxHeight)
+          if (maxHeight) {
+            height = maxHeight
+          }
         }
       }
 

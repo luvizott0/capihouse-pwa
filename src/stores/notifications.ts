@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import type { AppNotification } from '@/types/models'
 import * as notifApi from '@/api/notifications'
 import * as groupsApi from '@/api/groups'
-import { connectEcho, disconnectEcho } from '@/services/echo'
+import { connectEcho } from '@/services/echo'
 
 export const useNotificationsStore = defineStore('notifications', () => {
   const notifications = ref<AppNotification[]>([])
