@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import type { Post, PostComment } from '@/types/models'
 import { useFeedStore } from '@/stores/feed'
 import { useAuthStore } from '@/stores/auth'
@@ -49,12 +49,39 @@ function canDeleteComment(comment: PostComment) {
   )
 }
 
+// Comment options menu (3-dots)
+const activeCommentMenuId = ref<number | null>(null)
+
+function toggleCommentMenu(commentId: number) {
+  if (activeCommentMenuId.value === commentId) {
+    activeCommentMenuId.value = null
+  } else {
+    activeCommentMenuId.value = commentId
+  }
+}
+
+function handleDocumentClick(e: MouseEvent) {
+  const target = e.target as HTMLElement | null
+  if (target && !target.closest('.comment-menu-wrapper')) {
+    activeCommentMenuId.value = null
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleDocumentClick)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleDocumentClick)
+})
+
 // Inline comment editing
 const editingCommentId = ref<number | null>(null)
 const editingCommentContent = ref('')
 const isUpdatingComment = ref(false)
 
 function startEditComment(comment: PostComment) {
+  activeCommentMenuId.value = null
   editingCommentId.value = comment.id
   editingCommentContent.value = comment.content
 }
@@ -82,6 +109,7 @@ const showDeleteCommentModal = ref(false)
 const isDeletingComment = ref(false)
 
 function promptDeleteComment(comment: PostComment) {
+  activeCommentMenuId.value = null
   commentToDelete.value = comment
   showDeleteCommentModal.value = true
 }
@@ -412,25 +440,41 @@ async function confirmDeletePost() {
                   {{ formatRelativeTime(c.created_at) }}
                   <span v-if="c.updated_at && c.updated_at !== c.created_at" class="comment-edited-tag">(editado)</span>
                 </span>
-                <div v-if="editingCommentId !== c.id && (canEditComment(c) || canDeleteComment(c))" class="comment-actions">
+                <div
+                  v-if="editingCommentId !== c.id && (canEditComment(c) || canDeleteComment(c))"
+                  class="comment-menu-wrapper"
+                >
                   <button
-                    v-if="canEditComment(c)"
                     type="button"
-                    class="comment-action-btn edit-comment-btn"
-                    title="Editar comentário"
-                    @click="startEditComment(c)"
+                    class="comment-menu-trigger"
+                    title="Mais opções"
+                    aria-label="Mais opções"
+                    @click.stop="toggleCommentMenu(c.id)"
                   >
-                    [✎]
+                    ⋮
                   </button>
-                  <button
-                    v-if="canDeleteComment(c)"
-                    type="button"
-                    class="comment-action-btn delete-comment-btn"
-                    title="Excluir comentário"
-                    @click="promptDeleteComment(c)"
+                  <div
+                    v-if="activeCommentMenuId === c.id"
+                    class="comment-dropdown-menu"
+                    @click.stop
                   >
-                    [×]
-                  </button>
+                    <button
+                      v-if="canEditComment(c)"
+                      type="button"
+                      class="comment-menu-item edit-item"
+                      @click="startEditComment(c)"
+                    >
+                      <span class="item-icon">✎</span> Editar
+                    </button>
+                    <button
+                      v-if="canDeleteComment(c)"
+                      type="button"
+                      class="comment-menu-item delete-item"
+                      @click="promptDeleteComment(c)"
+                    >
+                      <span class="item-icon">×</span> Excluir
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1013,6 +1057,11 @@ async function confirmDeletePost() {
   font-weight: bold;
   color: var(--color-primary-800);
   text-decoration: none;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .comment-user-name:hover {
   text-decoration: underline;
@@ -1021,8 +1070,9 @@ async function confirmDeletePost() {
 .comment-header-right {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.35rem;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 .comment-date {
@@ -1035,38 +1085,85 @@ async function confirmDeletePost() {
   font-size: 0.65rem;
   color: var(--color-muted);
   font-style: italic;
-  margin-left: 0.2rem;
+  margin-left: 0.15rem;
 }
 
-.comment-actions {
+.comment-menu-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.comment-menu-trigger {
+  background: none;
+  border: 1px solid transparent;
+  font-size: 1rem;
+  font-weight: bold;
+  line-height: 1;
+  color: var(--color-muted, #847062);
+  cursor: pointer;
+  padding: 0;
+  border-radius: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  transition: all 0.15s ease;
+}
+.comment-menu-trigger:hover {
+  color: var(--color-primary-800, #5f4120);
+  background-color: var(--color-primary-50, #f8f6f1);
+  border-color: var(--color-border, #d8cdc5);
+}
+
+.comment-dropdown-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 2px);
+  background: #ffffff;
+  border: 1px solid var(--color-border, #d8cdc5);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.14);
+  border-radius: 2px;
+  z-index: 30;
+  min-width: 90px;
+  display: flex;
+  flex-direction: column;
+  padding: 0.2rem 0;
+}
+
+.comment-menu-item {
   display: flex;
   align-items: center;
-  gap: 0.15rem;
-}
-
-.comment-action-btn {
+  gap: 0.35rem;
+  padding: 0.35rem 0.55rem;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.72rem;
+  font-weight: bold;
   background: none;
   border: none;
-  font-family: var(--font-heading, 'Space Mono', monospace);
-  font-size: 0.75rem;
-  font-weight: bold;
+  text-align: left;
+  width: 100%;
   cursor: pointer;
-  padding: 0.1rem 0.25rem;
+  white-space: nowrap;
+  transition: background-color 0.1s ease;
+}
+.comment-menu-item .item-icon {
+  font-size: 0.8rem;
   line-height: 1;
-  border-radius: 2px;
 }
 
-.edit-comment-btn {
-  color: var(--color-primary-700, #7d5628);
+.comment-menu-item.edit-item {
+  color: var(--color-primary-800, #7d5628);
 }
-.edit-comment-btn:hover {
-  background-color: var(--color-primary-100, #fdf8f3);
+.comment-menu-item.edit-item:hover {
+  background-color: var(--color-primary-50, #fdf8f3);
 }
 
-.delete-comment-btn {
+.comment-menu-item.delete-item {
   color: var(--color-danger, #ef4444);
 }
-.delete-comment-btn:hover {
+.comment-menu-item.delete-item:hover {
   background-color: #fee2e2;
 }
 
