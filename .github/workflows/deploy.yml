@@ -53,11 +53,16 @@ jobs:
     name: Deploy Homelab (BMO)
     needs: build-and-push
     runs-on: [self-hosted]
+    permissions:
+      contents: read
+      packages: read
     steps:
       - name: Autenticar no GHCR no Runner Local
-        run: |
-          echo "🔑 Autenticando Docker no GHCR..."
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Backup da Imagem Atual (Rollback Safety)
         run: |
@@ -72,8 +77,21 @@ jobs:
         run: |
           IMAGE_NAME="ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]'):latest"
           echo "📥 Baixando imagem compilada na nuvem: $IMAGE_NAME..."
-          docker pull "$IMAGE_NAME"
-          docker tag "$IMAGE_NAME" capihouse-pwa:latest
+          if docker pull "$IMAGE_NAME"; then
+            docker tag "$IMAGE_NAME" capihouse-pwa:latest
+          else
+            echo "⚠️ Falha ao baixar do GHCR via token. Compilando localmente no homelab..."
+            TARGET_DIR="${{ vars.CAPIHOUSE_DIR }}"
+            if [ -z "$TARGET_DIR" ]; then
+              if [ -n "$CAPIHOUSE_DIR" ]; then TARGET_DIR="$CAPIHOUSE_DIR";
+              elif [ -f "$HOME/homelab/capihouse/docker-compose.yml" ]; then TARGET_DIR="$HOME/homelab/capihouse";
+              elif [ -f "/opt/capihouse/docker-compose.yml" ]; then TARGET_DIR="/opt/capihouse";
+              elif [ -f "$HOME/capihouse/docker-compose.yml" ]; then TARGET_DIR="$HOME/capihouse";
+              elif [ -f "../docker-compose.yml" ]; then TARGET_DIR="..";
+              else TARGET_DIR="."; fi
+            fi
+            docker compose --project-directory "$TARGET_DIR" -f "$TARGET_DIR/docker-compose.yml" build capihouse-pwa
+          fi
 
       - name: Executar Deploy Zero-Downtime Blue-Green
         run: |
