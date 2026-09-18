@@ -161,6 +161,14 @@ export interface EventUser {
   status: 'invited' | 'confirmed' | 'declined'
 }
 
+export interface EventGuest extends User {
+  pivot?: {
+    event_id: number
+    user_id: number
+    status: 'invited' | 'confirmed' | 'declined'
+  }
+}
+
 export interface Event {
   id: number
   name: string
@@ -169,7 +177,7 @@ export interface Event {
   user_id: number
   created_at: string
   owner: User
-  guests?: User[]
+  guests?: EventGuest[]
   guests_count?: number
   media?: Media[]
   image_url?: string | null

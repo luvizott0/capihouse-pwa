@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGroupsStore } from '@/stores/groups'
 import { useAuthStore } from '@/stores/auth'
@@ -10,6 +10,7 @@ import RetroButton from '@/components/ui/RetroButton.vue'
 import RetroConfirmModal from '@/components/ui/RetroConfirmModal.vue'
 import RetroModal from '@/components/ui/RetroModal.vue'
 import GroupInviteModal from '@/components/groups/GroupInviteModal.vue'
+import ImageCropper from '@/components/profile/ImageCropper.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -23,8 +24,25 @@ const messagesContainer = ref<HTMLDivElement | null>(null)
 const showInviteModal = ref(false)
 const showLeaveModal = ref(false)
 const showMembersModal = ref(false)
+const showCoverCropper = ref(false)
 const isLeaving = ref(false)
 const errorMsg = ref('')
+
+const isOwnerOrAdmin = computed(() => {
+  return groupsStore.currentGroup?.my_role === 'owner' || authStore.isAdmin
+})
+
+async function handleCoverCropped(blob: Blob) {
+  try {
+    await groupsStore.updateGroupCover(groupId, blob)
+  } catch (err: unknown) {
+    if (axios.isAxiosError(err) && err.response?.data?.message) {
+      errorMsg.value = err.response.data.message
+    } else {
+      errorMsg.value = 'Erro ao atualizar foto de capa do grupo.'
+    }
+  }
+}
 
 onMounted(async () => {
   await loadGroupData()
@@ -131,6 +149,22 @@ async function openMembersModal() {
 
     <!-- Group Header Card -->
     <div v-if="groupsStore.currentGroup" class="retro-card group-header-card">
+      <!-- Top Cover Banner -->
+      <div
+        class="group-cover-banner"
+        :style="groupsStore.currentGroup.image_url ? { backgroundImage: `url(${groupsStore.currentGroup.image_url})` } : {}"
+      >
+        <button
+          v-if="isOwnerOrAdmin"
+          type="button"
+          class="group-banner-edit-btn"
+          @click.stop="showCoverCropper = true"
+          title="Editar foto de capa (formato retangular)"
+        >
+          📷 [ Editar capa ]
+        </button>
+      </div>
+
       <div class="group-banner-row">
         <!-- Photo -->
         <div class="group-photo-large">
@@ -319,6 +353,15 @@ async function openMembersModal() {
         </div>
       </div>
     </RetroModal>
+
+    <!-- Cover Cropper Modal -->
+    <ImageCropper
+      v-model="showCoverCropper"
+      :aspectRatio="3 / 1"
+      title="Editar Foto de Capa do Grupo"
+      formatNote="Formato retangular recomendado (3:1 panorâmico)"
+      @cropped="handleCoverCropped"
+    />
   </div>
 </template>
 
@@ -339,8 +382,40 @@ async function openMembersModal() {
 }
 
 .group-header-card {
-  padding: 1.25rem;
+  padding: 0;
   background-color: #ffffff;
+  overflow: hidden;
+}
+
+.group-cover-banner {
+  position: relative;
+  width: 100%;
+  height: 140px;
+  background: linear-gradient(90deg, #d6bda2 0%, #e8d3bc 100%);
+  background-size: cover;
+  background-position: center;
+  border-bottom: 2px solid var(--color-border);
+}
+
+.group-banner-edit-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-family: var(--font-heading);
+  font-size: 0.75rem;
+  font-weight: bold;
+  background-color: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--color-border);
+  color: var(--color-primary-800);
+  padding: 0.3rem 0.6rem;
+  border-radius: 2px;
+  cursor: pointer;
+  z-index: 2;
+  transition: all 0.15s ease;
+}
+.group-banner-edit-btn:hover {
+  background-color: #ffffff;
+  color: var(--color-primary);
 }
 
 .group-banner-row {
@@ -348,12 +423,13 @@ async function openMembersModal() {
   align-items: flex-start;
   gap: 1.25rem;
   flex-wrap: wrap;
+  padding: 1.25rem;
 }
 
 .group-photo-large {
   width: 90px;
   height: 90px;
-  border: 2px solid var(--color-border);
+  border: 3px solid #ffffff;
   border-radius: 2px;
   overflow: hidden;
   background-color: var(--color-primary-100);
@@ -361,6 +437,10 @@ async function openMembersModal() {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  margin-top: -45px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  position: relative;
+  z-index: 1;
 }
 .photo-img {
   width: 100%;

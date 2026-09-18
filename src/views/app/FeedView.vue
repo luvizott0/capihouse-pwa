@@ -638,14 +638,15 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   gap: 0.6rem;
-  padding: 1rem;
-  background-color: var(--color-primary-50, #f8f6f1);
-  border: 1px dashed var(--color-primary-300, #c4884e);
-  border-radius: 2px;
+  padding: 0.85rem 1.25rem;
+  background-color: #fdf8f3;
+  border: 1px dashed #d4a574;
+  border-radius: 4px;
   font-family: var(--font-heading, 'Space Mono', monospace);
   font-size: 0.82rem;
   font-weight: bold;
-  color: var(--color-primary-800, #5f4120);
+  color: #5f4120;
+  box-shadow: 0 1px 3px rgba(62, 39, 35, 0.06);
 }
 
 .infinite-end-card {
@@ -653,13 +654,18 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  padding: 1rem;
+  padding: 0.85rem 1.25rem;
   text-align: center;
   font-family: var(--font-heading, 'Space Mono', monospace);
-  font-size: 0.8rem;
-  color: var(--color-muted, #847062);
-  border-top: 1px dashed var(--color-border, #D8CDC5);
-  margin-top: 0.5rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #5f4120;
+  background-color: #fdf8f3;
+  border: 1px solid #e8c9a5;
+  border-radius: 4px;
+  box-shadow: 0 1px 4px rgba(62, 39, 35, 0.08);
+  margin-top: 0.75rem;
+  margin-bottom: 1rem;
 }
 
 .end-marker {

@@ -165,6 +165,18 @@ export const useGroupsStore = defineStore('groups', () => {
       })
   }
 
+  async function updateGroupCover(groupId: number, fileOrBlob: Blob | File) {
+    const formData = new FormData()
+    formData.append('photo', fileOrBlob, 'group-cover.webp')
+    const res = await groupsApi.updateGroup(groupId, formData)
+    currentGroup.value = res.data
+    const index = myGroups.value.findIndex(g => g.id === groupId)
+    if (index !== -1) {
+      myGroups.value[index] = res.data
+    }
+    return res.data
+  }
+
   /**
    * Unsubscribe from a group's WebSocket channel.
    * Call this when leaving the group chat view.
@@ -194,6 +206,7 @@ export const useGroupsStore = defineStore('groups', () => {
     fetchMessages,
     sendMessage,
     fetchMembers,
+    updateGroupCover,
     subscribeToGroupChat,
     unsubscribeFromGroupChat,
   }

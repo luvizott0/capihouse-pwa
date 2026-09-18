@@ -113,8 +113,16 @@ export const useEventsStore = defineStore('events', () => {
   }
 
   async function rsvp(eventId: number, status: 'confirmed' | 'declined' | 'invited') {
-    await eventsApi.rsvpEvent(eventId, status)
-    fetchEvents()
+    const res = await eventsApi.rsvpEvent(eventId, status)
+    if (res.data?.event) {
+      const index = events.value.findIndex(e => e.id === eventId)
+      if (index !== -1) {
+        events.value[index] = res.data.event
+      }
+    } else {
+      await fetchEvents()
+    }
+    return res.data
   }
 
   async function deleteEvent(eventId: number) {

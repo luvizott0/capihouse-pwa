@@ -17,7 +17,8 @@ const authStore = useAuthStore()
 
 const name = ref('')
 const description = ref('')
-const date = ref('')
+const eventDate = ref('')
+const eventTime = ref('')
 const selectedImage = ref<File | null>(null)
 const imagePreview = ref<string | null>(null)
 const selectedGuestIds = ref<number[]>([])
@@ -78,15 +79,17 @@ function removeImage() {
 
 async function handleSubmit() {
   errorMsg.value = ''
-  if (!name.value.trim() || !description.value.trim() || !date.value) {
-    errorMsg.value = 'Preencha todos os campos obrigatórios.'
+  if (!name.value.trim() || !description.value.trim() || !eventDate.value || !eventTime.value) {
+    errorMsg.value = 'Preencha todos os campos obrigatórios (nome, data, horário e descrição).'
     return
   }
+
+  const combinedDateTime = `${eventDate.value}T${eventTime.value}`
 
   const formData = new FormData()
   formData.append('name', name.value.trim())
   formData.append('description', description.value.trim())
-  formData.append('date', date.value)
+  formData.append('date', combinedDateTime)
   if (selectedImage.value) {
     formData.append('image', selectedImage.value)
   }
@@ -99,7 +102,8 @@ async function handleSubmit() {
     await eventsStore.createEvent(formData)
     name.value = ''
     description.value = ''
-    date.value = ''
+    eventDate.value = ''
+    eventTime.value = ''
     selectedImage.value = null
     imagePreview.value = null
     selectedGuestIds.value = []
@@ -125,9 +129,16 @@ function handleClose() {
 
       <RetroInput v-model="name" label="Nome do Evento" placeholder="Ex: Churrasco da Capivara" required />
 
-      <div class="form-group">
-        <label class="form-label">Data e Hora *</label>
-        <input v-model="date" type="datetime-local" class="retro-field" required />
+      <!-- Data e Horário separados -->
+      <div class="datetime-grid">
+        <div class="form-group datetime-field">
+          <label class="form-label">Data do Evento *</label>
+          <input v-model="eventDate" type="date" class="retro-field" required />
+        </div>
+        <div class="form-group datetime-field">
+          <label class="form-label">Horário *</label>
+          <input v-model="eventTime" type="time" class="retro-field" required />
+        </div>
       </div>
 
       <div class="form-group">
@@ -143,7 +154,10 @@ function handleClose() {
 
       <!-- Image upload -->
       <div class="form-group">
-        <label class="form-label">Foto de Capa</label>
+        <label class="form-label">
+          Foto de Capa
+          <span class="muted-note">(formato retangular recomendado)</span>
+        </label>
         <input type="file" accept="image/*" @change="handleImageSelect" class="retro-field" />
         <div v-if="imagePreview" class="preview-box">
           <img :src="imagePreview" alt="Capa do evento" class="preview-img" />
@@ -215,6 +229,32 @@ function handleClose() {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+.datetime-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 480px) {
+  .datetime-grid {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+}
+
+.datetime-field {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .error-banner {
@@ -230,6 +270,9 @@ function handleClose() {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .form-label {
@@ -241,6 +284,9 @@ function handleClose() {
 
 .retro-field, .retro-textarea {
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
   padding: 0.55rem 0.75rem;
   font-size: 0.9rem;
   font-family: var(--font-body);

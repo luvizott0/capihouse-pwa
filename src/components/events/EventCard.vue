@@ -5,6 +5,7 @@ import { useEventsStore } from '@/stores/events'
 import { useAuthStore } from '@/stores/auth'
 import RetroConfirmModal from '@/components/ui/RetroConfirmModal.vue'
 import EventEditModal from '@/components/events/EventEditModal.vue'
+import ImageCropper from '@/components/profile/ImageCropper.vue'
 import { resolveMediaUrl } from '@/utils/media'
 
 const props = defineProps<{ event: Event }>()
@@ -15,6 +16,18 @@ const authStore = useAuthStore()
 const isOwner = computed(() => {
   return authStore.user?.id === props.event.user_id || authStore.isAdmin
 })
+
+const myGuestRecord = computed(() => {
+  const currentUserId = authStore.user?.id
+  if (!currentUserId || !props.event.guests) return null
+  return props.event.guests.find(g => g.id === currentUserId)
+})
+
+const myRsvp = computed<'confirmed' | 'declined' | 'invited' | null>(() => {
+  return (myGuestRecord.value?.pivot?.status as 'confirmed' | 'declined' | 'invited') || null
+})
+
+const isRsvping = ref(false)
 
 const eventImage = computed(() => {
   const raw = props.event.image_url || props.event.media?.[0]?.url || props.event.media?.[0]?.path || null
@@ -34,10 +47,32 @@ const formattedDate = computed(() => {
 })
 
 async function handleRsvp(status: 'confirmed' | 'declined') {
-  await eventsStore.rsvp(props.event.id, status)
+  if (isRsvping.value) return
+  isRsvping.value = true
+  try {
+    await eventsStore.rsvp(props.event.id, status)
+  } finally {
+    isRsvping.value = false
+  }
 }
 
 const imageFailed = ref(false)
+const showCoverCropper = ref(false)
+const isUpdatingCover = ref(false)
+
+async function handleCoverCropped(blob: Blob) {
+  isUpdatingCover.value = true
+  const formData = new FormData()
+  formData.append('image', blob, 'event-cover.webp')
+  try {
+    await eventsStore.updateEvent(props.event.id, formData)
+    imageFailed.value = false
+  } catch (err) {
+    console.error('Erro ao atualizar capa do evento', err)
+  } finally {
+    isUpdatingCover.value = false
+  }
+}
 
 const showEditModal = ref(false)
 const showDeleteModal = ref(false)
@@ -71,6 +106,14 @@ async function confirmDeleteEvent() {
       <div v-if="isOwner" class="card-actions-group">
         <button
           type="button"
+          class="card-action-btn cover-btn"
+          @click="showCoverCropper = true"
+          title="Editar foto de capa (formato retangular)"
+        >
+          📷 Capa
+        </button>
+        <button
+          type="button"
           class="card-action-btn edit-btn"
           @click="showEditModal = true"
           title="Editar evento"
@@ -86,6 +129,15 @@ async function confirmDeleteEvent() {
           [×]
         </button>
       </div>
+      <button
+        v-if="isOwner"
+        type="button"
+        class="cover-edit-floating-btn"
+        @click.stop="showCoverCropper = true"
+        title="Editar capa do evento (formato retangular)"
+      >
+        📷 [ Editar capa ]
+      </button>
     </div>
 
     <!-- Event Body -->
@@ -108,13 +160,36 @@ async function confirmDeleteEvent() {
 
       <!-- RSVP Actions: Hidden for owner, shown for guests/others -->
       <div v-if="!isOwner" class="rsvp-row">
-        <span class="rsvp-label">Sua presença:</span>
+        <div class="rsvp-status-container">
+          <span class="rsvp-label">Sua presença:</span>
+          <span v-if="myRsvp === 'confirmed'" class="rsvp-status-badge confirmed">
+            ✓ Presença confirmada!
+          </span>
+          <span v-else-if="myRsvp === 'declined'" class="rsvp-status-badge declined">
+            ✕ Você marcou que não vai
+          </span>
+          <span v-else class="rsvp-status-badge pending">
+            ❓ Não confirmado
+          </span>
+        </div>
         <div class="rsvp-buttons">
-          <button type="button" class="rsvp-btn rsvp-confirm" @click="handleRsvp('confirmed')">
-            [ Vou ]
+          <button
+            type="button"
+            class="rsvp-btn rsvp-confirm"
+            :class="{ 'is-active': myRsvp === 'confirmed' }"
+            :disabled="isRsvping"
+            @click="handleRsvp('confirmed')"
+          >
+            {{ myRsvp === 'confirmed' ? '✓ Vou' : '[ Vou ]' }}
           </button>
-          <button type="button" class="rsvp-btn rsvp-decline" @click="handleRsvp('declined')">
-            [ Não vou ]
+          <button
+            type="button"
+            class="rsvp-btn rsvp-decline"
+            :class="{ 'is-active': myRsvp === 'declined' }"
+            :disabled="isRsvping"
+            @click="handleRsvp('declined')"
+          >
+            {{ myRsvp === 'declined' ? '✕ Não vou' : '[ Não vou ]' }}
           </button>
         </div>
       </div>
@@ -122,6 +197,15 @@ async function confirmDeleteEvent() {
         <span class="owner-status-badge">👑 Você é o organizador deste evento</span>
       </div>
     </div>
+
+    <!-- Cover Cropper Modal -->
+    <ImageCropper
+      v-model="showCoverCropper"
+      :aspectRatio="16 / 9"
+      title="Editar Foto de Capa do Evento"
+      formatNote="Formato retangular recomendado (16:9 panorâmico)"
+      @cropped="handleCoverCropped"
+    />
 
     <!-- Edit Event Modal -->
     <EventEditModal
@@ -284,6 +368,35 @@ async function confirmDeleteEvent() {
   white-space: pre-wrap;
 }
 
+.cover-btn {
+  color: var(--color-primary-800, #5f4120);
+}
+.cover-btn:hover {
+  background-color: var(--color-primary-100, #fdf8f3);
+  border-radius: 2px;
+}
+
+.cover-edit-floating-btn {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background-color: rgba(0, 0, 0, 0.72);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.72rem;
+  font-weight: bold;
+  padding: 0.25rem 0.5rem;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  backdrop-filter: blur(2px);
+}
+.cover-edit-floating-btn:hover {
+  background-color: var(--color-primary, #a66130);
+  border-color: #ffffff;
+}
+
 .rsvp-row {
   margin-top: 0.75rem;
   padding-top: 0.75rem;
@@ -291,6 +404,15 @@ async function confirmDeleteEvent() {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.rsvp-status-container {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
 }
 
 .rsvp-label {
@@ -298,6 +420,32 @@ async function confirmDeleteEvent() {
   font-weight: bold;
   color: var(--color-primary-800);
   font-family: var(--font-heading);
+}
+
+.rsvp-status-badge {
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.72rem;
+  font-weight: bold;
+  padding: 0.15rem 0.45rem;
+  border-radius: 2px;
+}
+
+.rsvp-status-badge.confirmed {
+  background-color: #dcfce7;
+  color: #15803d;
+  border: 1px solid #86efac;
+}
+
+.rsvp-status-badge.declined {
+  background-color: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+}
+
+.rsvp-status-badge.pending {
+  background-color: var(--color-primary-50, #f8f6f1);
+  color: var(--color-muted, #847062);
+  border: 1px dashed var(--color-border, #d8cdc5);
 }
 
 .rsvp-buttons {
@@ -312,24 +460,41 @@ async function confirmDeleteEvent() {
   padding: 0.25rem 0.6rem;
   border-radius: 2px;
   cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.rsvp-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 
 .rsvp-confirm {
   background-color: var(--color-primary);
   color: white;
-  border: none;
+  border: 1px solid var(--color-primary-800, #5f4120);
 }
-.rsvp-confirm:hover {
+.rsvp-confirm:hover:not(:disabled) {
   background-color: var(--color-primary-600);
+}
+.rsvp-confirm.is-active {
+  background-color: #16a34a;
+  border-color: #15803d;
+  box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.25);
 }
 
 .rsvp-decline {
-  background: none;
+  background-color: #ffffff;
   border: 1px solid var(--color-border);
   color: var(--color-muted);
 }
-.rsvp-decline:hover {
+.rsvp-decline:hover:not(:disabled) {
   background-color: #fee2e2;
   color: #dc2626;
+}
+.rsvp-decline.is-active {
+  background-color: #dc2626;
+  color: #ffffff;
+  border-color: #b91c1c;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.25);
 }
 </style>

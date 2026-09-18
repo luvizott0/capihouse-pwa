@@ -148,7 +148,10 @@ function handleClose() {
 
       <!-- Group Photo Upload -->
       <div class="form-group">
-        <label class="field-label">Foto do Grupo</label>
+        <label class="field-label">
+          Foto de Capa do Grupo
+          <span class="muted-note">(formato retangular recomendado)</span>
+        </label>
         <div class="photo-upload-row">
           <div v-if="photoPreview" class="photo-preview-box">
             <img :src="photoPreview" alt="Foto do grupo" class="preview-img" />

@@ -176,6 +176,12 @@ function onGroupCreated() {
       </router-link>
     </div>
 
+    <!-- Final dos Grupos -->
+    <div v-if="groupsStore.myGroups.length" class="infinite-end-card">
+      <span class="end-marker">👥</span>
+      <span class="end-text">Você está visualizando todos os seus grupos da casa!</span>
+    </div>
+
     <!-- Empty State -->
     <div v-else class="empty-groups-box">
       <img src="/capihouse-logo.png" alt="Capivara" class="empty-capivara-logo" />
@@ -479,5 +485,28 @@ function onGroupCreated() {
   display: flex;
   gap: 0.75rem;
   margin-top: 0.75rem;
+}
+
+.infinite-end-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1.25rem;
+  text-align: center;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #5f4120;
+  background-color: #fdf8f3;
+  border: 1px solid #e8c9a5;
+  border-radius: 4px;
+  box-shadow: 0 1px 4px rgba(62, 39, 35, 0.08);
+  margin-top: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.end-marker {
+  font-size: 1rem;
 }
 </style>
