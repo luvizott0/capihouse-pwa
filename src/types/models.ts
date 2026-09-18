@@ -130,6 +130,10 @@ export interface GroupMessage {
   content: string
   user: User
   created_at: string
+  edited_at?: string | null
+  deleted_at?: string | null
+  is_edited?: boolean
+  is_deleted?: boolean
 }
 
 export interface AppNotification {

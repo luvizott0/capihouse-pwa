@@ -133,11 +133,33 @@ export const useGroupsStore = defineStore('groups', () => {
     isSending.value = true
     try {
       const res = await groupsApi.sendGroupMessage(groupId, content.trim())
-      messages.value.push(res.data)
+      const exists = messages.value.some(m => m.id === res.data.id)
+      if (!exists) {
+        messages.value.push(res.data)
+      }
       return res.data
     } finally {
       isSending.value = false
     }
+  }
+
+  async function editMessage(groupId: number, messageId: number, content: string) {
+    if (!content.trim()) return
+    const res = await groupsApi.updateGroupMessage(groupId, messageId, content.trim())
+    const index = messages.value.findIndex(m => m.id === messageId)
+    if (index !== -1) {
+      messages.value[index] = res.data
+    }
+    return res.data
+  }
+
+  async function deleteMessage(groupId: number, messageId: number) {
+    const res = await groupsApi.deleteGroupMessage(groupId, messageId)
+    const index = messages.value.findIndex(m => m.id === messageId)
+    if (index !== -1) {
+      messages.value[index] = res.data
+    }
+    return res.data
   }
 
   async function fetchMembers(groupId: number) {
@@ -155,12 +177,31 @@ export const useGroupsStore = defineStore('groups', () => {
    */
   function subscribeToGroupChat(groupId: number) {
     const echo = connectEcho()
-    echo.private(`group.${groupId}`)
+    const channel = echo.private(`group.${groupId}`)
+
+    channel
+      .stopListening('.GroupMessageSent')
+      .stopListening('.GroupMessageUpdated')
+      .stopListening('.GroupMessageDeleted')
+
+    channel
       .listen('.GroupMessageSent', (data: { message: GroupMessage }) => {
-        // Avoid duplicates (own message is already added by sendMessage)
+        // Avoid duplicates (own message is already added by sendMessage or already received)
         const exists = messages.value.some(m => m.id === data.message.id)
         if (!exists) {
           messages.value.push(data.message)
+        }
+      })
+      .listen('.GroupMessageUpdated', (data: { message: GroupMessage }) => {
+        const index = messages.value.findIndex(m => m.id === data.message.id)
+        if (index !== -1) {
+          messages.value[index] = data.message
+        }
+      })
+      .listen('.GroupMessageDeleted', (data: { message: GroupMessage }) => {
+        const index = messages.value.findIndex(m => m.id === data.message.id)
+        if (index !== -1) {
+          messages.value[index] = data.message
         }
       })
   }
@@ -205,6 +246,8 @@ export const useGroupsStore = defineStore('groups', () => {
     leaveGroup,
     fetchMessages,
     sendMessage,
+    editMessage,
+    deleteMessage,
     fetchMembers,
     updateGroupCover,
     subscribeToGroupChat,

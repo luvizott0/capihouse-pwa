@@ -12,6 +12,8 @@ import RetroModal from '@/components/ui/RetroModal.vue'
 import GroupInviteModal from '@/components/groups/GroupInviteModal.vue'
 import ImageCropper from '@/components/profile/ImageCropper.vue'
 
+import type { GroupMessage } from '@/types/models'
+
 const route = useRoute()
 const router = useRouter()
 const groupsStore = useGroupsStore()
@@ -20,6 +22,14 @@ const authStore = useAuthStore()
 const groupId = Number(route.params.id)
 const messageInput = ref('')
 const messagesContainer = ref<HTMLDivElement | null>(null)
+
+const editingMessageId = ref<number | null>(null)
+const editingContent = ref('')
+const isUpdatingMessage = ref(false)
+
+const showDeleteMessageModal = ref(false)
+const messageToDelete = ref<GroupMessage | null>(null)
+const isDeletingMessage = ref(false)
 
 const showInviteModal = ref(false)
 const showLeaveModal = ref(false)
@@ -31,6 +41,57 @@ const errorMsg = ref('')
 const isOwnerOrAdmin = computed(() => {
   return groupsStore.currentGroup?.my_role === 'owner' || authStore.isAdmin
 })
+
+function startEditMessage(msg: GroupMessage) {
+  editingMessageId.value = msg.id
+  editingContent.value = msg.content
+}
+
+function cancelEditMessage() {
+  editingMessageId.value = null
+  editingContent.value = ''
+}
+
+async function saveEditMessage() {
+  if (!editingMessageId.value || !editingContent.value.trim() || isUpdatingMessage.value) return
+  isUpdatingMessage.value = true
+  try {
+    await groupsStore.editMessage(groupId, editingMessageId.value, editingContent.value.trim())
+    editingMessageId.value = null
+    editingContent.value = ''
+  } catch (err: unknown) {
+    if (axios.isAxiosError(err) && err.response?.data?.message) {
+      errorMsg.value = err.response.data.message
+    } else {
+      errorMsg.value = 'Erro ao editar mensagem.'
+    }
+  } finally {
+    isUpdatingMessage.value = false
+  }
+}
+
+function promptDeleteMessage(msg: GroupMessage) {
+  messageToDelete.value = msg
+  showDeleteMessageModal.value = true
+}
+
+async function handleConfirmDeleteMessage() {
+  if (!messageToDelete.value) return
+  isDeletingMessage.value = true
+  try {
+    await groupsStore.deleteMessage(groupId, messageToDelete.value.id)
+    showDeleteMessageModal.value = false
+    messageToDelete.value = null
+  } catch (err: unknown) {
+    if (axios.isAxiosError(err) && err.response?.data?.message) {
+      errorMsg.value = err.response.data.message
+    } else {
+      errorMsg.value = 'Erro ao excluir mensagem.'
+    }
+  } finally {
+    isDeletingMessage.value = false
+  }
+}
 
 async function handleCoverCropped(blob: Blob) {
   try {
@@ -270,7 +331,10 @@ async function openMembersModal() {
             v-for="msg in groupsStore.messages"
             :key="msg.id"
             class="message-item"
-            :class="{ 'my-message': msg.user_id === authStore.user?.id }"
+            :class="{
+              'my-message': msg.user_id === authStore.user?.id,
+              'is-deleted': msg.is_deleted || msg.deleted_at,
+            }"
           >
             <router-link :to="`/profile/${msg.user?.username}`" class="message-avatar-link">
               <UserAvatar :user="msg.user" size="sm" />
@@ -279,11 +343,79 @@ async function openMembersModal() {
             <div class="message-bubble-box">
               <div class="message-header-line">
                 <span class="message-sender-name">{{ msg.user?.name }}</span>
-                <span class="message-time">{{ formatRelativeTime(msg.created_at) }}</span>
+                <div class="message-meta-right">
+                  <span class="message-time">{{ formatRelativeTime(msg.created_at) }}</span>
+                  <div
+                    v-if="!msg.is_deleted && !msg.deleted_at && (msg.user_id === authStore.user?.id || isOwnerOrAdmin)"
+                    class="message-actions"
+                  >
+                    <button
+                      v-if="msg.user_id === authStore.user?.id && editingMessageId !== msg.id"
+                      type="button"
+                      class="msg-action-btn"
+                      title="Editar mensagem"
+                      @click="startEditMessage(msg)"
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      type="button"
+                      class="msg-action-btn delete-btn"
+                      title="Excluir mensagem"
+                      @click="promptDeleteMessage(msg)"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </div>
               </div>
-              <div class="message-content">
-                {{ msg.content }}
+
+              <!-- Inline edit mode -->
+              <div v-if="editingMessageId === msg.id" class="message-edit-box">
+                <input
+                  v-model="editingContent"
+                  type="text"
+                  class="message-edit-input"
+                  maxlength="2000"
+                  :disabled="isUpdatingMessage"
+                  @keydown.enter.prevent="saveEditMessage"
+                  @keydown.esc="cancelEditMessage"
+                />
+                <div class="message-edit-actions">
+                  <button
+                    type="button"
+                    class="msg-edit-btn save"
+                    :disabled="!editingContent.trim() || isUpdatingMessage"
+                    @click="saveEditMessage"
+                  >
+                    Salvar
+                  </button>
+                  <button
+                    type="button"
+                    class="msg-edit-btn cancel"
+                    :disabled="isUpdatingMessage"
+                    @click="cancelEditMessage"
+                  >
+                    Cancelar
+                  </button>
+                </div>
               </div>
+
+              <!-- Message content & tags -->
+              <template v-else>
+                <div
+                  class="message-content"
+                  :class="{ 'content-deleted': msg.is_deleted || msg.deleted_at }"
+                >
+                  {{ msg.content }}
+                </div>
+                <div
+                  v-if="!msg.is_deleted && !msg.deleted_at && (msg.is_edited || msg.edited_at)"
+                  class="message-edited-tag"
+                >
+                  (mensagem editada)
+                </div>
+              </template>
             </div>
           </div>
         </div>
@@ -361,6 +493,17 @@ async function openMembersModal() {
       title="Editar Foto de Capa do Grupo"
       formatNote="Formato retangular recomendado (3:1 panorâmico)"
       @cropped="handleCoverCropped"
+    />
+
+    <!-- Delete Message Confirm Modal -->
+    <RetroConfirmModal
+      v-model="showDeleteMessageModal"
+      title="» Excluir Mensagem"
+      message="Tem certeza que deseja excluir esta mensagem?"
+      details="O conteúdo será substituído por 'mensagem deletada' no histórico do grupo."
+      confirmText="Excluir Mensagem"
+      :loading="isDeletingMessage"
+      @confirm="handleConfirmDeleteMessage"
     />
   </div>
 </template>
@@ -652,6 +795,108 @@ async function openMembersModal() {
   line-height: 1.4;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.content-deleted {
+  font-style: italic;
+  color: #888888 !important;
+}
+
+.message-meta-right {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.message-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+}
+.message-item:hover .message-actions {
+  opacity: 1;
+}
+
+.msg-action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.1rem 0.2rem;
+  font-size: 0.72rem;
+  line-height: 1;
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.msg-action-btn:hover {
+  background-color: rgba(0, 0, 0, 0.08);
+}
+
+.message-edit-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.25rem;
+  min-width: 180px;
+}
+
+.message-edit-input {
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--color-primary);
+  border-radius: 2px;
+  outline: none;
+  background-color: #ffffff;
+}
+.message-edit-input:focus {
+  box-shadow: 0 0 0 1px var(--color-primary);
+}
+
+.message-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+
+.msg-edit-btn {
+  font-family: var(--font-heading);
+  font-size: 0.7rem;
+  font-weight: bold;
+  padding: 0.2rem 0.5rem;
+  border-radius: 2px;
+  cursor: pointer;
+  border: 1px solid var(--color-border);
+}
+.msg-edit-btn.save {
+  background-color: var(--color-primary);
+  color: #ffffff;
+  border-color: var(--color-primary);
+}
+.msg-edit-btn.save:hover:not(:disabled) {
+  opacity: 0.9;
+}
+.msg-edit-btn.save:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.msg-edit-btn.cancel {
+  background-color: #f3f4f6;
+  color: #374151;
+}
+.msg-edit-btn.cancel:hover {
+  background-color: #e5e7eb;
+}
+
+.message-edited-tag {
+  font-size: 0.68rem;
+  color: var(--color-muted);
+  font-style: italic;
+  align-self: flex-end;
+  margin-top: 0.1rem;
 }
 
 .chat-footer-form {

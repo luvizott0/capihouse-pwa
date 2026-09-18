@@ -54,3 +54,11 @@ export function getGroupMessages(groupId: number, sinceId?: number) {
 export function sendGroupMessage(groupId: number, content: string) {
   return apiClient.post<GroupMessage>(`/groups/${groupId}/messages`, { content })
 }
+
+export function updateGroupMessage(groupId: number, messageId: number, content: string) {
+  return apiClient.put<GroupMessage>(`/groups/${groupId}/messages/${messageId}`, { content })
+}
+
+export function deleteGroupMessage(groupId: number, messageId: number) {
+  return apiClient.delete<GroupMessage>(`/groups/${groupId}/messages/${messageId}`)
+}
