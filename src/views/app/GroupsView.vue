@@ -9,11 +9,21 @@ import { useGroupsStore } from '@/stores/groups'
 import GroupCardSkeleton from '@/components/groups/GroupCardSkeleton.vue'
 import GroupCreateModal from '@/components/groups/GroupCreateModal.vue'
 import RetroButton from '@/components/ui/RetroButton.vue'
+import PullToRefreshIndicator from '@/components/ui/PullToRefreshIndicator.vue'
+import { usePullToRefresh } from '@/composables/usePullToRefresh'
 
 const route = useRoute()
 const router = useRouter()
 const groupsStore = useGroupsStore()
 const showCreateModal = ref(false)
+
+const {
+  pullDistance,
+  isRefreshingFromPull,
+  handleTouchStart,
+  handleTouchMove,
+  handleTouchEnd,
+} = usePullToRefresh(() => loadGroups(true))
 
 const hasSearchFilters = computed(() => {
   return !!(route.query.q || route.query.search || route.query.date || route.query.user_id)
@@ -45,7 +55,7 @@ watch(
     route.query.date,
     route.query.user_id,
   ],
-  ([name, q, search, date, userId], [oldName, oldQ, oldSearch, oldDate, oldUserId]) => {
+  ([name, q, search, date, userId], [, oldQ, oldSearch, oldDate, oldUserId]) => {
     if (name !== 'groups') return
     if (q !== oldQ || search !== oldSearch || date !== oldDate || userId !== oldUserId) {
       loadGroups(true)
@@ -71,10 +81,46 @@ function onGroupCreated() {
 </script>
 
 <template>
-  <div class="groups-view-container">
+  <div
+    class="groups-view-container"
+    @touchstart="handleTouchStart"
+    @touchmove="handleTouchMove"
+    @touchend="handleTouchEnd"
+  >
+    <!-- Pull-to-refresh indicator box -->
+    <PullToRefreshIndicator
+      :pull-distance="pullDistance"
+      :is-refreshing="isRefreshingFromPull"
+      refreshing-text="Atualizando grupos..."
+    />
+
     <!-- Header -->
     <div class="groups-header-line">
       <h2 class="section-marker">» {{ hasSearchFilters ? 'Grupos Encontrados' : 'Meus Grupos' }}</h2>
+      <button
+        type="button"
+        class="refresh-btn"
+        :class="{ 'is-refreshing': groupsStore.isLoading }"
+        :disabled="groupsStore.isLoading"
+        @click="loadGroups(true)"
+        title="Recarregar grupos"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="refresh-icon"
+          :class="{ 'spin': groupsStore.isLoading }"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+          />
+        </svg>
+      </button>
     </div>
 
     <!-- Search Results Banner -->
@@ -179,6 +225,50 @@ function onGroupCreated() {
   font-weight: 700;
   color: #ffffff;
   margin: 0;
+}
+
+.refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background-color: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 2px;
+  padding: 0.3rem 0.6rem;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.refresh-btn:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.25);
+  border-color: #ffffff;
+  color: #ffffff;
+}
+.refresh-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.refresh-icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin {
+  animation: spin 0.8s linear infinite;
 }
 
 /* Search Results Banner */

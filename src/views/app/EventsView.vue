@@ -9,6 +9,8 @@ import { useEventsStore } from '@/stores/events'
 import EventCard from '@/components/events/EventCard.vue'
 import EventCardSkeleton from '@/components/events/EventCardSkeleton.vue'
 import EventCreateModal from '@/components/events/EventCreateModal.vue'
+import PullToRefreshIndicator from '@/components/ui/PullToRefreshIndicator.vue'
+import { usePullToRefresh } from '@/composables/usePullToRefresh'
 
 const route = useRoute()
 const router = useRouter()
@@ -16,6 +18,14 @@ const eventsStore = useEventsStore()
 const showCreateModal = ref(false)
 const sentinelRef = ref<HTMLElement | null>(null)
 let scrollObserver: IntersectionObserver | null = null
+
+const {
+  pullDistance,
+  isRefreshingFromPull,
+  handleTouchStart,
+  handleTouchMove,
+  handleTouchEnd,
+} = usePullToRefresh(handleManualRefresh)
 
 const hasSearchFilters = computed(() => {
   return !!(route.query.q || route.query.search || route.query.date || route.query.user_id)
@@ -37,6 +47,13 @@ async function loadEventsForCurrentRoute(force = false) {
     date: filterDate.value || undefined,
     userId: filterUserId.value || undefined,
   })
+}
+
+async function handleManualRefresh() {
+  await Promise.all([
+    loadEventsForCurrentRoute(true),
+    eventsStore.fetchUpcoming(),
+  ])
 }
 
 function setupScrollObserver() {
@@ -75,7 +92,7 @@ watch(
     route.query.date,
     route.query.user_id,
   ],
-  ([name, q, search, date, userId], [oldName, oldQ, oldSearch, oldDate, oldUserId]) => {
+  ([name, q, search, date, userId], [, oldQ, oldSearch, oldDate, oldUserId]) => {
     if (name !== 'events') return
     if (q !== oldQ || search !== oldSearch || date !== oldDate || userId !== oldUserId) {
       loadEventsForCurrentRoute(true)
@@ -109,15 +126,51 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="events-view-container">
+  <div
+    class="events-view-container"
+    @touchstart="handleTouchStart"
+    @touchmove="handleTouchMove"
+    @touchend="handleTouchEnd"
+  >
+    <!-- Pull-to-refresh indicator box -->
+    <PullToRefreshIndicator
+      :pull-distance="pullDistance"
+      :is-refreshing="isRefreshingFromPull"
+      refreshing-text="Atualizando eventos..."
+    />
+
     <!-- Header -->
     <div class="events-header">
       <div>
         <h2 class="section-title">» {{ hasSearchFilters ? 'Eventos Encontrados' : 'Eventos da Casa' }}</h2>
-        <p class="section-subtitle">
-          {{ hasSearchFilters ? 'Resultados filtrados da sua busca de eventos.' : '' }}
+        <p v-if="hasSearchFilters" class="section-subtitle">
+          Resultados filtrados da sua busca de eventos.
         </p>
       </div>
+      <button
+        type="button"
+        class="refresh-btn"
+        :class="{ 'is-refreshing': eventsStore.isLoading }"
+        :disabled="eventsStore.isLoading"
+        @click="handleManualRefresh"
+        title="Recarregar eventos"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="refresh-icon"
+          :class="{ 'spin': eventsStore.isLoading }"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+          />
+        </svg>
+      </button>
     </div>
 
     <!-- Search Results Banner -->
@@ -217,6 +270,50 @@ onUnmounted(() => {
   font-size: 0.8rem;
   color: rgba(255, 255, 255, 0.9);
   margin: 0.2rem 0 0 0;
+}
+
+.refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background-color: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 2px;
+  padding: 0.3rem 0.6rem;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.refresh-btn:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.25);
+  border-color: #ffffff;
+  color: #ffffff;
+}
+.refresh-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.refresh-icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin {
+  animation: spin 0.8s linear infinite;
 }
 
 /* Search Results Banner */

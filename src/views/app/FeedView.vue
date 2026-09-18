@@ -12,6 +12,8 @@ import PostCardSkeleton from '@/components/feed/PostCardSkeleton.vue'
 import PostCreateModal from '@/components/feed/PostCreateModal.vue'
 import NewPostsBanner from '@/components/feed/NewPostsBanner.vue'
 import UserAvatar from '@/components/ui/UserAvatar.vue'
+import PullToRefreshIndicator from '@/components/ui/PullToRefreshIndicator.vue'
+import { usePullToRefresh } from '@/composables/usePullToRefresh'
 
 const route = useRoute()
 const router = useRouter()
@@ -22,11 +24,13 @@ const showCreateModal = ref(false)
 const sentinelRef = ref<HTMLElement | null>(null)
 let scrollObserver: IntersectionObserver | null = null
 
-// Pull to refresh state
-const pullDistance = ref(0)
-const isRefreshingFromPull = ref(false)
-let touchStartY = 0
-let isTrackingTouch = false
+const {
+  pullDistance,
+  isRefreshingFromPull,
+  handleTouchStart,
+  handleTouchMove,
+  handleTouchEnd,
+} = usePullToRefresh(() => loadPostsForCurrentRoute(true))
 
 const hasSearchFilters = computed(() => {
   return !!(route.query.q || route.query.search || route.query.date || route.query.user_id)
@@ -109,60 +113,6 @@ function clearSearch() {
   router.push({ path: '/feed' })
 }
 
-// Mobile Pull to Refresh handlers
-function handleTouchStart(e: TouchEvent) {
-  const touch = e.touches[0]
-  if (touch && window.scrollY <= 5 && !isRefreshingFromPull.value) {
-    touchStartY = touch.clientY
-    isTrackingTouch = true
-  } else {
-    isTrackingTouch = false
-  }
-}
-
-function handleTouchMove(e: TouchEvent) {
-  if (!isTrackingTouch || isRefreshingFromPull.value) return
-  const touch = e.touches[0]
-  if (!touch) return
-  const currentY = touch.clientY
-  const diff = currentY - touchStartY
-
-  if (diff > 0 && window.scrollY <= 5) {
-    // Resistência elástica
-    pullDistance.value = Math.min(75, Math.pow(diff, 0.85))
-  } else {
-    pullDistance.value = 0
-  }
-}
-
-async function handleTouchEnd() {
-  if (!isTrackingTouch) return
-  isTrackingTouch = false
-
-  if (pullDistance.value >= 50 && !isRefreshingFromPull.value) {
-    isRefreshingFromPull.value = true
-    pullDistance.value = 50
-
-    try {
-      if ('vibrate' in navigator) {
-        navigator.vibrate(12)
-      }
-      await feedStore.fetchPosts(1, {
-        search: searchTerms.value || undefined,
-        date: filterDate.value || undefined,
-        userId: filterUserId.value || undefined,
-      })
-    } finally {
-      setTimeout(() => {
-        pullDistance.value = 0
-        isRefreshingFromPull.value = false
-      }, 300)
-    }
-  } else {
-    pullDistance.value = 0
-  }
-}
-
 onMounted(async () => {
   setupScrollObserver()
 
@@ -223,32 +173,11 @@ onUnmounted(() => {
     @touchend="handleTouchEnd"
   >
     <!-- Pull-to-refresh indicator box -->
-    <div
-      v-if="pullDistance > 0 || isRefreshingFromPull"
-      class="pull-refresh-bar"
-      :style="{ height: `${pullDistance}px` }"
-    >
-      <div class="pull-refresh-inner" :class="{ 'is-refreshing': isRefreshingFromPull }">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="pull-refresh-icon"
-          :class="{ 'spin': isRefreshingFromPull }"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          stroke-width="2.5"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-          />
-        </svg>
-        <span class="pull-refresh-text">
-          {{ isRefreshingFromPull ? 'Atualizando feed...' : (pullDistance >= 50 ? 'Solte para atualizar' : 'Puxe para atualizar...') }}
-        </span>
-      </div>
-    </div>
+    <PullToRefreshIndicator
+      :pull-distance="pullDistance"
+      :is-refreshing="isRefreshingFromPull"
+      refreshing-text="Atualizando feed..."
+    />
 
     <!-- Real-time new posts banner -->
     <NewPostsBanner />
@@ -694,33 +623,6 @@ onUnmounted(() => {
 }
 .clear-search-link:hover {
   color: #b71c1c;
-}
-
-/* Pull to Refresh */
-.pull-refresh-bar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  transition: height 0.15s ease-out;
-  background-color: var(--color-primary-50, #f8f6f1);
-  border-bottom: 1px dashed var(--color-primary-300, #c4884e);
-}
-
-.pull-refresh-inner {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-family: var(--font-heading, 'Space Mono', monospace);
-  font-size: 0.8rem;
-  font-weight: bold;
-  color: var(--color-primary-800, #5f4120);
-}
-
-.pull-refresh-icon {
-  width: 18px;
-  height: 18px;
-  stroke-width: 2.5;
 }
 
 /* Sentinel & Infinite Scroll Indicators */
