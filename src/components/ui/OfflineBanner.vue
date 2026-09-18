@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useNetworkStatus } from '@/composables/useNetworkStatus'
-import { useRegisterSW } from 'virtual:pwa-register/vue'
+import { usePwaUpdate } from '@/composables/usePwaUpdate'
 
 const { isOnline } = useNetworkStatus()
 
-// PWA update registration
-const { offlineReady, needRefresh, updateServiceWorker } = useRegisterSW()
+// PWA update registration via shared composable
+const { needRefresh, updateServiceWorker } = usePwaUpdate()
 
 const dismissedOffline = ref(false)
+const dismissUpdate = ref(false)
 
 // PWA Install prompt handling
 const deferredPrompt = ref<any>(null)
@@ -59,17 +60,22 @@ onUnmounted(() => {
     </div>
   </transition>
 
-  <!-- PWA Update Available Banner -->
+  <!-- PWA Update Available Banner (cor fixa de aviso semelhante ao aviso offline) -->
   <transition name="slide-fade">
-    <div v-if="needRefresh" class="pwa-banner update-banner" role="alert">
+    <div v-if="needRefresh && !dismissUpdate" class="pwa-banner update-banner" role="alert">
       <div class="banner-content">
-        <span class="banner-icon">⚡</span>
+        <span class="banner-icon">⚠️</span>
         <div class="banner-text">
-          Nova versão do <strong>CapiHouse</strong> disponível!
+          <strong>Nova versão disponível:</strong> O <strong>CapiHouse</strong> possui atualizações recentes prontas para instalar.
         </div>
-        <button type="button" class="banner-action-btn" @click="updateServiceWorker()">
-          [ Atualizar agora ]
-        </button>
+        <div class="banner-buttons">
+          <button type="button" class="banner-action-btn update-btn" @click="updateServiceWorker()">
+            [ Atualizar agora ]
+          </button>
+          <button type="button" class="banner-close" @click="dismissUpdate = true" title="Lembrar mais tarde">
+            ✕
+          </button>
+        </div>
       </div>
     </div>
   </transition>
@@ -140,9 +146,20 @@ onUnmounted(() => {
 }
 
 .update-banner {
-  background-color: #dbeafe;
-  color: #1e40af;
-  border-color: #3b82f6;
+  background-color: #fef3c7;
+  color: #78350f;
+  border-color: #f59e0b;
+}
+
+.update-btn {
+  background-color: #b45309 !important;
+  color: #ffffff !important;
+  border: 1px solid #78350f !important;
+  box-shadow: 2px 2px 0 #78350f;
+}
+
+.update-btn:hover {
+  background-color: #92400e !important;
 }
 
 .install-banner {

@@ -14,6 +14,7 @@ import ThemeCustomizerModal from '@/components/profile/ThemeCustomizerModal.vue'
 import PostCard from '@/components/feed/PostCard.vue'
 import PostCardSkeleton from '@/components/feed/PostCardSkeleton.vue'
 import { formatBirthDate } from '@/utils/date'
+import { usePwaUpdate } from '@/composables/usePwaUpdate'
 
 const route = useRoute()
 const router = useRouter()
@@ -48,6 +49,16 @@ const showConfirmPassword = ref(false)
 const settingsError = ref('')
 const settingsSuccess = ref('')
 const isSavingSettings = ref(false)
+
+// PWA Updates
+const {
+  needRefresh: pwaNeedRefresh,
+  isChecking: isCheckingUpdates,
+  feedbackMessage: pwaFeedbackMessage,
+  checkForUpdates: checkPwaUpdates,
+  updateServiceWorker: applyPwaUpdate,
+  forceReloadApp: reloadApp
+} = usePwaUpdate()
 
 async function handleLogout() {
   await authStore.logout()
@@ -211,6 +222,7 @@ function openSettings() {
   settingsPasswordConfirmation.value = ''
   settingsError.value = ''
   settingsSuccess.value = ''
+  pwaFeedbackMessage.value = ''
   showSettingsModal.value = true
 }
 
@@ -591,6 +603,70 @@ const userPosts = computed(() => feedStore.userPosts)
                 </svg>
               </button>
             </div>
+          </div>
+        </div>
+
+        <!-- App Updates Section -->
+        <div class="app-updates-box">
+          <h4 class="settings-section-title">
+            <svg xmlns="http://www.w3.org/2000/svg" class="section-title-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Atualizações do Aplicativo
+          </h4>
+          <p class="updates-description">
+            Busque a versão mais recente do CapiHouse ou recarregue o aplicativo para sincronizar dados e novidades.
+          </p>
+
+          <!-- Warning banner if update is ready -->
+          <div v-if="pwaNeedRefresh" class="update-alert-banner">
+            <span class="update-alert-icon">⚠️</span>
+            <div class="update-alert-text">
+              <strong>Nova versão disponível!</strong>
+              <div>Uma atualização recente do CapiHouse está pronta para ser instalada.</div>
+            </div>
+            <button
+              type="button"
+              class="apply-update-btn"
+              @click="applyPwaUpdate"
+            >
+              Atualizar Agora
+            </button>
+          </div>
+
+          <!-- Status feedback message from check -->
+          <div v-else-if="pwaFeedbackMessage" class="update-feedback-banner">
+            ℹ️ {{ pwaFeedbackMessage }}
+          </div>
+
+          <div class="updates-buttons-row">
+            <button
+              type="button"
+              class="retro-action-btn"
+              :disabled="isCheckingUpdates"
+              @click="checkPwaUpdates"
+            >
+              <svg v-if="isCheckingUpdates" class="spin-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+              </svg>
+              <svg v-else xmlns="http://www.w3.org/2000/svg" class="action-svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span>{{ isCheckingUpdates ? 'Buscando...' : 'Buscar Atualizações' }}</span>
+            </button>
+
+            <button
+              type="button"
+              class="retro-action-btn"
+              title="Recarregar aplicativo"
+              @click="reloadApp"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="action-svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+              </svg>
+              <span>Recarregar App</span>
+            </button>
           </div>
         </div>
 
@@ -1102,6 +1178,138 @@ const userPosts = computed(() => feedStore.userPosts)
   font-size: 0.85rem;
   text-transform: uppercase;
   color: var(--color-primary-800);
+}
+
+.app-updates-box {
+  border-top: 1px solid var(--color-border);
+  padding-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.settings-section-title {
+  font-family: var(--font-heading);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  color: var(--color-primary-800);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.section-title-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.updates-description {
+  font-size: 0.8rem;
+  color: var(--color-muted, #666);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.update-alert-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.75rem;
+  background-color: #fef3c7;
+  color: #78350f;
+  border: 1px solid #f59e0b;
+  border-radius: 2px;
+  font-size: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.update-alert-icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.update-alert-text {
+  flex: 1;
+  min-width: 180px;
+}
+
+.apply-update-btn {
+  background-color: #b45309;
+  color: #ffffff;
+  border: 1px solid #78350f;
+  box-shadow: 2px 2px 0 #78350f;
+  padding: 0.35rem 0.75rem;
+  border-radius: 2px;
+  font-family: var(--font-heading, monospace);
+  font-size: 0.75rem;
+  font-weight: bold;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.1s ease;
+}
+
+.apply-update-btn:hover {
+  background-color: #92400e;
+  transform: translateY(-1px);
+}
+
+.update-feedback-banner {
+  padding: 0.45rem 0.65rem;
+  background-color: var(--color-primary-50, #f8f6f1);
+  border: 1px dashed var(--color-primary-300, #d4a574);
+  color: var(--color-primary-900, #422d16);
+  font-size: 0.8rem;
+  border-radius: 2px;
+}
+
+.updates-buttons-row {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.retro-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.8rem;
+  background-color: var(--color-primary-100, #fdf8f3);
+  color: var(--color-primary-900, #422d16);
+  border: 1px solid var(--color-primary-300, #d4a574);
+  font-family: var(--font-heading, monospace);
+  font-size: 0.8rem;
+  font-weight: bold;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.retro-action-btn:hover:not(:disabled) {
+  background-color: var(--color-primary-200, #e8c9a5);
+  border-color: var(--color-primary);
+}
+
+.retro-action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.action-svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+.spin-icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  animation: pwa-spin 1s linear infinite;
+}
+
+@keyframes pwa-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .error-banner {

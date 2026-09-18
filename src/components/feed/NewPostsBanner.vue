@@ -41,7 +41,8 @@ function handleClick() {
   gap: 8px;
   padding: 8px 20px;
   background: var(--color-primary, #00c896);
-  color: #000;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
   font-family: 'Courier New', Courier, monospace;
   font-size: 0.85rem;
   font-weight: bold;
