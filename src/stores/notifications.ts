@@ -15,6 +15,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
   const selectedCategory = ref<string>('all')
   const categoryCounts = ref<NotificationCategoryCounts>({
     all: 0,
+    unread: 0,
     likes: 0,
     comments: 0,
     mentions: 0,
@@ -72,6 +73,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
     if (item && !item.read_at) {
       item.read_at = new Date().toISOString()
       unreadCount.value = Math.max(0, unreadCount.value - 1)
+      categoryCounts.value.unread = Math.max(0, (categoryCounts.value.unread ?? 1) - 1)
       try {
         await notifApi.markNotificationAsRead(id)
       } catch {
@@ -85,6 +87,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
       n.read_at = n.read_at || new Date().toISOString()
     })
     unreadCount.value = 0
+    categoryCounts.value.unread = 0
     try {
       await notifApi.markAllNotificationsAsRead()
     } catch {
@@ -122,6 +125,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
       .listen('.NotificationSent', (data: { notification: AppNotification; unread_count: number }) => {
         // Update category counts
         categoryCounts.value.all += 1
+        categoryCounts.value.unread = (categoryCounts.value.unread ?? 0) + 1
         const type = data.notification.type
         if (type === 'post_like' || type === 'comment_like') {
           categoryCounts.value.likes += 1
@@ -137,6 +141,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
 
         const matchesCategory =
           selectedCategory.value === 'all' ||
+          selectedCategory.value === 'unread' ||
           (selectedCategory.value === 'likes' && (type === 'post_like' || type === 'comment_like')) ||
           (selectedCategory.value === 'comments' && (type === 'post_comment' || type === 'comment_reply')) ||
           (selectedCategory.value === 'mentions' && (type === 'post_mention' || type === 'comment_mention')) ||

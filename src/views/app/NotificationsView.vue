@@ -19,6 +19,7 @@ interface CategoryItem {
 
 const categories: CategoryItem[] = [
   { id: 'all', label: 'Todas as notificações', icon: '🔔', countKey: 'all' },
+  { id: 'unread', label: 'Não lidas', icon: '📩', countKey: 'unread' },
   { id: 'likes', label: 'Curtidas', icon: '❤️', countKey: 'likes' },
   { id: 'comments', label: 'Comentários', icon: '💬', countKey: 'comments' },
   { id: 'mentions', label: 'Marcações', icon: '🏷️', countKey: 'mentions' },
@@ -113,7 +114,7 @@ async function handleItemClick(item: AppNotification) {
           :aria-label="cat.label"
           @click="notifStore.setCategory(cat.id)"
         >
-          <span class="filter-count">{{ notifStore.categoryCounts[cat.countKey] ?? 0 }}</span>
+          <span class="filter-count">{{ cat.id === 'unread' ? notifStore.unreadCount : (notifStore.categoryCounts[cat.countKey] ?? 0) }}</span>
           <span class="filter-icon">{{ cat.icon }}</span>
         </button>
       </div>
@@ -129,7 +130,14 @@ async function handleItemClick(item: AppNotification) {
 
         <div v-else-if="notifStore.notifications.length === 0" class="empty-notif-box">
           <img src="/capihouse-logo.png" alt="Capivara" class="empty-capivara-logo" />
-          <template v-if="notifStore.selectedCategory !== 'all'">
+          <template v-if="notifStore.selectedCategory === 'unread'">
+            <h3 class="empty-title">Tudo limpo por aqui!</h3>
+            <p class="empty-subtitle">Você não possui notificações não lidas no momento.</p>
+            <RetroButton size="sm" variant="secondary" @click="notifStore.setCategory('all')">
+              [ Ver todas as notificações ]
+            </RetroButton>
+          </template>
+          <template v-else-if="notifStore.selectedCategory !== 'all'">
             <h3 class="empty-title">Nenhuma notificação encontrada!</h3>
             <p class="empty-subtitle">Você não possui notificações nesta categoria.</p>
             <RetroButton size="sm" variant="secondary" @click="notifStore.setCategory('all')">

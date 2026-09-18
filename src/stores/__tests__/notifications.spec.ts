@@ -50,7 +50,7 @@ describe('Notifications Store', () => {
 
   it('fetches category counts and updates store', async () => {
     vi.mocked(notifApi.getCategoryCounts).mockResolvedValueOnce({
-      data: { all: 10, likes: 4, comments: 3, mentions: 2, groups: 1, events: 0 },
+      data: { all: 10, unread: 5, likes: 4, comments: 3, mentions: 2, groups: 1, events: 0 },
     } as unknown as AxiosResponse<notifApi.NotificationCategoryCounts>)
 
     const store = useNotificationsStore()
@@ -58,6 +58,7 @@ describe('Notifications Store', () => {
 
     expect(store.categoryCounts).toEqual({
       all: 10,
+      unread: 5,
       likes: 4,
       comments: 3,
       mentions: 2,

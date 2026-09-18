@@ -15,6 +15,8 @@ import PostCard from '@/components/feed/PostCard.vue'
 import PostCardSkeleton from '@/components/feed/PostCardSkeleton.vue'
 import { formatBirthDate } from '@/utils/date'
 import { usePwaUpdate } from '@/composables/usePwaUpdate'
+import PullToRefreshIndicator from '@/components/ui/PullToRefreshIndicator.vue'
+import { usePullToRefresh } from '@/composables/usePullToRefresh'
 
 const route = useRoute()
 const router = useRouter()
@@ -261,10 +263,36 @@ async function saveSettings() {
 
 // User's own posts and posts where user is tagged
 const userPosts = computed(() => feedStore.userPosts)
+
+const {
+  pullDistance,
+  isRefreshingFromPull,
+  handleTouchStart,
+  handleTouchMove,
+  handleTouchEnd,
+} = usePullToRefresh(async () => {
+  if (isOwner.value) {
+    await authStore.fetchMe()
+  }
+  await loadProfile()
+})
 </script>
 
 <template>
-  <div v-if="user" class="profile-page-container">
+  <div
+    v-if="user"
+    class="profile-page-container"
+    @touchstart="handleTouchStart"
+    @touchmove="handleTouchMove"
+    @touchend="handleTouchEnd"
+  >
+    <!-- Pull-to-refresh indicator box -->
+    <PullToRefreshIndicator
+      :pull-distance="pullDistance"
+      :is-refreshing="isRefreshingFromPull"
+      refreshing-text="Atualizando perfil..."
+    />
+
     <!-- Header Card (Banner + Avatar + Info) -->
     <div class="retro-box profile-header-box">
       <!-- Banner -->

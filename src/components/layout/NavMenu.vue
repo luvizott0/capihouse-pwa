@@ -1,6 +1,36 @@
 <script setup lang="ts">
+import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { smoothScrollToTop } from '@/utils/scroll'
+
+const route = useRoute()
 const authStore = useAuthStore()
+
+function handleNavClick(targetPath: string, e: MouseEvent) {
+  let isCurrent = false
+
+  if (targetPath === '/feed') {
+    isCurrent = route.path === '/feed' || route.name === 'feed'
+  } else if (targetPath === '/events') {
+    isCurrent = route.path === '/events' || route.name === 'events'
+  } else if (targetPath === '/groups') {
+    isCurrent = route.path === '/groups' || route.name === 'groups'
+  } else if (targetPath === '/profile') {
+    isCurrent =
+      route.path === '/profile' ||
+      route.name === 'profile' ||
+      (route.name === 'user-profile' && route.params.username === authStore.user?.username)
+  } else if (targetPath === '/admin/users') {
+    isCurrent = route.path === '/admin/users' || route.name === 'admin-users'
+  } else {
+    isCurrent = route.path === targetPath
+  }
+
+  if (isCurrent) {
+    e.preventDefault()
+    smoothScrollToTop()
+  }
+}
 </script>
 
 <template>
@@ -9,19 +39,45 @@ const authStore = useAuthStore()
     <nav class="desktop-nav">
       <div class="nav-container">
         <div class="nav-tabs">
-          <router-link to="/feed" class="nav-tab" active-class="active">
+          <router-link
+            to="/feed"
+            class="nav-tab"
+            active-class="active"
+            @click="(e) => handleNavClick('/feed', e)"
+          >
             Feed
           </router-link>
-          <router-link to="/events" class="nav-tab" active-class="active">
+          <router-link
+            to="/events"
+            class="nav-tab"
+            active-class="active"
+            @click="(e) => handleNavClick('/events', e)"
+          >
             Eventos
           </router-link>
-          <router-link to="/groups" class="nav-tab" active-class="active">
+          <router-link
+            to="/groups"
+            class="nav-tab"
+            active-class="active"
+            @click="(e) => handleNavClick('/groups', e)"
+          >
             Grupos
           </router-link>
-          <router-link to="/profile" class="nav-tab" active-class="active">
+          <router-link
+            to="/profile"
+            class="nav-tab"
+            active-class="active"
+            @click="(e) => handleNavClick('/profile', e)"
+          >
             Perfil
           </router-link>
-          <router-link v-if="authStore.isAdmin" to="/admin/users" class="nav-tab" active-class="active">
+          <router-link
+            v-if="authStore.isAdmin"
+            to="/admin/users"
+            class="nav-tab"
+            active-class="active"
+            @click="(e) => handleNavClick('/admin/users', e)"
+          >
             Admin
           </router-link>
         </div>
@@ -35,7 +91,12 @@ const authStore = useAuthStore()
     <nav class="mobile-bottom-nav">
       <div class="mobile-nav-grid" :class="{ 'has-admin': authStore.isAdmin }">
         <!-- Feed Tab -->
-        <router-link to="/feed" class="mobile-tab" active-class="active">
+        <router-link
+          to="/feed"
+          class="mobile-tab"
+          active-class="active"
+          @click="(e) => handleNavClick('/feed', e)"
+        >
           <svg xmlns="http://www.w3.org/2000/svg" class="tab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
           </svg>
@@ -43,7 +104,12 @@ const authStore = useAuthStore()
         </router-link>
 
         <!-- Events Tab -->
-        <router-link to="/events" class="mobile-tab" active-class="active">
+        <router-link
+          to="/events"
+          class="mobile-tab"
+          active-class="active"
+          @click="(e) => handleNavClick('/events', e)"
+        >
           <svg xmlns="http://www.w3.org/2000/svg" class="tab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
@@ -51,7 +117,12 @@ const authStore = useAuthStore()
         </router-link>
 
         <!-- Groups Tab -->
-        <router-link to="/groups" class="mobile-tab" active-class="active">
+        <router-link
+          to="/groups"
+          class="mobile-tab"
+          active-class="active"
+          @click="(e) => handleNavClick('/groups', e)"
+        >
           <svg xmlns="http://www.w3.org/2000/svg" class="tab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
           </svg>
@@ -59,7 +130,12 @@ const authStore = useAuthStore()
         </router-link>
 
         <!-- Profile Tab -->
-        <router-link to="/profile" class="mobile-tab" active-class="active">
+        <router-link
+          to="/profile"
+          class="mobile-tab"
+          active-class="active"
+          @click="(e) => handleNavClick('/profile', e)"
+        >
           <svg xmlns="http://www.w3.org/2000/svg" class="tab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           </svg>
@@ -67,7 +143,13 @@ const authStore = useAuthStore()
         </router-link>
 
         <!-- Admin Tab (Only if admin) -->
-        <router-link v-if="authStore.isAdmin" to="/admin/users" class="mobile-tab" active-class="active">
+        <router-link
+          v-if="authStore.isAdmin"
+          to="/admin/users"
+          class="mobile-tab"
+          active-class="active"
+          @click="(e) => handleNavClick('/admin/users', e)"
+        >
           <svg xmlns="http://www.w3.org/2000/svg" class="tab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
           </svg>

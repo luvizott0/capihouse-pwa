@@ -3,6 +3,7 @@ import type { AppNotification } from '@/types/models'
 
 export interface NotificationCategoryCounts {
   all: number
+  unread?: number
   likes: number
   comments: number
   mentions: number
