@@ -3,6 +3,7 @@ import apiClient from './client'
 export interface GetPostsParams {
   page?: number
   groupId?: number
+  eventId?: number
   search?: string
   date?: string
   userId?: number
@@ -16,6 +17,7 @@ export function getPosts(paramsOrPage: number | GetPostsParams = 1, groupId?: nu
   } else {
     if (paramsOrPage.page) params.page = paramsOrPage.page
     if (paramsOrPage.groupId) params.group_id = paramsOrPage.groupId
+    if (paramsOrPage.eventId) params.event_id = paramsOrPage.eventId
     if (paramsOrPage.search) params.search = paramsOrPage.search
     if (paramsOrPage.date) params.date = paramsOrPage.date
     if (paramsOrPage.userId) params.user_id = paramsOrPage.userId

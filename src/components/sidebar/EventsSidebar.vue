@@ -19,7 +19,7 @@ onMounted(() => {
         <router-link
           v-for="ev in eventsStore.upcomingEvents"
           :key="ev.id"
-          to="/events"
+          :to="'/events/' + ev.id"
           class="event-mini-item"
         >
           <div class="event-mini-date">

@@ -56,6 +56,7 @@ export const useFeedStore = defineStore('feed', () => {
   const hasMorePages = computed(() => currentPage.value < lastPage.value)
 
   const activeGroupId = ref<number | undefined>(undefined)
+  const activeEventId = ref<number | undefined>(undefined)
 
   /** Holds incoming posts that haven't been prepended yet (shown via banner). */
   const pendingPosts = ref<Post[]>([])
@@ -74,7 +75,7 @@ export const useFeedStore = defineStore('feed', () => {
 
   async function fetchPosts(
     page = 1,
-    options?: { groupId?: number; search?: string; date?: string; userId?: number; forceRefresh?: boolean } | number
+    options?: { groupId?: number; eventId?: number; search?: string; date?: string; userId?: number; forceRefresh?: boolean } | number
   ) {
     if (page > 1) {
       isLoadingMore.value = true
@@ -84,10 +85,12 @@ export const useFeedStore = defineStore('feed', () => {
     }
 
     let groupId: number | undefined
+    let eventId: number | undefined
     if (typeof options === 'number') {
       groupId = options
     } else if (options) {
       groupId = options.groupId
+      eventId = options.eventId
       activeFilters.value = {
         search: options.search || undefined,
         date: options.date || undefined,
@@ -100,10 +103,15 @@ export const useFeedStore = defineStore('feed', () => {
     if (groupId !== undefined) {
       activeGroupId.value = groupId || undefined
     }
+    if (eventId !== undefined) {
+      activeEventId.value = eventId || undefined
+    }
     const targetGroupId = groupId !== undefined ? (groupId || undefined) : activeGroupId.value
+    const targetEventId = eventId !== undefined ? (eventId || undefined) : activeEventId.value
 
     const hasAnyFilter = Boolean(
       targetGroupId ||
+      targetEventId ||
       activeFilters.value.search ||
       activeFilters.value.date ||
       activeFilters.value.userId
@@ -113,6 +121,7 @@ export const useFeedStore = defineStore('feed', () => {
       const res = await postsApi.getPosts({
         page,
         groupId: targetGroupId,
+        eventId: targetEventId,
         search: activeFilters.value.search,
         date: activeFilters.value.date,
         userId: activeFilters.value.userId,
@@ -205,8 +214,11 @@ export const useFeedStore = defineStore('feed', () => {
       const res = await postsApi.createPost(formData)
       // The server will broadcast PostCreated; we still add it locally for
       // the author so they see their own post immediately without waiting for the WS event.
-      posts.value.unshift(res.data)
-      if (activeProfileUserId.value && res.data.user_id === activeProfileUserId.value) {
+      // If post belongs to an event, only add to posts if activeEventId matches
+      if (!res.data.event_id || (activeEventId.value && activeEventId.value === res.data.event_id)) {
+        posts.value.unshift(res.data)
+      }
+      if (activeProfileUserId.value && res.data.user_id === activeProfileUserId.value && !res.data.event_id) {
         userPosts.value.unshift(res.data)
       }
       return res.data
@@ -392,15 +404,16 @@ export const useFeedStore = defineStore('feed', () => {
   }
 
   /**
-   * Subscribe to the public feed channel (and optionally a group channel).
+   * Subscribe to the public feed channel (and optionally a group or event channel).
    * @param currentUserId — used to avoid duplicating the author's own posts.
    * @param groupId — when viewing a group feed, subscribe to the group's private channel.
+   * @param eventId — when viewing an event feed, subscribe to the event's private channel.
    */
-  function subscribeToFeed(currentUserId: number, groupId?: number) {
+  function subscribeToFeed(currentUserId: number, groupId?: number, eventId?: number) {
     const echo = connectEcho()
 
-    const channelName = groupId ? `group.${groupId}` : 'posts'
-    const channel = groupId
+    const channelName = eventId ? `event.${eventId}` : (groupId ? `group.${groupId}` : 'posts')
+    const channel = (groupId || eventId)
       ? echo.private(channelName)
       : echo.channel(channelName)
 
@@ -506,9 +519,9 @@ export const useFeedStore = defineStore('feed', () => {
       })
   }
 
-  function unsubscribeFromFeed(groupId?: number) {
+  function unsubscribeFromFeed(groupId?: number, eventId?: number) {
     const echo = connectEcho()
-    const channelName = groupId ? `group.${groupId}` : 'posts'
+    const channelName = eventId ? `event.${eventId}` : (groupId ? `group.${groupId}` : 'posts')
     echo.leave(channelName)
   }
 
@@ -528,6 +541,7 @@ export const useFeedStore = defineStore('feed', () => {
     userPostsCurrentPage,
     userPostsLastPage,
     activeGroupId,
+    activeEventId,
     pendingPosts,
     activeFilters,
     isFiltered,

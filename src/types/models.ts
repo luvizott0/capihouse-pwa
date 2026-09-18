@@ -92,6 +92,8 @@ export interface Post {
   user_id: number
   group_id?: number | null
   group?: { id: number; name: string } | null
+  event_id?: number | null
+  event?: { id: number; name: string } | null
   content: string | null
   likes_count: number
   comments_count: number

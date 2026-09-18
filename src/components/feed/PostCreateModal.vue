@@ -8,7 +8,17 @@ import EmojiPicker from '@/components/ui/EmojiPicker.vue'
 import MentionInput from '@/components/ui/MentionInput.vue'
 import { compressImageFile } from '@/utils/imageCompressor'
 
-const props = defineProps<{ modelValue: boolean }>()
+const props = withDefaults(
+  defineProps<{
+    modelValue: boolean
+    eventId?: number | null
+    eventName?: string | null
+  }>(),
+  {
+    eventId: null,
+    eventName: null,
+  }
+)
 const emit = defineEmits<{ (e: 'update:modelValue', value: boolean): void; (e: 'created'): void }>()
 
 const feedStore = useFeedStore()
@@ -176,7 +186,9 @@ async function handleSubmit() {
   hashtags.value.forEach(tag => {
     formData.append('hashtags[]', tag)
   })
-  if (selectedGroupId.value) {
+  if (props.eventId) {
+    formData.append('event_id', props.eventId.toString())
+  } else if (selectedGroupId.value) {
     formData.append('group_id', selectedGroupId.value.toString())
   }
   selectedFiles.value.forEach(file => {
@@ -223,14 +235,25 @@ function handleClose() {
 </script>
 
 <template>
-  <RetroModal :modelValue="modelValue" @update:modelValue="handleClose" title="» Nova Publicação" size="md">
+  <RetroModal
+    :modelValue="modelValue"
+    @update:modelValue="handleClose"
+    :title="props.eventId ? ('» Publicar no Evento: ' + (props.eventName || 'Evento')) : '» Nova Publicação'"
+    size="md"
+  >
     <div ref="formContainerRef" class="post-create-form">
       <div v-if="errorMsg" class="error-banner">
         ⚠️ {{ errorMsg }}
       </div>
 
       <!-- Audience / Group selector -->
-      <div class="audience-row">
+      <div v-if="props.eventId" class="audience-row">
+        <label class="audience-label">Visibilidade:</label>
+        <div class="event-locked-badge">
+          🔒 Exclusivo do Evento: <strong>{{ props.eventName || 'Evento' }}</strong>
+        </div>
+      </div>
+      <div v-else class="audience-row">
         <label class="audience-label">Visibilidade:</label>
         <select v-model="selectedGroupId" class="audience-select">
           <option :value="null">🌐 Público (todos)</option>
@@ -390,6 +413,18 @@ function handleClose() {
   border-radius: 2px;
   outline: none;
   cursor: pointer;
+}
+
+.event-locked-badge {
+  flex: 1;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: var(--color-primary-800, #5f4120);
+  background-color: var(--color-primary-50, #fdf8f3);
+  border: 1px solid var(--color-primary-200, #eed9c4);
+  padding: 0.45rem 0.6rem;
+  border-radius: 2px;
 }
 .audience-select:focus {
   border-color: var(--color-primary);

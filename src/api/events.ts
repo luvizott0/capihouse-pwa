@@ -45,6 +45,16 @@ export function rsvpEvent(eventId: number, status: 'confirmed' | 'declined' | 'i
   return apiClient.post(`/events/${eventId}/rsvp`, { status })
 }
 
+export function getEvent(eventId: number) {
+  return apiClient.get(`/events/${eventId}`)
+}
+
+export function inviteEventGuests(eventId: number, userIds: number[]) {
+  return apiClient.post<{ message: string; event: any }>(`/events/${eventId}/invite`, {
+    guests: userIds,
+  })
+}
+
 export function deleteEvent(eventId: number) {
   return apiClient.delete(`/events/${eventId}`)
 }

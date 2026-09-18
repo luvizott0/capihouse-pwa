@@ -61,6 +61,12 @@ const router = createRouter({
           meta: { requiresApproved: true }
         },
         {
+          path: 'events/:id',
+          name: 'event-detail',
+          component: () => import('@/views/app/EventDetailView.vue'),
+          meta: { requiresApproved: true }
+        },
+        {
           path: 'groups',
           name: 'groups',
           component: () => import('@/views/app/GroupsView.vue'),
