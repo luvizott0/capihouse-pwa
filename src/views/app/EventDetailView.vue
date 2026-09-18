@@ -125,10 +125,7 @@ async function loadEventData() {
 }
 
 async function loadEventPosts() {
-  await feedStore.fetchPosts(1, {
-    eventId,
-    forceRefresh: true,
-  })
+  await feedStore.fetchEventPosts(eventId)
 }
 
 async function handleRsvp(status: 'confirmed' | 'declined' | 'invited') {
@@ -193,7 +190,7 @@ onMounted(async () => {
 onUnmounted(() => {
   document.removeEventListener('click', handleDocumentClick)
   feedStore.unsubscribeFromFeed(undefined, eventId)
-  feedStore.activeEventId = undefined
+  feedStore.clearEventPosts()
 })
 </script>
 
@@ -423,13 +420,13 @@ onUnmounted(() => {
         </div>
 
         <!-- Posts List -->
-        <div v-if="feedStore.isLoading && feedStore.posts.length === 0" class="posts-loading">
+        <div v-if="feedStore.isLoadingEventPosts && feedStore.eventPosts.length === 0" class="posts-loading">
           <PostCardSkeleton v-for="i in 3" :key="i" />
         </div>
 
-        <div v-else-if="feedStore.posts.length" class="posts-stream">
+        <div v-else-if="feedStore.eventPosts.length" class="posts-stream">
           <PostCard
-            v-for="post in feedStore.posts"
+            v-for="post in feedStore.eventPosts"
             :key="post.id"
             :post="post"
             @deleted="feedStore.deletePost(post.id)"

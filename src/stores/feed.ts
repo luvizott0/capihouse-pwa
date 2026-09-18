@@ -73,6 +73,14 @@ export const useFeedStore = defineStore('feed', () => {
   const hasMoreUserPosts = computed(() => userPostsCurrentPage.value < userPostsLastPage.value)
   const activeProfileUserId = ref<number | null>(null)
 
+  // Event-specific posts to avoid polluting the main feed
+  const eventPosts = ref<Post[]>([])
+  const isLoadingEventPosts = ref(false)
+  const isLoadingMoreEventPosts = ref(false)
+  const eventPostsCurrentPage = ref(1)
+  const eventPostsLastPage = ref(1)
+  const hasMoreEventPosts = computed(() => eventPostsCurrentPage.value < eventPostsLastPage.value)
+
   async function fetchPosts(
     page = 1,
     options?: { groupId?: number; eventId?: number; search?: string; date?: string; userId?: number; forceRefresh?: boolean } | number
@@ -85,12 +93,10 @@ export const useFeedStore = defineStore('feed', () => {
     }
 
     let groupId: number | undefined
-    let eventId: number | undefined
     if (typeof options === 'number') {
       groupId = options
     } else if (options) {
       groupId = options.groupId
-      eventId = options.eventId
       activeFilters.value = {
         search: options.search || undefined,
         date: options.date || undefined,
@@ -103,15 +109,10 @@ export const useFeedStore = defineStore('feed', () => {
     if (groupId !== undefined) {
       activeGroupId.value = groupId || undefined
     }
-    if (eventId !== undefined) {
-      activeEventId.value = eventId || undefined
-    }
     const targetGroupId = groupId !== undefined ? (groupId || undefined) : activeGroupId.value
-    const targetEventId = eventId !== undefined ? (eventId || undefined) : activeEventId.value
 
     const hasAnyFilter = Boolean(
       targetGroupId ||
-      targetEventId ||
       activeFilters.value.search ||
       activeFilters.value.date ||
       activeFilters.value.userId
@@ -121,7 +122,6 @@ export const useFeedStore = defineStore('feed', () => {
       const res = await postsApi.getPosts({
         page,
         groupId: targetGroupId,
-        eventId: targetEventId,
         search: activeFilters.value.search,
         date: activeFilters.value.date,
         userId: activeFilters.value.userId,
@@ -188,6 +188,47 @@ export const useFeedStore = defineStore('feed', () => {
     await fetchUserPosts(activeProfileUserId.value, userPostsCurrentPage.value + 1)
   }
 
+  async function fetchEventPosts(eventId: number, page = 1) {
+    if (page > 1) {
+      isLoadingMoreEventPosts.value = true
+    } else {
+      isLoadingEventPosts.value = true
+      activeEventId.value = eventId
+    }
+
+    try {
+      const res = await postsApi.getPosts({
+        page,
+        eventId,
+      })
+      if (page === 1) {
+        eventPosts.value = res.data.data
+      } else {
+        const existingIds = new Set(eventPosts.value.map(p => p.id))
+        const newUniquePosts = res.data.data.filter((p: Post) => !existingIds.has(p.id))
+        eventPosts.value.push(...newUniquePosts)
+      }
+      eventPostsCurrentPage.value = res.data.current_page
+      eventPostsLastPage.value = res.data.last_page
+      return res.data
+    } finally {
+      isLoadingEventPosts.value = false
+      isLoadingMoreEventPosts.value = false
+    }
+  }
+
+  async function loadMoreEventPosts() {
+    if (isLoadingEventPosts.value || isLoadingMoreEventPosts.value || !hasMoreEventPosts.value || !activeEventId.value) return
+    await fetchEventPosts(activeEventId.value, eventPostsCurrentPage.value + 1)
+  }
+
+  function clearEventPosts() {
+    eventPosts.value = []
+    eventPostsCurrentPage.value = 1
+    eventPostsLastPage.value = 1
+    activeEventId.value = undefined
+  }
+
   function clearFilters() {
     activeFilters.value = {}
   }
@@ -214,9 +255,11 @@ export const useFeedStore = defineStore('feed', () => {
       const res = await postsApi.createPost(formData)
       // The server will broadcast PostCreated; we still add it locally for
       // the author so they see their own post immediately without waiting for the WS event.
-      // If post belongs to an event, only add to posts if activeEventId matches
-      if (!res.data.event_id || (activeEventId.value && activeEventId.value === res.data.event_id)) {
+      if (!res.data.event_id) {
         posts.value.unshift(res.data)
+      }
+      if (activeEventId.value && res.data.event_id === activeEventId.value) {
+        eventPosts.value.unshift(res.data)
       }
       if (activeProfileUserId.value && res.data.user_id === activeProfileUserId.value && !res.data.event_id) {
         userPosts.value.unshift(res.data)
@@ -230,9 +273,10 @@ export const useFeedStore = defineStore('feed', () => {
   async function toggleLike(postId: number) {
     const postInFeed = posts.value.find(p => p.id === postId)
     const postInUser = userPosts.value.find(p => p.id === postId)
-    if (!postInFeed && !postInUser) return
+    const postInEvent = eventPosts.value.find(p => p.id === postId)
+    if (!postInFeed && !postInUser && !postInEvent) return
 
-    const targetPost = postInFeed || postInUser!
+    const targetPost = postInFeed || postInUser || postInEvent!
     // Optimistic update
     const previousLiked = targetPost.is_liked
     const previousCount = targetPost.likes_count
@@ -247,6 +291,10 @@ export const useFeedStore = defineStore('feed', () => {
       postInUser.is_liked = nextLiked
       postInUser.likes_count = nextCount
     }
+    if (postInEvent) {
+      postInEvent.is_liked = nextLiked
+      postInEvent.likes_count = nextCount
+    }
 
     try {
       const res = await postsApi.toggleLike(postId)
@@ -258,6 +306,10 @@ export const useFeedStore = defineStore('feed', () => {
         postInUser.is_liked = res.data.is_liked
         postInUser.likes_count = res.data.likes_count
       }
+      if (postInEvent) {
+        postInEvent.is_liked = res.data.is_liked
+        postInEvent.likes_count = res.data.likes_count
+      }
     } catch {
       // Revert if error
       if (postInFeed) {
@@ -268,17 +320,23 @@ export const useFeedStore = defineStore('feed', () => {
         postInUser.is_liked = previousLiked
         postInUser.likes_count = previousCount
       }
+      if (postInEvent) {
+        postInEvent.is_liked = previousLiked
+        postInEvent.likes_count = previousCount
+      }
     }
   }
 
   async function toggleCommentLike(postId: number, commentId: number) {
     const postInFeed = posts.value.find(p => p.id === postId)
     const postInUser = userPosts.value.find(p => p.id === postId)
+    const postInEvent = eventPosts.value.find(p => p.id === postId)
 
     const commentInFeed = postInFeed?.comments?.find(c => Number(c.id) === Number(commentId))
     const commentInUser = postInUser?.comments?.find(c => Number(c.id) === Number(commentId))
+    const commentInEvent = postInEvent?.comments?.find(c => Number(c.id) === Number(commentId))
 
-    const targetComment = commentInFeed || commentInUser
+    const targetComment = commentInFeed || commentInUser || commentInEvent
     if (!targetComment) return
 
     const prevLiked = !!targetComment.is_liked
@@ -294,6 +352,10 @@ export const useFeedStore = defineStore('feed', () => {
       commentInUser.is_liked = nextLiked
       commentInUser.likes_count = nextCount
     }
+    if (commentInEvent) {
+      commentInEvent.is_liked = nextLiked
+      commentInEvent.likes_count = nextCount
+    }
 
     try {
       const res = await postsApi.toggleCommentLike(commentId)
@@ -305,6 +367,10 @@ export const useFeedStore = defineStore('feed', () => {
         commentInUser.is_liked = res.data.is_liked
         commentInUser.likes_count = res.data.likes_count
       }
+      if (commentInEvent) {
+        commentInEvent.is_liked = res.data.is_liked
+        commentInEvent.likes_count = res.data.likes_count
+      }
     } catch {
       // Revert on error
       if (commentInFeed) {
@@ -315,12 +381,17 @@ export const useFeedStore = defineStore('feed', () => {
         commentInUser.is_liked = prevLiked
         commentInUser.likes_count = prevCount
       }
+      if (commentInEvent) {
+        commentInEvent.is_liked = prevLiked
+        commentInEvent.likes_count = prevCount
+      }
     }
   }
 
   async function addComment(postId: number, content: string, parentId?: number | null) {
     const postInFeed = posts.value.find(p => p.id === postId)
     const postInUser = userPosts.value.find(p => p.id === postId)
+    const postInEvent = eventPosts.value.find(p => p.id === postId)
     const res = await postsApi.addComment(postId, content, parentId)
 
     const applyComment = (post: Post) => {
@@ -336,6 +407,7 @@ export const useFeedStore = defineStore('feed', () => {
 
     if (postInFeed) applyComment(postInFeed)
     if (postInUser) applyComment(postInUser)
+    if (postInEvent) applyComment(postInEvent)
 
     return res.data
   }
@@ -352,8 +424,10 @@ export const useFeedStore = defineStore('feed', () => {
     }
     const postInFeed = posts.value.find(p => p.id === postId)
     const postInUser = userPosts.value.find(p => p.id === postId)
+    const postInEvent = eventPosts.value.find(p => p.id === postId)
     if (postInFeed) applyUpdate(postInFeed)
     if (postInUser) applyUpdate(postInUser)
+    if (postInEvent) applyUpdate(postInEvent)
     return res.data
   }
 
@@ -367,14 +441,17 @@ export const useFeedStore = defineStore('feed', () => {
     }
     const postInFeed = posts.value.find(p => p.id === postId)
     const postInUser = userPosts.value.find(p => p.id === postId)
+    const postInEvent = eventPosts.value.find(p => p.id === postId)
     if (postInFeed) applyDelete(postInFeed)
     if (postInUser) applyDelete(postInUser)
+    if (postInEvent) applyDelete(postInEvent)
   }
 
   async function deletePost(postId: number) {
     await postsApi.deletePost(postId)
     posts.value = posts.value.filter(p => p.id !== postId)
     userPosts.value = userPosts.value.filter(p => p.id !== postId)
+    eventPosts.value = eventPosts.value.filter(p => p.id !== postId)
   }
 
   async function updatePost(postId: number, data: { content?: string | null, feeling_name?: string, feeling_emoji?: string, hashtags?: string[] }) {
@@ -388,6 +465,10 @@ export const useFeedStore = defineStore('feed', () => {
       const userIndex = userPosts.value.findIndex(p => p.id === postId)
       if (userIndex !== -1) {
         userPosts.value[userIndex] = res.data
+      }
+      const eventIndex = eventPosts.value.findIndex(p => p.id === postId)
+      if (eventIndex !== -1) {
+        eventPosts.value[eventIndex] = res.data
       }
       return res.data
     } finally {
@@ -421,10 +502,17 @@ export const useFeedStore = defineStore('feed', () => {
       .listen('.PostCreated', (data: { post: Post }) => {
         // Don't show banner for the author's own post (already prepended locally)
         if (data.post.user_id === currentUserId) return
-        // Only add to pending if not already in the list
-        const exists = posts.value.some(p => p.id === data.post.id)
-        if (!exists) {
-          pendingPosts.value.unshift(data.post)
+        if (eventId) {
+          const exists = eventPosts.value.some(p => p.id === data.post.id)
+          if (!exists) {
+            eventPosts.value.unshift(data.post)
+          }
+        } else {
+          // Only add to pending if not already in the list
+          const exists = posts.value.some(p => p.id === data.post.id)
+          if (!exists) {
+            pendingPosts.value.unshift(data.post)
+          }
         }
       })
       .listen('.PostUpdated', (data: { post: Post }) => {
@@ -439,10 +527,12 @@ export const useFeedStore = defineStore('feed', () => {
         }
         updateInList(posts.value)
         updateInList(userPosts.value)
+        updateInList(eventPosts.value)
       })
       .listen('.PostDeleted', (data: { id: number }) => {
         posts.value = posts.value.filter(p => p.id !== data.id)
         userPosts.value = userPosts.value.filter(p => p.id !== data.id)
+        eventPosts.value = eventPosts.value.filter(p => p.id !== data.id)
         pendingPosts.value = pendingPosts.value.filter(p => p.id !== data.id)
       })
       .listen('.PostLiked', (data: { post_id: number; is_liked: boolean; likes_count: number; user_id: number }) => {
@@ -455,6 +545,10 @@ export const useFeedStore = defineStore('feed', () => {
         const postInUser = userPosts.value.find(p => p.id === data.post_id)
         if (postInUser) {
           postInUser.likes_count = data.likes_count
+        }
+        const postInEvent = eventPosts.value.find(p => p.id === data.post_id)
+        if (postInEvent) {
+          postInEvent.likes_count = data.likes_count
         }
       })
       .listen('.CommentCreated', (data: { post_id: number; comment: PostComment; comments_count: number }) => {
@@ -474,6 +568,8 @@ export const useFeedStore = defineStore('feed', () => {
         if (postInFeed) updateComments(postInFeed)
         const postInUser = userPosts.value.find(p => p.id === data.post_id)
         if (postInUser) updateComments(postInUser)
+        const postInEvent = eventPosts.value.find(p => p.id === data.post_id)
+        if (postInEvent) updateComments(postInEvent)
       })
       .listen('.CommentUpdated', (data: { post_id: number; comment: PostComment }) => {
         const updateComments = (post: Post) => {
@@ -488,6 +584,8 @@ export const useFeedStore = defineStore('feed', () => {
         if (postInFeed) updateComments(postInFeed)
         const postInUser = userPosts.value.find(p => p.id === data.post_id)
         if (postInUser) updateComments(postInUser)
+        const postInEvent = eventPosts.value.find(p => p.id === data.post_id)
+        if (postInEvent) updateComments(postInEvent)
       })
       .listen('.CommentDeleted', (data: { comment_id: number; post_id: number; comments_count: number }) => {
         const updateComments = (post: Post) => {
@@ -502,6 +600,8 @@ export const useFeedStore = defineStore('feed', () => {
         if (postInFeed) updateComments(postInFeed)
         const postInUser = userPosts.value.find(p => p.id === data.post_id)
         if (postInUser) updateComments(postInUser)
+        const postInEvent = eventPosts.value.find(p => p.id === data.post_id)
+        if (postInEvent) updateComments(postInEvent)
       })
       .listen('.CommentLiked', (data: { post_id: number; comment_id: number; is_liked: boolean; likes_count: number; user_id: number }) => {
         if (data.user_id === currentUserId) return
@@ -516,6 +616,8 @@ export const useFeedStore = defineStore('feed', () => {
         if (postInFeed) updateCommentLikes(postInFeed)
         const postInUser = userPosts.value.find(p => p.id === data.post_id)
         if (postInUser) updateCommentLikes(postInUser)
+        const postInEvent = eventPosts.value.find(p => p.id === data.post_id)
+        if (postInEvent) updateCommentLikes(postInEvent)
       })
   }
 
@@ -528,18 +630,24 @@ export const useFeedStore = defineStore('feed', () => {
   return {
     posts,
     userPosts,
+    eventPosts,
     isLoading,
     isLoadingMore,
     hasLoaded,
     isLoadingUserPosts,
     isLoadingMoreUserPosts,
+    isLoadingEventPosts,
+    isLoadingMoreEventPosts,
     hasMorePages,
     hasMoreUserPosts,
+    hasMoreEventPosts,
     isSubmitting,
     currentPage,
     lastPage,
     userPostsCurrentPage,
     userPostsLastPage,
+    eventPostsCurrentPage,
+    eventPostsLastPage,
     activeGroupId,
     activeEventId,
     pendingPosts,
@@ -548,8 +656,11 @@ export const useFeedStore = defineStore('feed', () => {
     clearFilters,
     fetchPosts,
     fetchUserPosts,
+    fetchEventPosts,
     loadMorePosts,
     loadMoreUserPosts,
+    loadMoreEventPosts,
+    clearEventPosts,
     fetchSinglePost,
     createPost,
     updatePost,

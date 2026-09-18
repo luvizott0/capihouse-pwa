@@ -255,4 +255,66 @@ describe('Feed Store', () => {
     expect(store.userPosts[0]!.comments[0]!.is_liked).toBe(true)
     expect(store.userPosts[0]!.comments[0]!.likes_count).toBe(1)
   })
+
+  it('fetchEventPosts does NOT overwrite the general feed posts even when event has 0 posts', async () => {
+    // 1. First, load general feed with posts
+    vi.mocked(postsApi.getPosts).mockResolvedValueOnce({
+      data: {
+        data: [mockPost1, mockPost2],
+        current_page: 1,
+        last_page: 1,
+      },
+    } as any)
+
+    const store = useFeedStore()
+    await store.fetchPosts(1)
+    expect(store.posts).toHaveLength(2)
+
+    // 2. Now visit an event with 0 posts
+    vi.mocked(postsApi.getPosts).mockResolvedValueOnce({
+      data: {
+        data: [],
+        current_page: 1,
+        last_page: 1,
+      },
+    } as any)
+
+    await store.fetchEventPosts(42)
+
+    // Event posts is empty, but general feed STILL has its 2 posts!
+    expect(store.eventPosts).toHaveLength(0)
+    expect(store.posts).toHaveLength(2)
+    expect(store.isFiltered).toBe(false)
+    expect(store.activeEventId).toBe(42)
+
+    // 3. Leaving the event cleans up eventPosts without affecting general feed
+    store.clearEventPosts()
+    expect(store.eventPosts).toHaveLength(0)
+    expect(store.activeEventId).toBeUndefined()
+    expect(store.posts).toHaveLength(2)
+  })
+
+  it('toggleLike and deletePost update eventPosts correctly', async () => {
+    const store = useFeedStore()
+    store.posts = [{ ...mockPost1 }]
+    store.eventPosts = [{ ...mockPost1 }]
+
+    vi.mocked(postsApi.toggleLike).mockResolvedValueOnce({
+      data: {
+        is_liked: true,
+        likes_count: 1,
+      },
+    } as any)
+
+    await store.toggleLike(1)
+
+    expect(store.posts[0]!.is_liked).toBe(true)
+    expect(store.eventPosts[0]!.is_liked).toBe(true)
+
+    vi.mocked(postsApi.deletePost).mockResolvedValueOnce({} as any)
+    await store.deletePost(1)
+
+    expect(store.posts).toHaveLength(0)
+    expect(store.eventPosts).toHaveLength(0)
+  })
 })
