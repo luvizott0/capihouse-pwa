@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { AppNotification } from '@/types/models'
 import * as notifApi from '@/api/notifications'
+import type { NotificationCategoryCounts } from '@/api/notifications'
 import * as groupsApi from '@/api/groups'
 import { connectEcho } from '@/services/echo'
 
@@ -11,6 +12,15 @@ export const useNotificationsStore = defineStore('notifications', () => {
   const isLoading = ref(false)
   const currentPage = ref(1)
   const lastPage = ref(1)
+  const selectedCategory = ref<string>('all')
+  const categoryCounts = ref<NotificationCategoryCounts>({
+    all: 0,
+    likes: 0,
+    comments: 0,
+    mentions: 0,
+    groups: 0,
+    events: 0,
+  })
 
   async function fetchUnreadCount() {
     try {
@@ -21,10 +31,20 @@ export const useNotificationsStore = defineStore('notifications', () => {
     }
   }
 
-  async function fetchNotifications(page = 1) {
-    isLoading.value = true
+  async function fetchCategoryCounts() {
     try {
-      const res = await notifApi.getNotifications(page)
+      const res = await notifApi.getCategoryCounts()
+      categoryCounts.value = res.data
+    } catch {
+      // Ignore network errors
+    }
+  }
+
+  async function fetchNotifications(page = 1, category = selectedCategory.value) {
+    isLoading.value = true
+    selectedCategory.value = category
+    try {
+      const res = await notifApi.getNotifications(page, category)
       if (page === 1) {
         notifications.value = res.data.data
       } else {
@@ -32,10 +52,19 @@ export const useNotificationsStore = defineStore('notifications', () => {
       }
       currentPage.value = res.data.current_page
       lastPage.value = res.data.last_page
-      await fetchUnreadCount()
+      await Promise.all([fetchUnreadCount(), fetchCategoryCounts()])
     } finally {
       isLoading.value = false
     }
+  }
+
+  async function setCategory(category: string) {
+    if (selectedCategory.value === category) {
+      selectedCategory.value = 'all'
+    } else {
+      selectedCategory.value = category
+    }
+    await fetchNotifications(1, selectedCategory.value)
   }
 
   async function markAsRead(id: number) {
@@ -91,8 +120,32 @@ export const useNotificationsStore = defineStore('notifications', () => {
     const echo = connectEcho()
     echo.private(`App.Models.User.${userId}`)
       .listen('.NotificationSent', (data: { notification: AppNotification; unread_count: number }) => {
-        // Prepend new notification to the top of the list
-        notifications.value.unshift(data.notification)
+        // Update category counts
+        categoryCounts.value.all += 1
+        const type = data.notification.type
+        if (type === 'post_like' || type === 'comment_like') {
+          categoryCounts.value.likes += 1
+        } else if (type === 'post_comment' || type === 'comment_reply') {
+          categoryCounts.value.comments += 1
+        } else if (type === 'post_mention' || type === 'comment_mention') {
+          categoryCounts.value.mentions += 1
+        } else if (type === 'group_invite') {
+          categoryCounts.value.groups += 1
+        } else if (type === 'event_rsvp') {
+          categoryCounts.value.events += 1
+        }
+
+        const matchesCategory =
+          selectedCategory.value === 'all' ||
+          (selectedCategory.value === 'likes' && (type === 'post_like' || type === 'comment_like')) ||
+          (selectedCategory.value === 'comments' && (type === 'post_comment' || type === 'comment_reply')) ||
+          (selectedCategory.value === 'mentions' && (type === 'post_mention' || type === 'comment_mention')) ||
+          (selectedCategory.value === 'groups' && type === 'group_invite') ||
+          (selectedCategory.value === 'events' && type === 'event_rsvp')
+
+        if (matchesCategory) {
+          notifications.value.unshift(data.notification)
+        }
         unreadCount.value = data.unread_count
       })
   }
@@ -122,8 +175,12 @@ export const useNotificationsStore = defineStore('notifications', () => {
     isLoading,
     currentPage,
     lastPage,
+    selectedCategory,
+    categoryCounts,
     fetchNotifications,
     fetchUnreadCount,
+    fetchCategoryCounts,
+    setCategory,
     markAsRead,
     markAllAsRead,
     acceptGroupInvite,

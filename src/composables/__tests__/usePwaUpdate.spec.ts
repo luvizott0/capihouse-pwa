@@ -3,10 +3,10 @@ import { ref } from 'vue'
 
 const mockNeedRefresh = ref(false)
 const mockOfflineReady = ref(false)
-const mockUpdateServiceWorker = vi.fn()
+const mockUpdateServiceWorker = vi.fn<() => void>()
 
 vi.mock('virtual:pwa-register/vue', () => ({
-  useRegisterSW: vi.fn(() => ({
+  useRegisterSW: vi.fn<() => any>(() => ({
     needRefresh: mockNeedRefresh,
     offlineReady: mockOfflineReady,
     updateServiceWorker: mockUpdateServiceWorker

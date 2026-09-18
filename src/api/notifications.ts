@@ -1,8 +1,26 @@
 import apiClient from './client'
 import type { AppNotification } from '@/types/models'
 
-export function getNotifications(page = 1) {
-  return apiClient.get<{ data: AppNotification[]; current_page: number; last_page: number; total: number }>(`/notifications?page=${page}`)
+export interface NotificationCategoryCounts {
+  all: number
+  likes: number
+  comments: number
+  mentions: number
+  groups: number
+  events: number
+}
+
+export function getNotifications(page = 1, category?: string) {
+  const params = new URLSearchParams()
+  params.set('page', String(page))
+  if (category && category !== 'all') {
+    params.set('category', category)
+  }
+  return apiClient.get<{ data: AppNotification[]; current_page: number; last_page: number; total: number }>(`/notifications?${params.toString()}`)
+}
+
+export function getCategoryCounts() {
+  return apiClient.get<NotificationCategoryCounts>('/notifications/category-counts')
 }
 
 export function getUnreadCount() {

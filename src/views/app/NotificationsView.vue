@@ -1,13 +1,36 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNotificationsStore } from '@/stores/notifications'
 import { formatRelativeTime } from '@/utils/date'
 import axios from 'axios'
+import type { AppNotification } from '@/types/models'
 import RetroButton from '@/components/ui/RetroButton.vue'
 
 const router = useRouter()
 const notifStore = useNotificationsStore()
+
+interface CategoryItem {
+  id: string
+  label: string
+  icon: string
+  countKey: keyof typeof notifStore.categoryCounts
+}
+
+const categories: CategoryItem[] = [
+  { id: 'all', label: 'Todas as notificações', icon: '🔔', countKey: 'all' },
+  { id: 'likes', label: 'Curtidas', icon: '❤️', countKey: 'likes' },
+  { id: 'comments', label: 'Comentários', icon: '💬', countKey: 'comments' },
+  { id: 'mentions', label: 'Marcações', icon: '🏷️', countKey: 'mentions' },
+  { id: 'groups', label: 'Grupos e Convites', icon: '👥', countKey: 'groups' },
+  { id: 'events', label: 'Eventos', icon: '📅', countKey: 'events' },
+]
+
+const visibleCategories = computed(() => {
+  return categories.filter(
+    cat => cat.id !== 'events' || notifStore.categoryCounts.events > 0
+  )
+})
 
 const actionLoadingId = ref<number | null>(null)
 const actionMsg = ref('')
@@ -53,7 +76,7 @@ async function handleDecline(notifId: number, groupId: number) {
   }
 }
 
-async function handleItemClick(item: any) {
+async function handleItemClick(item: AppNotification) {
   if (!item.read_at) {
     await notifStore.markAsRead(item.id)
   }
@@ -78,6 +101,23 @@ async function handleItemClick(item: any) {
         </button>
       </div>
 
+      <!-- Barra de Filtros por Categoria -->
+      <div class="notif-filter-bar">
+        <button
+          v-for="cat in visibleCategories"
+          :key="cat.id"
+          type="button"
+          class="notif-filter-btn"
+          :class="{ active: notifStore.selectedCategory === cat.id }"
+          :title="cat.label"
+          :aria-label="cat.label"
+          @click="notifStore.setCategory(cat.id)"
+        >
+          <span class="filter-count">{{ notifStore.categoryCounts[cat.countKey] ?? 0 }}</span>
+          <span class="filter-icon">{{ cat.icon }}</span>
+        </button>
+      </div>
+
       <div class="notif-body">
         <div v-if="actionMsg" class="action-alert-box">
           {{ actionMsg }}
@@ -89,8 +129,17 @@ async function handleItemClick(item: any) {
 
         <div v-else-if="notifStore.notifications.length === 0" class="empty-notif-box">
           <img src="/capihouse-logo.png" alt="Capivara" class="empty-capivara-logo" />
-          <h3 class="empty-title">Tudo limpo por aqui!</h3>
-          <p class="empty-subtitle">Você não possui nenhuma notificação recente.</p>
+          <template v-if="notifStore.selectedCategory !== 'all'">
+            <h3 class="empty-title">Nenhuma notificação encontrada!</h3>
+            <p class="empty-subtitle">Você não possui notificações nesta categoria.</p>
+            <RetroButton size="sm" variant="secondary" @click="notifStore.setCategory('all')">
+              [ Ver todas as notificações ]
+            </RetroButton>
+          </template>
+          <template v-else>
+            <h3 class="empty-title">Tudo limpo por aqui!</h3>
+            <p class="empty-subtitle">Você não possui nenhuma notificação recente.</p>
+          </template>
         </div>
 
         <div v-else class="notif-list">
@@ -111,8 +160,8 @@ async function handleItemClick(item: any) {
               <span v-if="item.type === 'group_invite'" class="type-icon">👥</span>
               <span v-else-if="item.type === 'post_like' || item.type === 'comment_like'" class="type-icon">❤️</span>
               <span v-else-if="item.type === 'post_comment' || item.type === 'comment_reply'" class="type-icon">💬</span>
-              <span v-else-if="item.type === 'post_mention'" class="type-icon">🏷️</span>
-              <span v-else-if="item.type === 'comment_mention'" class="type-icon">💬</span>
+              <span v-else-if="item.type === 'post_mention' || item.type === 'comment_mention'" class="type-icon">🏷️</span>
+              <span v-else-if="item.type === 'event_rsvp'" class="type-icon">📅</span>
               <span v-else class="type-icon">🔔</span>
             </div>
 
@@ -221,6 +270,59 @@ async function handleItemClick(item: any) {
 }
 .mark-all-btn:hover {
   text-decoration: underline;
+}
+
+.notif-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  background-color: var(--color-primary-50);
+  border-bottom: 1px solid var(--color-border);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.notif-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  background-color: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: 2px;
+  color: var(--color-primary-800);
+  font-family: var(--font-heading);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.notif-filter-btn:hover {
+  background-color: var(--color-primary-100);
+  border-color: var(--color-primary);
+}
+
+.notif-filter-btn.active {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary-800);
+  color: #ffffff;
+  box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.filter-count {
+  font-family: var(--font-heading);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.filter-icon {
+  font-size: 0.95rem;
+  line-height: 1;
 }
 
 .notif-body {
