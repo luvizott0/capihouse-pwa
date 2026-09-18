@@ -129,6 +129,10 @@ export default defineConfig({
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
       },
+      '/capihouse-media': {
+        target: 'http://192.168.5.253:9000',
+        changeOrigin: true,
+      },
       '/broadcasting': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,

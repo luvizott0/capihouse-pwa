@@ -57,9 +57,19 @@ server {
     }
 
     # Proxy para arquivos públicos de storage do Laravel
-    location /storage/ {
+    location ^~ /storage/ {
         proxy_pass http://${BACKEND_HOST}:${BACKEND_PORT}/storage/;
         proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        client_max_body_size 100M;
+    }
+
+    # Proxy para arquivos de mídia do MinIO S3
+    location ^~ /capihouse-media/ {
+        proxy_pass http://192.168.5.253:9000/capihouse-media/;
+        proxy_set_header Host 192.168.5.253:9000;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
