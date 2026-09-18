@@ -287,16 +287,18 @@ onUnmounted(() => {
 
         <h1 class="event-name">{{ event.name }}</h1>
 
-        <div class="event-organizer-row">
-          <span class="organizer-label">Organizado por:</span>
+        <div class="event-organizer-section">
+          <span class="organizer-section-title">Organizado por:</span>
           <router-link
             v-if="event.owner?.username"
             :to="'/profile/' + event.owner.username"
-            class="organizer-profile-link"
+            class="organizer-profile-card"
           >
-            <UserAvatar :user="event.owner" size="sm" />
-            <span class="organizer-name">{{ event.owner.name }}</span>
-            <span class="organizer-handle">(@{{ event.owner.username }})</span>
+            <UserAvatar :user="event.owner" size="md" />
+            <div class="organizer-text-info">
+              <span class="organizer-name">{{ event.owner.name }}</span>
+              <span class="organizer-username">@{{ event.owner.username }}</span>
+            </div>
           </router-link>
         </div>
 
@@ -453,26 +455,6 @@ onUnmounted(() => {
 
       <!-- TAB 2: Guest List -->
       <div v-else-if="activeTab === 'guests'" class="tab-pane guests-pane">
-        <!-- Guest Summary Metrics -->
-        <div class="guest-metrics-row">
-          <div class="metric-card total">
-            <span class="metric-val">{{ event.guests?.length || 0 }}</span>
-            <span class="metric-lbl">Total Convidados</span>
-          </div>
-          <div class="metric-card confirmed">
-            <span class="metric-val">{{ confirmedGuests.length }}</span>
-            <span class="metric-lbl">Confirmados</span>
-          </div>
-          <div class="metric-card declined">
-            <span class="metric-val">{{ declinedGuests.length }}</span>
-            <span class="metric-lbl">Não vão</span>
-          </div>
-          <div class="metric-card pending">
-            <span class="metric-val">{{ pendingGuests.length }}</span>
-            <span class="metric-lbl">Aguardando</span>
-          </div>
-        </div>
-
         <!-- Filter Chips & Add button -->
         <div class="guests-filter-bar">
           <div class="filter-chips">
@@ -839,33 +821,54 @@ onUnmounted(() => {
   margin: 0;
 }
 
-.event-organizer-row {
+.event-organizer-section {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.85rem;
-  color: var(--color-muted, #7c6858);
+  flex-direction: column;
+  gap: 0.35rem;
 }
 
-.organizer-profile-link {
+.organizer-section-title {
+  font-size: 0.78rem;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-weight: 700;
+  color: var(--color-muted, #7c6858);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.organizer-profile-card {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.65rem;
   text-decoration: none;
   color: inherit;
+  width: fit-content;
+  padding: 0.2rem 0.4rem 0.2rem 0;
+  border-radius: 2px;
+  transition: all 0.15s ease;
 }
-.organizer-profile-link:hover .organizer-name {
+
+.organizer-profile-card:hover .organizer-name {
   color: var(--color-primary, #a66130);
   text-decoration: underline;
 }
 
-.organizer-name {
-  font-weight: bold;
-  color: var(--color-primary-800, #5f4120);
+.organizer-text-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  line-height: 1.25;
 }
 
-.organizer-handle {
-  font-size: 0.78rem;
+.organizer-name {
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-primary-900, #3E2723);
+}
+
+.organizer-username {
+  font-size: 0.8rem;
   color: var(--color-muted, #7c6858);
 }
 
@@ -1181,44 +1184,6 @@ onUnmounted(() => {
 }
 
 /* Guests Pane */
-.guest-metrics-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 0.75rem;
-}
-
-.metric-card {
-  background-color: #ffffff;
-  border: 1px solid var(--color-border, #d8cdc5);
-  border-radius: 2px;
-  padding: 0.75rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.2rem;
-}
-
-.metric-val {
-  font-family: var(--font-heading, 'Space Mono', monospace);
-  font-size: 1.4rem;
-  font-weight: bold;
-}
-
-.metric-lbl {
-  font-size: 0.75rem;
-  color: var(--color-muted, #7c6858);
-}
-
-.metric-card.confirmed .metric-val {
-  color: #15803d;
-}
-.metric-card.declined .metric-val {
-  color: #b91c1c;
-}
-.metric-card.pending .metric-val {
-  color: var(--color-primary, #a66130);
-}
-
 .guests-filter-bar {
   display: flex;
   justify-content: space-between;
