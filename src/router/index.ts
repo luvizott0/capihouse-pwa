@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
+import { useNotificationsStore } from '@/stores/notifications'
 import AppShell from '@/components/layout/AppShell.vue'
 
 const router = createRouter({
@@ -130,6 +131,14 @@ router.beforeEach(async (to, from, next) => {
     }
   }
 
+  // Suporte a links /feed?post=ID redirecionando para a rota canônica /posts/ID
+  if (to.path === '/feed' && to.query.post) {
+    const query = { ...to.query }
+    const postId = query.post
+    delete query.post
+    return next({ path: `/posts/${postId}`, query })
+  }
+
   next()
 })
 
@@ -171,6 +180,15 @@ router.afterEach((to) => {
 
   if (!isVisitingOtherUser) {
     themeStore.loadThemeFromUser(auth.user)
+  }
+
+  // Marca notificação como lida se vier de um clique em Push Notification com query notif_id
+  if (to.query.notif_id && auth.isAuthenticated) {
+    const notifId = Number(to.query.notif_id)
+    if (!isNaN(notifId) && notifId > 0) {
+      const notifStore = useNotificationsStore()
+      notifStore.markAsRead(notifId)
+    }
   }
 })
 

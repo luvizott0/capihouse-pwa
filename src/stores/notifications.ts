@@ -70,15 +70,21 @@ export const useNotificationsStore = defineStore('notifications', () => {
 
   async function markAsRead(id: number) {
     const item = notifications.value.find(n => n.id === id)
-    if (item && !item.read_at) {
-      item.read_at = new Date().toISOString()
-      unreadCount.value = Math.max(0, unreadCount.value - 1)
-      categoryCounts.value.unread = Math.max(0, (categoryCounts.value.unread ?? 1) - 1)
-      try {
-        await notifApi.markNotificationAsRead(id)
-      } catch {
-        // Silent error
+    if (item) {
+      if (!item.read_at) {
+        item.read_at = new Date().toISOString()
+        unreadCount.value = Math.max(0, unreadCount.value - 1)
+        categoryCounts.value.unread = Math.max(0, (categoryCounts.value.unread ?? 1) - 1)
       }
+    } else {
+      unreadCount.value = Math.max(0, unreadCount.value - 1)
+    }
+
+    try {
+      await notifApi.markNotificationAsRead(id)
+      await Promise.all([fetchUnreadCount(), fetchCategoryCounts()])
+    } catch {
+      // Silent error
     }
   }
 
