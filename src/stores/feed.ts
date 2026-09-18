@@ -6,31 +6,52 @@ import { connectEcho } from '@/services/echo'
 
 const FEED_CACHE_KEY = 'capihouse_feed_cache'
 
-function loadInitialFeedCache(): Post[] {
+interface FeedCacheData {
+  posts: Post[]
+  lastPage: number
+}
+
+function loadInitialFeedCache(): FeedCacheData {
   try {
     const stored = localStorage.getItem(FEED_CACHE_KEY)
     if (stored) {
       const parsed = JSON.parse(stored)
-      if (Array.isArray(parsed)) return parsed
+      if (Array.isArray(parsed)) {
+        return { posts: parsed, lastPage: 1 }
+      }
+      if (parsed && Array.isArray(parsed.posts)) {
+        return {
+          posts: parsed.posts,
+          lastPage: typeof parsed.lastPage === 'number' ? parsed.lastPage : 1,
+        }
+      }
     }
   } catch {}
-  return []
+  return { posts: [], lastPage: 1 }
 }
 
-function saveFeedCache(data: Post[]) {
+function saveFeedCache(data: Post[], lastPage: number) {
   try {
     // Mantém no máximo 15 posts no storage local para ser leve e rápido
-    localStorage.setItem(FEED_CACHE_KEY, JSON.stringify(data.slice(0, 15)))
+    localStorage.setItem(
+      FEED_CACHE_KEY,
+      JSON.stringify({
+        posts: data.slice(0, 15),
+        lastPage,
+      })
+    )
   } catch {}
 }
 
 export const useFeedStore = defineStore('feed', () => {
-  const posts = ref<Post[]>(loadInitialFeedCache())
+  const initialCache = loadInitialFeedCache()
+  const posts = ref<Post[]>(initialCache.posts)
   const isLoading = ref(false)
   const isLoadingMore = ref(false)
   const isSubmitting = ref(false)
   const currentPage = ref(1)
-  const lastPage = ref(1)
+  const lastPage = ref(initialCache.lastPage)
+  const hasLoaded = ref(false)
 
   const hasMorePages = computed(() => currentPage.value < lastPage.value)
 
@@ -96,12 +117,16 @@ export const useFeedStore = defineStore('feed', () => {
         date: activeFilters.value.date,
         userId: activeFilters.value.userId,
       })
+      currentPage.value = res.data.current_page
+      lastPage.value = res.data.last_page
+      hasLoaded.value = true
+
       if (page === 1) {
         posts.value = res.data.data
         isFiltered.value = hasAnyFilter
         // Salva no cache local offline-first apenas se for o feed geral sem filtros
         if (!hasAnyFilter) {
-          saveFeedCache(res.data.data)
+          saveFeedCache(res.data.data, res.data.last_page)
         }
       } else {
         // Evita duplicatas caso algum post já tenha chegado via WebSocket
@@ -109,8 +134,6 @@ export const useFeedStore = defineStore('feed', () => {
         const newUniquePosts = res.data.data.filter((p: Post) => !existingIds.has(p.id))
         posts.value.push(...newUniquePosts)
       }
-      currentPage.value = res.data.current_page
-      lastPage.value = res.data.last_page
     } finally {
       isLoading.value = false
       isLoadingMore.value = false
@@ -494,6 +517,7 @@ export const useFeedStore = defineStore('feed', () => {
     userPosts,
     isLoading,
     isLoadingMore,
+    hasLoaded,
     isLoadingUserPosts,
     isLoadingMoreUserPosts,
     hasMorePages,

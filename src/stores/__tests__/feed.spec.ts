@@ -63,6 +63,53 @@ describe('Feed Store', () => {
     expect(store.isFiltered).toBe(false)
   })
 
+  it('hasLoaded is false initially and becomes true after fetchPosts with pagination', async () => {
+    vi.mocked(postsApi.getPosts).mockResolvedValueOnce({
+      data: {
+        data: [mockPost1],
+        current_page: 1,
+        last_page: 3,
+      },
+    } as any)
+
+    const store = useFeedStore()
+    expect(store.hasLoaded).toBe(false)
+
+    await store.fetchPosts(1)
+
+    expect(store.hasLoaded).toBe(true)
+    expect(store.currentPage).toBe(1)
+    expect(store.lastPage).toBe(3)
+    expect(store.hasMorePages).toBe(true)
+  })
+
+  it('loadMorePosts requests next page when hasMorePages is true', async () => {
+    vi.mocked(postsApi.getPosts)
+      .mockResolvedValueOnce({
+        data: {
+          data: [mockPost1],
+          current_page: 1,
+          last_page: 2,
+        },
+      } as any)
+      .mockResolvedValueOnce({
+        data: {
+          data: [mockPost2],
+          current_page: 2,
+          last_page: 2,
+        },
+      } as any)
+
+    const store = useFeedStore()
+    await store.fetchPosts(1)
+    expect(store.hasMorePages).toBe(true)
+
+    await store.loadMorePosts()
+    expect(store.posts).toHaveLength(2)
+    expect(store.currentPage).toBe(2)
+    expect(store.hasMorePages).toBe(false)
+  })
+
   it('fetchPosts with filters marks isFiltered = true', async () => {
     vi.mocked(postsApi.getPosts).mockResolvedValueOnce({
       data: {

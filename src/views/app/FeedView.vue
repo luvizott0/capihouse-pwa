@@ -39,8 +39,8 @@ const filterDate = computed(() => (route.query.date as string) || '')
 const filterUserId = computed(() => route.query.user_id ? Number(route.query.user_id) : null)
 
 async function loadPostsForCurrentRoute(force = false) {
-  // Se já temos posts e não é um reload forçado nem há filtros de busca ativos, reutiliza o cache do Pinia
-  if (!force && !hasSearchFilters.value && feedStore.posts.length > 0 && !feedStore.isFiltered) {
+  // Se já temos posts carregados da rede nesta sessão, não é um reload forçado nem há filtros de busca ativos, reutiliza o estado do Pinia
+  if (!force && !hasSearchFilters.value && feedStore.hasLoaded && !feedStore.isFiltered) {
     return
   }
 
@@ -49,6 +49,16 @@ async function loadPostsForCurrentRoute(force = false) {
     date: filterDate.value || undefined,
     userId: filterUserId.value || undefined,
   })
+}
+
+function checkSentinelIntersection() {
+  if (!sentinelRef.value || !feedStore.hasMorePages || feedStore.isLoading || feedStore.isLoadingMore) {
+    return
+  }
+  const rect = sentinelRef.value.getBoundingClientRect()
+  if (rect.top <= window.innerHeight + 300) {
+    feedStore.loadMorePosts()
+  }
 }
 
 function setupScrollObserver() {
@@ -154,9 +164,16 @@ async function handleTouchEnd() {
 }
 
 onMounted(async () => {
+  setupScrollObserver()
+
+  // Subscribe to real-time post updates
+  const userId = authStore.user?.id
+  if (userId) {
+    feedStore.subscribeToFeed(userId)
+  }
+
   await loadPostsForCurrentRoute()
   await nextTick()
-  setupScrollObserver()
 
   if (route.hash) {
     setTimeout(() => {
@@ -166,13 +183,19 @@ onMounted(async () => {
       }
     }, 100)
   }
-
-  // Subscribe to real-time post updates
-  const userId = authStore.user?.id
-  if (userId) {
-    feedStore.subscribeToFeed(userId)
-  }
 })
+
+// Se a sincronização inicial terminar e o usuário já estiver próximo ao fim, carrega mais páginas
+watch(
+  () => feedStore.isLoading,
+  (loading) => {
+    if (!loading && feedStore.hasMorePages && sentinelRef.value) {
+      nextTick(() => {
+        checkSentinelIntersection()
+      })
+    }
+  }
+)
 
 // Observa o sentinel se o DOM do feed for atualizado
 watch(sentinelRef, (newEl) => {
@@ -323,8 +346,14 @@ onUnmounted(() => {
         <span>Carregando mais publicações antigas...</span>
       </div>
 
+      <!-- Sincronizando com o servidor em background se já tiver posts na tela -->
+      <div v-else-if="feedStore.isLoading && feedStore.posts.length > 0" class="infinite-loading-bar">
+        <span class="refresh-dot"></span>
+        <span>Sincronizando publicações...</span>
+      </div>
+
       <!-- Final do Feed -->
-      <div v-else-if="!feedStore.hasMorePages" class="infinite-end-card">
+      <div v-else-if="!feedStore.hasMorePages && feedStore.hasLoaded" class="infinite-end-card">
         <span class="end-marker">🐾</span>
         <span class="end-text">Você visualizou todas as publicações recentes da casa!</span>
       </div>
