@@ -189,3 +189,21 @@ export interface Event {
   media?: Media[]
   image_url?: string | null
 }
+
+export interface NotificationPreferences {
+  likes: boolean
+  comments: boolean
+  mentions: boolean
+  group_invites: boolean
+  event_invites: boolean
+}
+
+export interface PushSubscriptionData {
+  endpoint: string
+  keys: {
+    p256dh: string
+    auth: string
+  }
+  content_encoding?: string
+}
+

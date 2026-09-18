@@ -15,6 +15,7 @@ import PostCard from '@/components/feed/PostCard.vue'
 import PostCardSkeleton from '@/components/feed/PostCardSkeleton.vue'
 import { formatBirthDate } from '@/utils/date'
 import { usePwaUpdate } from '@/composables/usePwaUpdate'
+import { useWebPush } from '@/composables/useWebPush'
 import PullToRefreshIndicator from '@/components/ui/PullToRefreshIndicator.vue'
 import { usePullToRefresh } from '@/composables/usePullToRefresh'
 
@@ -61,6 +62,28 @@ const {
   updateServiceWorker: applyPwaUpdate,
   forceReloadApp: reloadApp
 } = usePwaUpdate()
+
+// Web Push Notifications
+const {
+  isSupported: isPushSupported,
+  isIos: isIosDevice,
+  isStandalone: isPwaStandalone,
+  permission: pushPermission,
+  isSubscribed: isPushSubscribed,
+  isLoading: isPushLoading,
+  isTesting: isPushTesting,
+  isSavingPreferences: isSavingNotificationPreferences,
+  statusMessage: pushStatusMessage,
+  errorMessage: pushErrorMessage,
+  preferences: notificationPreferences,
+  registeredDevicesCount: pushDevicesCount,
+  checkSubscription: checkPushSubscription,
+  loadPreferences: loadNotificationPreferences,
+  subscribe: subscribePush,
+  unsubscribe: unsubscribePush,
+  testPush: sendTestNotification,
+  updatePreference: setNotificationPreference,
+} = useWebPush()
 
 async function handleLogout() {
   await authStore.logout()
@@ -226,6 +249,10 @@ function openSettings() {
   settingsSuccess.value = ''
   pwaFeedbackMessage.value = ''
   showSettingsModal.value = true
+
+  // Check push subscription & preferences
+  checkPushSubscription()
+  loadNotificationPreferences()
 }
 
 async function saveSettings() {
@@ -630,6 +657,168 @@ const {
                   <path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
                 </svg>
               </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Push Notifications & Preferences Section -->
+        <div class="push-notifications-box">
+          <h4 class="settings-section-title">
+            <svg xmlns="http://www.w3.org/2000/svg" class="section-title-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+            Notificações Push
+          </h4>
+          <p class="settings-section-desc">
+            Receba notificações direto no seu navegador ou celular sobre interações na comunidade.
+          </p>
+
+          <!-- iOS Alert banner -->
+          <div v-if="isIosDevice && !isPwaStandalone" class="ios-pwa-notice">
+            <span class="notice-icon">💡</span>
+            <div class="notice-text">
+              No iPhone/iPad, para receber notificações você precisa instalar o CapiHouse na Tela de Início (toque em <strong>Compartilhar</strong> e depois em <strong>Adicionar à Tela de Início</strong>).
+            </div>
+          </div>
+
+          <!-- Status Banners -->
+          <div v-if="pushStatusMessage" class="success-banner mb-2">
+            {{ pushStatusMessage }}
+          </div>
+          <div v-if="pushErrorMessage" class="error-banner mb-2">
+            {{ pushErrorMessage }}
+          </div>
+
+          <!-- Device Subscription Card -->
+          <div class="device-status-card">
+            <div class="device-info">
+              <div class="device-label">Status deste aparelho:</div>
+              <div class="device-badge" :class="isPushSubscribed ? 'badge-active' : 'badge-inactive'">
+                <span class="badge-dot"></span>
+                {{ isPushSubscribed ? 'Ativo e Conectado' : 'Não Ativado' }}
+              </div>
+            </div>
+
+            <div class="device-actions">
+              <button
+                v-if="!isPushSubscribed"
+                type="button"
+                class="retro-action-btn primary-action"
+                :disabled="isPushLoading"
+                @click="subscribePush"
+              >
+                <svg v-if="isPushLoading" class="spin-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                </svg>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" class="action-svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                <span>{{ isPushLoading ? 'Ativando...' : 'Ativar Notificações neste Aparelho' }}</span>
+              </button>
+
+              <template v-else>
+                <button
+                  type="button"
+                  class="retro-action-btn"
+                  :disabled="isPushTesting"
+                  title="Disparar notificação de teste"
+                  @click="sendTestNotification"
+                >
+                  <svg v-if="isPushTesting" class="spin-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                  </svg>
+                  <svg v-else xmlns="http://www.w3.org/2000/svg" class="action-svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  <span>{{ isPushTesting ? 'Enviando...' : 'Testar Notificação' }}</span>
+                </button>
+
+                <button
+                  type="button"
+                  class="retro-action-btn btn-danger-action"
+                  :disabled="isPushLoading"
+                  title="Desativar notificações neste aparelho"
+                  @click="unsubscribePush"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="action-svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                  </svg>
+                  <span>Desativar</span>
+                </button>
+              </template>
+            </div>
+          </div>
+
+          <!-- Preferences Category Toggles -->
+          <div class="preferences-toggles-section">
+            <h5 class="preferences-subtitle">Quais notificações deseja receber:</h5>
+            <div class="toggles-grid">
+              <label class="retro-toggle-item">
+                <input
+                  type="checkbox"
+                  class="retro-checkbox"
+                  :checked="notificationPreferences.likes"
+                  @change="setNotificationPreference('likes', ($event.target as HTMLInputElement).checked)"
+                />
+                <span class="toggle-text">
+                  <span class="toggle-title">Curtidas</span>
+                  <span class="toggle-desc">Quando curtirem suas publicações ou comentários</span>
+                </span>
+              </label>
+
+              <label class="retro-toggle-item">
+                <input
+                  type="checkbox"
+                  class="retro-checkbox"
+                  :checked="notificationPreferences.comments"
+                  @change="setNotificationPreference('comments', ($event.target as HTMLInputElement).checked)"
+                />
+                <span class="toggle-text">
+                  <span class="toggle-title">Comentários e Respostas</span>
+                  <span class="toggle-desc">Novos comentários em posts e respostas aos seus comentários</span>
+                </span>
+              </label>
+
+              <label class="retro-toggle-item">
+                <input
+                  type="checkbox"
+                  class="retro-checkbox"
+                  :checked="notificationPreferences.mentions"
+                  @change="setNotificationPreference('mentions', ($event.target as HTMLInputElement).checked)"
+                />
+                <span class="toggle-text">
+                  <span class="toggle-title">Marcações (@você)</span>
+                  <span class="toggle-desc">Quando alguém citar seu @username na casa</span>
+                </span>
+              </label>
+
+              <label class="retro-toggle-item">
+                <input
+                  type="checkbox"
+                  class="retro-checkbox"
+                  :checked="notificationPreferences.group_invites"
+                  @change="setNotificationPreference('group_invites', ($event.target as HTMLInputElement).checked)"
+                />
+                <span class="toggle-text">
+                  <span class="toggle-title">Convites de Grupos</span>
+                  <span class="toggle-desc">Quando convidarem você para participar de uma comunidade</span>
+                </span>
+              </label>
+
+              <label class="retro-toggle-item">
+                <input
+                  type="checkbox"
+                  class="retro-checkbox"
+                  :checked="notificationPreferences.event_invites"
+                  @change="setNotificationPreference('event_invites', ($event.target as HTMLInputElement).checked)"
+                />
+                <span class="toggle-text">
+                  <span class="toggle-title">Eventos da Casa</span>
+                  <span class="toggle-desc">Convites e confirmações de presença em eventos</span>
+                </span>
+              </label>
             </div>
           </div>
         </div>
@@ -1206,6 +1395,185 @@ const {
   font-size: 0.85rem;
   text-transform: uppercase;
   color: var(--color-primary-800);
+}
+
+.push-notifications-box {
+  border-top: 1px solid var(--color-border);
+  padding-top: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.settings-section-desc {
+  font-size: 0.8rem;
+  color: var(--color-muted, #666);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.ios-pwa-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.55rem 0.75rem;
+  background-color: #fefce8;
+  border: 1px solid #fde047;
+  color: #713f12;
+  font-size: 0.78rem;
+  border-radius: 2px;
+  line-height: 1.35;
+}
+
+.device-status-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  background-color: var(--color-primary-50, #f8f6f1);
+  border: 1px solid var(--color-primary-200, #e8c9a5);
+  padding: 0.65rem 0.85rem;
+  border-radius: 2px;
+}
+
+.device-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.device-label {
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: var(--color-primary-900, #422d16);
+}
+
+.device-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: bold;
+  padding: 0.2rem 0.5rem;
+  border-radius: 9999px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.badge-active {
+  background-color: #dcfce7;
+  color: #166534;
+  border: 1px solid #86efac;
+}
+
+.badge-active .badge-dot {
+  background-color: #22c55e;
+}
+
+.badge-inactive {
+  background-color: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+}
+
+.badge-inactive .badge-dot {
+  background-color: #94a3b8;
+}
+
+.device-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.primary-action {
+  background-color: var(--color-primary) !important;
+  color: #ffffff !important;
+  border-color: var(--color-primary-700, #804a1f) !important;
+}
+
+.primary-action:hover:not(:disabled) {
+  background-color: var(--color-primary-600, #915324) !important;
+}
+
+.btn-danger-action {
+  color: #b91c1c !important;
+  border-color: #fca5a5 !important;
+  background-color: #fff1f2 !important;
+}
+
+.btn-danger-action:hover:not(:disabled) {
+  background-color: #ffe4e6 !important;
+  border-color: #f87171 !important;
+}
+
+.preferences-toggles-section {
+  margin-top: 0.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.preferences-subtitle {
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: var(--color-primary-900, #422d16);
+  margin: 0;
+}
+
+.toggles-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.retro-toggle-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.45rem 0.65rem;
+  background-color: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.retro-toggle-item:hover {
+  background-color: var(--color-primary-50, #f8f6f1);
+}
+
+.retro-checkbox {
+  margin-top: 0.15rem;
+  accent-color: var(--color-primary);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.toggle-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.toggle-title {
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: var(--color-primary-900, #422d16);
+}
+
+.toggle-desc {
+  font-size: 0.72rem;
+  color: var(--color-muted, #777);
+  line-height: 1.25;
 }
 
 .app-updates-box {

@@ -14,7 +14,8 @@ export default defineConfig({
         'apple-touch-icon.png',
         'capihouse-logo.png',
         'favicon.svg',
-        'favicon-96x96.png'
+        'favicon-96x96.png',
+        'push-handler.js'
       ],
       manifest: {
         name: 'CapiHouse - Comunidade da Casa',
@@ -56,6 +57,7 @@ export default defineConfig({
         ]
       },
       workbox: {
+        importScripts: ['push-handler.js'],
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff,woff2,ttf}'],
         navigateFallback: '/index.html',
         runtimeCaching: [
