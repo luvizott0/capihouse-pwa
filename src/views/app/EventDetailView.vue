@@ -17,12 +17,20 @@ import EventEditModal from '@/components/events/EventEditModal.vue'
 import EventInviteModal from '@/components/events/EventInviteModal.vue'
 import ImageCropper from '@/components/profile/ImageCropper.vue'
 import { resolveMediaUrl } from '@/utils/media'
+import { useImageViewerStore } from '@/stores/imageViewer'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const feedStore = useFeedStore()
 const eventsStore = useEventsStore()
+const imageViewer = useImageViewerStore()
+
+function openBannerPhoto() {
+  if (eventImage.value && !imageFailed.value && event.value) {
+    imageViewer.openImage(eventImage.value, event.value.name, 'Banner do Evento')
+  }
+}
 
 const eventId = Number(route.params.id)
 const event = ref<Event | null>(null)
@@ -247,8 +255,13 @@ onUnmounted(() => {
 
     <!-- Event Detail Content -->
     <div v-else-if="event" class="event-main-content">
-      <!-- Panoramic Banner Cover -->
-      <div class="banner-cover-box">
+      <!-- Panoramic Banner Cover (3:1) -->
+      <div
+        class="banner-cover-box"
+        :class="{ 'clickable-banner': !!eventImage && !imageFailed }"
+        :title="eventImage && !imageFailed ? 'Clique para ampliar o banner' : ''"
+        @click="openBannerPhoto"
+      >
         <img
           v-if="eventImage && !imageFailed"
           :src="eventImage"
@@ -264,10 +277,10 @@ onUnmounted(() => {
           v-if="isOwner"
           type="button"
           class="banner-edit-btn"
-          @click="showCoverCropper = true"
-          title="Editar foto de capa (16:9 panorâmico)"
+          @click.stop="showCoverCropper = true"
+          title="Editar banner do evento"
         >
-          📷 [ Alterar foto de capa ]
+          📷 [ Editar banner ]
         </button>
       </div>
 
@@ -575,9 +588,9 @@ onUnmounted(() => {
     <!-- Cover Cropper Modal -->
     <ImageCropper
       v-model="showCoverCropper"
-      :aspectRatio="16 / 9"
-      title="Editar Foto de Capa do Evento"
-      formatNote="Formato retangular recomendado (16:9 panorâmico)"
+      :aspectRatio="3 / 1"
+      title="Editar Banner do Evento"
+      formatNote="Formato retangular recomendado (corte panorâmico)"
       @cropped="handleCoverCropped"
     />
 
@@ -726,11 +739,21 @@ onUnmounted(() => {
 .banner-cover-box {
   position: relative;
   width: 100%;
-  height: 240px;
+  height: 180px;
   background-color: var(--color-primary-100, #faede0);
   border: 2px solid var(--color-border, #d8cdc5);
   border-radius: 2px;
   overflow: hidden;
+}
+
+@media (min-width: 640px) {
+  .banner-cover-box {
+    height: 220px;
+  }
+}
+
+.clickable-banner {
+  cursor: zoom-in;
 }
 
 .banner-img {
@@ -751,22 +774,24 @@ onUnmounted(() => {
 
 .banner-edit-btn {
   position: absolute;
-  bottom: 10px;
-  right: 10px;
-  background-color: rgba(0, 0, 0, 0.75);
+  top: 0.75rem;
+  right: 0.75rem;
+  background-color: rgba(0, 0, 0, 0.6);
   color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  padding: 0.35rem 0.65rem;
   font-family: var(--font-heading, 'Space Mono', monospace);
   font-size: 0.75rem;
   font-weight: bold;
-  padding: 0.35rem 0.65rem;
   border-radius: 2px;
   cursor: pointer;
+  backdrop-filter: blur(4px);
   transition: all 0.15s ease;
-  backdrop-filter: blur(2px);
+  z-index: 2;
 }
+
 .banner-edit-btn:hover {
-  background-color: var(--color-primary, #a66130);
+  background-color: rgba(0, 0, 0, 0.85);
   border-color: #ffffff;
 }
 

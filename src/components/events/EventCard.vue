@@ -285,9 +285,9 @@ async function confirmDeleteEvent() {
     <!-- Cover Cropper Modal -->
     <ImageCropper
       v-model="showCoverCropper"
-      :aspectRatio="16 / 9"
-      title="Editar Foto de Capa do Evento"
-      formatNote="Formato retangular recomendado (16:9 panorâmico)"
+      :aspectRatio="3 / 1"
+      title="Editar Banner do Evento"
+      formatNote="Formato retangular recomendado (corte panorâmico)"
       @cropped="handleCoverCropped"
     />
 

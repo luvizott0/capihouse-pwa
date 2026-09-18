@@ -62,3 +62,8 @@ export function updateGroupMessage(groupId: number, messageId: number, content: 
 export function deleteGroupMessage(groupId: number, messageId: number) {
   return apiClient.delete<GroupMessage>(`/groups/${groupId}/messages/${messageId}`)
 }
+
+export function markGroupAsRead(groupId: number) {
+  return apiClient.post<{ message: string; unread_messages_count: number }>(`/groups/${groupId}/read`)
+}
+

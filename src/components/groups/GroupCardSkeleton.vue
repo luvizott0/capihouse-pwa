@@ -15,13 +15,13 @@
         <div class="skeleton-line skeleton-badge shimmer"></div>
       </div>
 
-      <!-- Description lines -->
-      <div class="skeleton-line skeleton-desc-line1 shimmer"></div>
-      <div class="skeleton-line skeleton-desc-line2 shimmer"></div>
-
-      <!-- Footer (members count & action link) -->
-      <div class="skeleton-footer">
+      <!-- Meta row -->
+      <div class="skeleton-meta-row">
         <div class="skeleton-line skeleton-members shimmer"></div>
+      </div>
+
+      <!-- Footer action link -->
+      <div class="skeleton-footer">
         <div class="skeleton-line skeleton-link shimmer"></div>
       </div>
     </div>
@@ -31,7 +31,10 @@
 <style scoped>
 .skeleton-group-card {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.75rem;
   background-color: #ffffff;
   border: 1px solid var(--color-border, #D8CDC5);
   border-radius: 2px;
@@ -39,16 +42,26 @@
 }
 
 .skeleton-photo-box {
-  width: 100%;
-  height: 120px;
+  width: 76px;
+  height: 76px;
+  min-width: 76px;
+  min-height: 76px;
+  border-radius: 2px;
+  flex-shrink: 0;
 }
 
 .skeleton-info {
-  padding: 0.85rem;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 0.5rem;
   flex: 1;
+  min-width: 0;
+}
+
+.skeleton-meta-row {
+  display: flex;
+  align-items: center;
 }
 
 .skeleton-title-row {

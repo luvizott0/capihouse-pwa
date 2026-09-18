@@ -8,6 +8,7 @@ import RetroModal from '@/components/ui/RetroModal.vue'
 import RetroButton from '@/components/ui/RetroButton.vue'
 import RetroInput from '@/components/ui/RetroInput.vue'
 import UserAvatar from '@/components/ui/UserAvatar.vue'
+import ImageCropper from '@/components/profile/ImageCropper.vue'
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{ (e: 'update:modelValue', value: boolean): void; (e: 'created'): void }>()
@@ -19,8 +20,10 @@ const name = ref('')
 const description = ref('')
 const eventDate = ref('')
 const eventTime = ref('')
-const selectedImage = ref<File | null>(null)
+const selectedBlob = ref<Blob | null>(null)
 const imagePreview = ref<string | null>(null)
+const showCropper = ref(false)
+const initialCropperImage = ref<string | null>(null)
 const selectedGuestIds = ref<number[]>([])
 const guestSearch = ref('')
 const availableUsers = ref<User[]>([])
@@ -67,14 +70,22 @@ function handleImageSelect(e: Event) {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
   if (file) {
-    selectedImage.value = file
-    imagePreview.value = URL.createObjectURL(file)
+    initialCropperImage.value = URL.createObjectURL(file)
+    showCropper.value = true
+    input.value = ''
   }
 }
 
+function handleImageCropped(blob: Blob) {
+  selectedBlob.value = blob
+  imagePreview.value = URL.createObjectURL(blob)
+  showCropper.value = false
+}
+
 function removeImage() {
-  selectedImage.value = null
+  selectedBlob.value = null
   imagePreview.value = null
+  initialCropperImage.value = null
 }
 
 async function handleSubmit() {
@@ -90,8 +101,8 @@ async function handleSubmit() {
   formData.append('name', name.value.trim())
   formData.append('description', description.value.trim())
   formData.append('date', combinedDateTime)
-  if (selectedImage.value) {
-    formData.append('image', selectedImage.value)
+  if (selectedBlob.value) {
+    formData.append('image', selectedBlob.value, 'event-banner.webp')
   }
 
   selectedGuestIds.value.forEach(id => {
@@ -104,8 +115,9 @@ async function handleSubmit() {
     description.value = ''
     eventDate.value = ''
     eventTime.value = ''
-    selectedImage.value = null
+    selectedBlob.value = null
     imagePreview.value = null
+    initialCropperImage.value = null
     selectedGuestIds.value = []
     guestSearch.value = ''
     emit('created')
@@ -155,10 +167,15 @@ function handleClose() {
       <!-- Image upload -->
       <div class="form-group">
         <label class="form-label">
-          Foto de Capa
-          <span class="muted-note">(formato retangular recomendado)</span>
+          Foto de Capa (Banner)
+          <span class="muted-note">(formato retangular 3:1 recomendado)</span>
         </label>
-        <input type="file" accept="image/*" @change="handleImageSelect" class="retro-field" />
+        <div class="photo-upload-row">
+          <label class="upload-btn">
+            <input type="file" accept="image/*" @change="handleImageSelect" class="hidden-input" />
+            📷 {{ imagePreview ? '[ Alterar Foto de Capa ]' : '[ Escolher Foto de Capa ]' }}
+          </label>
+        </div>
         <div v-if="imagePreview" class="preview-box">
           <img :src="imagePreview" alt="Capa do evento" class="preview-img" />
           <button type="button" class="remove-preview-btn" @click="removeImage" title="Remover foto">
@@ -222,9 +239,83 @@ function handleClose() {
       </div>
     </div>
   </RetroModal>
+
+  <!-- Cover Cropper Modal -->
+  <ImageCropper
+    v-model="showCropper"
+    :aspectRatio="3 / 1"
+    title="Editar Banner do Evento"
+    formatNote="Formato retangular recomendado (corte panorâmico)"
+    :initialImage="initialCropperImage"
+    @cropped="handleImageCropped"
+  />
 </template>
 
 <style scoped>
+.photo-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.upload-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background-color: var(--color-primary-50, #f8f6f1);
+  border: 1px dashed var(--color-primary-300, #c4884e);
+  color: var(--color-primary-800, #5f4120);
+  padding: 0.45rem 0.85rem;
+  border-radius: 2px;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.8rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.upload-btn:hover {
+  background-color: var(--color-primary-100, #faede0);
+  border-color: var(--color-primary, #a66130);
+}
+
+.hidden-input {
+  display: none;
+}
+
+.preview-box {
+  margin-top: 0.5rem;
+  position: relative;
+  width: 100%;
+  height: 110px;
+  border: 1px solid var(--color-border);
+  border-radius: 2px;
+  overflow: hidden;
+  background-color: var(--color-primary-100, #faede0);
+}
+
+.preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.remove-preview-btn {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  font-family: var(--font-heading);
+  font-size: 0.7rem;
+  padding: 0.2rem 0.4rem;
+  border-radius: 2px;
+  cursor: pointer;
+}
+.remove-preview-btn:hover {
+  background: rgba(0, 0, 0, 0.9);
+}
+
 .event-create-form {
   display: flex;
   flex-direction: column;

@@ -9,6 +9,7 @@ import axios from 'axios'
 import RetroModal from '@/components/ui/RetroModal.vue'
 import RetroButton from '@/components/ui/RetroButton.vue'
 import UserAvatar from '@/components/ui/UserAvatar.vue'
+import ImageCropper from '@/components/profile/ImageCropper.vue'
 
 defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{ (e: 'update:modelValue', val: boolean): void; (e: 'created'): void }>()
@@ -19,8 +20,10 @@ const authStore = useAuthStore()
 
 const name = ref('')
 const description = ref('')
-const photoFile = ref<File | null>(null)
+const photoBlob = ref<Blob | null>(null)
 const photoPreview = ref<string | null>(null)
+const showCropper = ref(false)
+const initialCropperImage = ref<string | null>(null)
 const errorMsg = ref('')
 const isSubmitting = ref(false)
 
@@ -50,13 +53,21 @@ function handlePhotoChange(e: Event) {
   const input = e.target as HTMLInputElement
   if (!input.files || !input.files[0]) return
   const file = input.files[0]
-  photoFile.value = file
-  photoPreview.value = URL.createObjectURL(file)
+  initialCropperImage.value = URL.createObjectURL(file)
+  showCropper.value = true
+  input.value = ''
+}
+
+function handlePhotoCropped(blob: Blob) {
+  photoBlob.value = blob
+  photoPreview.value = URL.createObjectURL(blob)
+  showCropper.value = false
 }
 
 function removePhoto() {
-  photoFile.value = null
+  photoBlob.value = null
   photoPreview.value = null
+  initialCropperImage.value = null
 }
 
 function toggleUserInvite(userId: number) {
@@ -81,8 +92,8 @@ async function handleCreate() {
   if (description.value.trim()) {
     formData.append('description', description.value.trim())
   }
-  if (photoFile.value) {
-    formData.append('photo', photoFile.value)
+  if (photoBlob.value) {
+    formData.append('photo', photoBlob.value, 'group-photo.webp')
   }
   selectedUserIds.value.forEach(id => {
     formData.append('invites[]', id.toString())
@@ -93,8 +104,9 @@ async function handleCreate() {
     // Reset form
     name.value = ''
     description.value = ''
-    photoFile.value = null
+    photoBlob.value = null
     photoPreview.value = null
+    initialCropperImage.value = null
     selectedUserIds.value = []
     emit('created')
     emit('update:modelValue', false)
@@ -149,17 +161,17 @@ function handleClose() {
       <!-- Group Photo Upload -->
       <div class="form-group">
         <label class="field-label">
-          Foto de Capa do Grupo
-          <span class="muted-note">(formato retangular recomendado)</span>
+          Foto do Grupo
+          <span class="muted-note">(formato quadrado 1:1)</span>
         </label>
         <div class="photo-upload-row">
           <div v-if="photoPreview" class="photo-preview-box">
             <img :src="photoPreview" alt="Foto do grupo" class="preview-img" />
-            <button type="button" class="remove-photo-btn" @click="removePhoto">×</button>
+            <button type="button" class="remove-photo-btn" @click="removePhoto" title="Remover foto">×</button>
           </div>
           <label class="upload-btn">
             <input type="file" accept="image/*" class="hidden-input" @change="handlePhotoChange" />
-            📷 [ Escolher Foto ]
+            📷 {{ photoPreview ? '[ Alterar Foto ]' : '[ Escolher Foto ]' }}
           </label>
         </div>
       </div>
@@ -210,6 +222,16 @@ function handleClose() {
       </div>
     </div>
   </RetroModal>
+
+  <!-- Image Cropper Modal for Group Photo -->
+  <ImageCropper
+    v-model="showCropper"
+    :aspectRatio="1"
+    title="Editar Foto do Grupo"
+    formatNote="Formato quadrado (1:1)"
+    :initialImage="initialCropperImage"
+    @cropped="handlePhotoCropped"
+  />
 </template>
 
 <style scoped>

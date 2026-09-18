@@ -11,6 +11,7 @@ import RetroConfirmModal from '@/components/ui/RetroConfirmModal.vue'
 import RetroModal from '@/components/ui/RetroModal.vue'
 import GroupInviteModal from '@/components/groups/GroupInviteModal.vue'
 import ImageCropper from '@/components/profile/ImageCropper.vue'
+import { useImageViewerStore } from '@/stores/imageViewer'
 
 import type { GroupMessage } from '@/types/models'
 
@@ -18,6 +19,7 @@ const route = useRoute()
 const router = useRouter()
 const groupsStore = useGroupsStore()
 const authStore = useAuthStore()
+const imageViewer = useImageViewerStore()
 
 const groupId = Number(route.params.id)
 const messageInput = ref('')
@@ -93,6 +95,12 @@ async function handleConfirmDeleteMessage() {
   }
 }
 
+function openGroupPhoto() {
+  if (groupsStore.currentGroup?.image_url) {
+    imageViewer.openImage(groupsStore.currentGroup.image_url, groupsStore.currentGroup.name, 'Foto do Grupo')
+  }
+}
+
 async function handleCoverCropped(blob: Blob) {
   try {
     await groupsStore.updateGroupCover(groupId, blob)
@@ -100,7 +108,7 @@ async function handleCoverCropped(blob: Blob) {
     if (axios.isAxiosError(err) && err.response?.data?.message) {
       errorMsg.value = err.response.data.message
     } else {
-      errorMsg.value = 'Erro ao atualizar foto de capa do grupo.'
+      errorMsg.value = 'Erro ao atualizar foto do grupo.'
     }
   }
 }
@@ -124,6 +132,7 @@ async function loadGroupData() {
     await groupsStore.fetchGroup(groupId)
     if (groupsStore.currentGroup?.is_member || authStore.isAdmin) {
       await groupsStore.fetchMessages(groupId)
+      await groupsStore.markGroupAsRead(groupId)
       await scrollToBottom()
     }
   } catch (err: unknown) {
@@ -210,32 +219,35 @@ async function openMembersModal() {
 
     <!-- Group Header Card -->
     <div v-if="groupsStore.currentGroup" class="retro-card group-header-card">
-      <!-- Top Cover Banner -->
-      <div
-        class="group-cover-banner"
-        :style="groupsStore.currentGroup.image_url ? { backgroundImage: `url(${groupsStore.currentGroup.image_url})` } : {}"
-      >
-        <button
-          v-if="isOwnerOrAdmin"
-          type="button"
-          class="group-banner-edit-btn"
-          @click.stop="showCoverCropper = true"
-          title="Editar foto de capa (formato retangular)"
-        >
-          📷 [ Editar capa ]
-        </button>
-      </div>
-
-      <div class="group-banner-row">
-        <!-- Photo -->
-        <div class="group-photo-large">
-          <img
-            v-if="groupsStore.currentGroup.image_url"
-            :src="groupsStore.currentGroup.image_url"
-            :alt="groupsStore.currentGroup.name"
-            class="photo-img"
-          />
-          <span v-else class="photo-fallback">👥</span>
+      <div class="group-header-row">
+        <!-- Square Photo (1:1) -->
+        <div class="group-photo-wrapper">
+          <div
+            class="group-photo-square"
+            :class="{ 'clickable-photo': !!groupsStore.currentGroup.image_url }"
+            :title="groupsStore.currentGroup.image_url ? 'Clique para ampliar a foto do grupo' : ''"
+            @click="openGroupPhoto"
+          >
+            <img
+              v-if="groupsStore.currentGroup.image_url"
+              :src="groupsStore.currentGroup.image_url"
+              :alt="groupsStore.currentGroup.name"
+              class="photo-img"
+            />
+            <span v-else class="photo-fallback">👥</span>
+            <div v-if="groupsStore.currentGroup.image_url" class="photo-zoom-badge" title="Ampliar">
+              🔍
+            </div>
+          </div>
+          <button
+            v-if="isOwnerOrAdmin"
+            type="button"
+            class="group-photo-edit-btn"
+            @click.stop="showCoverCropper = true"
+            title="Editar foto do grupo"
+          >
+            ✏️
+          </button>
         </div>
 
         <!-- Info -->
@@ -486,12 +498,12 @@ async function openMembersModal() {
       </div>
     </RetroModal>
 
-    <!-- Cover Cropper Modal -->
+    <!-- Group Photo Cropper Modal -->
     <ImageCropper
       v-model="showCoverCropper"
-      :aspectRatio="3 / 1"
-      title="Editar Foto de Capa do Grupo"
-      formatNote="Formato retangular recomendado (3:1 panorâmico)"
+      :aspectRatio="1"
+      title="Editar Foto do Grupo"
+      formatNote="Formato quadrado (1:1)"
       @cropped="handleCoverCropped"
     />
 
@@ -525,73 +537,87 @@ async function openMembersModal() {
 }
 
 .group-header-card {
-  padding: 0;
+  padding: 1.25rem;
   background-color: #ffffff;
-  overflow: hidden;
-}
-
-.group-cover-banner {
-  position: relative;
-  width: 100%;
-  height: 140px;
-  background: linear-gradient(90deg, #d6bda2 0%, #e8d3bc 100%);
-  background-size: cover;
-  background-position: center;
-  border-bottom: 2px solid var(--color-border);
-}
-
-.group-banner-edit-btn {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  font-family: var(--font-heading);
-  font-size: 0.75rem;
-  font-weight: bold;
-  background-color: rgba(255, 255, 255, 0.92);
-  border: 1px solid var(--color-border);
-  color: var(--color-primary-800);
-  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--color-border, #d8cdc5);
   border-radius: 2px;
-  cursor: pointer;
-  z-index: 2;
-  transition: all 0.15s ease;
-}
-.group-banner-edit-btn:hover {
-  background-color: #ffffff;
-  color: var(--color-primary);
 }
 
-.group-banner-row {
+.group-header-row {
   display: flex;
   align-items: flex-start;
   gap: 1.25rem;
   flex-wrap: wrap;
-  padding: 1.25rem;
 }
 
-.group-photo-large {
-  width: 90px;
-  height: 90px;
-  border: 3px solid #ffffff;
+.group-photo-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.group-photo-square {
+  width: 96px;
+  height: 96px;
+  border: 2px solid var(--color-border, #d8cdc5);
   border-radius: 2px;
   overflow: hidden;
-  background-color: var(--color-primary-100);
+  background-color: var(--color-primary-100, #faede0);
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
-  margin-top: -45px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   position: relative;
-  z-index: 1;
 }
+
+.clickable-photo {
+  cursor: zoom-in;
+}
+
+.photo-zoom-badge {
+  position: absolute;
+  bottom: 3px;
+  left: 3px;
+  font-size: 0.75rem;
+  background-color: rgba(255, 255, 255, 0.85);
+  border-radius: 2px;
+  padding: 1px 3px;
+  pointer-events: none;
+}
+
+.group-photo-edit-btn {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  width: 28px;
+  height: 28px;
+  background-color: #ffffff;
+  border: 1px solid var(--color-border, #d8cdc5);
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  transition: all 0.15s ease;
+  z-index: 2;
+}
+
+.group-photo-edit-btn:hover {
+  background-color: var(--color-primary-50, #faede0);
+  border-color: var(--color-primary, #a66130);
+  transform: scale(1.05);
+}
+
 .photo-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
+
 .photo-fallback {
   font-size: 2.5rem;
+  opacity: 0.55;
 }
 
 .group-header-info {

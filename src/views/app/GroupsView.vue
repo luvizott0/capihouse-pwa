@@ -148,6 +148,7 @@ function onGroupCreated() {
         :key="group.id"
         :to="`/groups/${group.id}`"
         class="group-card"
+        :class="{ 'has-unread': (group.unread_messages_count ?? 0) > 0 }"
       >
         <div class="group-photo-box">
           <img
@@ -161,15 +162,20 @@ function onGroupCreated() {
 
         <div class="group-info">
           <div class="group-title-row">
-            <span class="group-name">{{ group.name }}</span>
+            <span class="group-name" :title="group.name">{{ group.name }}</span>
             <span v-if="group.my_role === 'owner'" class="group-role-badge">[ Dono ]</span>
             <span v-else class="group-role-badge">[ Membro ]</span>
           </div>
 
-          <p class="group-desc">{{ group.description || 'Sem descrição.' }}</p>
+          <div class="group-meta-row">
+            <span class="members-count">👥 {{ group.members_count }} {{ group.members_count === 1 ? 'membro' : 'membros' }}</span>
+            <span v-if="(group.unread_messages_count ?? 0) > 0" class="unread-indicator-badge">
+              <span class="unread-dot">●</span>
+              {{ group.unread_messages_count }} {{ group.unread_messages_count === 1 ? 'nova' : 'novas' }}
+            </span>
+          </div>
 
           <div class="group-footer">
-            <span class="members-count">👥 {{ group.members_count }} {{ group.members_count === 1 ? 'membro' : 'membros' }}</span>
             <span class="open-group-link">Entrar no grupo &raquo;</span>
           </div>
         </div>
@@ -352,15 +358,18 @@ function onGroupCreated() {
 
 .groups-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 0.85rem;
 }
 
 .group-card {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.75rem;
   background-color: #ffffff;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border, #d8cdc5);
   border-radius: 2px;
   overflow: hidden;
   text-decoration: none;
@@ -371,17 +380,28 @@ function onGroupCreated() {
 .group-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(62, 39, 35, 0.08);
-  border-color: var(--color-primary);
+  border-color: var(--color-primary, #a66130);
+}
+
+.group-card.has-unread {
+  border-color: var(--color-primary, #a66130);
+  background-color: #fdfaf7;
+  box-shadow: 0 1px 4px rgba(166, 97, 48, 0.12);
 }
 
 .group-photo-box {
-  width: 100%;
-  height: 120px;
-  background-color: var(--color-primary-100);
+  width: 76px;
+  height: 76px;
+  min-width: 76px;
+  min-height: 76px;
+  background-color: var(--color-primary-100, #faede0);
+  border: 1px solid var(--color-border, #d8cdc5);
+  border-radius: 2px;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .group-photo-img {
@@ -391,16 +411,17 @@ function onGroupCreated() {
 }
 
 .group-photo-fallback {
-  font-size: 2.5rem;
-  opacity: 0.5;
+  font-size: 2rem;
+  opacity: 0.55;
 }
 
 .group-info {
-  padding: 0.85rem;
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  justify-content: center;
+  gap: 0.35rem;
   flex: 1;
+  min-width: 0;
 }
 
 .group-title-row {
@@ -426,35 +447,55 @@ function onGroupCreated() {
   font-weight: bold;
   color: var(--color-primary);
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
-.group-desc {
-  font-size: 0.8rem;
-  color: var(--color-muted);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  line-height: 1.3;
-}
-
-.group-footer {
+.group-meta-row {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  font-size: 0.75rem;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.78rem;
   font-family: var(--font-heading);
-  padding-top: 0.25rem;
-  border-top: 1px solid var(--color-primary-50);
 }
 
 .members-count {
   color: var(--color-muted);
 }
 
+.unread-indicator-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background-color: #fbeee4;
+  color: #7c2d12;
+  border: 1px solid #ea580c;
+  border-radius: 2px;
+  padding: 0.15rem 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-family: var(--font-heading);
+}
+
+.unread-dot {
+  color: #ea580c;
+  font-size: 0.65rem;
+}
+
+.group-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  font-size: 0.75rem;
+  font-family: var(--font-heading);
+  padding-top: 0.2rem;
+  border-top: 1px dashed var(--color-primary-50, #f8f6f1);
+}
+
 .open-group-link {
   color: var(--color-primary);
   font-weight: bold;
+  font-size: 0.75rem;
 }
 
 .empty-groups-box {

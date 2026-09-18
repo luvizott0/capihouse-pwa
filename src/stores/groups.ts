@@ -227,6 +227,21 @@ export const useGroupsStore = defineStore('groups', () => {
     echo.leave(`group.${groupId}`)
   }
 
+  async function markGroupAsRead(groupId: number) {
+    const groupInList = myGroups.value.find(g => g.id === groupId)
+    if (groupInList) {
+      groupInList.unread_messages_count = 0
+    }
+    if (currentGroup.value?.id === groupId) {
+      currentGroup.value.unread_messages_count = 0
+    }
+    try {
+      await groupsApi.markGroupAsRead(groupId)
+    } catch (err) {
+      console.error('Erro ao marcar grupo como lido:', err)
+    }
+  }
+
   return {
     myGroups,
     currentGroup,
@@ -250,6 +265,7 @@ export const useGroupsStore = defineStore('groups', () => {
     deleteMessage,
     fetchMembers,
     updateGroupCover,
+    markGroupAsRead,
     subscribeToGroupChat,
     unsubscribeFromGroupChat,
   }

@@ -120,6 +120,7 @@ export interface Group {
   membership_status: 'pending' | 'accepted' | 'declined' | null
   my_role: 'owner' | 'admin' | 'member' | null
   accepted_members?: User[]
+  unread_messages_count?: number
   created_at: string
 }
 
