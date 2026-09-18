@@ -44,7 +44,34 @@ const isOwnerOrAdmin = computed(() => {
   return groupsStore.currentGroup?.my_role === 'owner' || authStore.isAdmin
 })
 
+// Message options menu (3-dots)
+const activeMessageMenuId = ref<number | null>(null)
+
+function toggleMessageMenu(msgId: number) {
+  if (activeMessageMenuId.value === msgId) {
+    activeMessageMenuId.value = null
+  } else {
+    activeMessageMenuId.value = msgId
+  }
+}
+
+function handleDocumentClick(e: MouseEvent) {
+  const target = e.target as HTMLElement | null
+  if (target && !target.closest('.message-menu-wrapper')) {
+    activeMessageMenuId.value = null
+  }
+}
+
+function canEditMessage(msg: GroupMessage) {
+  return msg.user_id === authStore.user?.id && !msg.is_deleted && !msg.deleted_at
+}
+
+function canDeleteMessage(msg: GroupMessage) {
+  return !msg.is_deleted && !msg.deleted_at && (msg.user_id === authStore.user?.id || isOwnerOrAdmin.value)
+}
+
 function startEditMessage(msg: GroupMessage) {
+  activeMessageMenuId.value = null
   editingMessageId.value = msg.id
   editingContent.value = msg.content
 }
@@ -73,6 +100,7 @@ async function saveEditMessage() {
 }
 
 function promptDeleteMessage(msg: GroupMessage) {
+  activeMessageMenuId.value = null
   messageToDelete.value = msg
   showDeleteMessageModal.value = true
 }
@@ -114,6 +142,7 @@ async function handleCoverCropped(blob: Blob) {
 }
 
 onMounted(async () => {
+  document.addEventListener('click', handleDocumentClick)
   await loadGroupData()
 
   // Subscribe to real-time group chat messages via WebSocket
@@ -123,6 +152,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  document.removeEventListener('click', handleDocumentClick)
   groupsStore.unsubscribeFromGroupChat(groupId)
 })
 
@@ -358,26 +388,40 @@ async function openMembersModal() {
                 <div class="message-meta-right">
                   <span class="message-time">{{ formatRelativeTime(msg.created_at) }}</span>
                   <div
-                    v-if="!msg.is_deleted && !msg.deleted_at && (msg.user_id === authStore.user?.id || isOwnerOrAdmin)"
-                    class="message-actions"
+                    v-if="editingMessageId !== msg.id && (canEditMessage(msg) || canDeleteMessage(msg))"
+                    class="message-menu-wrapper"
                   >
                     <button
-                      v-if="msg.user_id === authStore.user?.id && editingMessageId !== msg.id"
                       type="button"
-                      class="msg-action-btn"
-                      title="Editar mensagem"
-                      @click="startEditMessage(msg)"
+                      class="message-menu-trigger"
+                      title="Mais opções"
+                      aria-label="Mais opções"
+                      @click.stop="toggleMessageMenu(msg.id)"
                     >
-                      ✏️
+                      ⋮
                     </button>
-                    <button
-                      type="button"
-                      class="msg-action-btn delete-btn"
-                      title="Excluir mensagem"
-                      @click="promptDeleteMessage(msg)"
+                    <div
+                      v-if="activeMessageMenuId === msg.id"
+                      class="message-dropdown-menu"
+                      @click.stop
                     >
-                      🗑️
-                    </button>
+                      <button
+                        v-if="canEditMessage(msg)"
+                        type="button"
+                        class="message-menu-item edit-item"
+                        @click="startEditMessage(msg)"
+                      >
+                        <span class="item-icon">✎</span> Editar
+                      </button>
+                      <button
+                        v-if="canDeleteMessage(msg)"
+                        type="button"
+                        class="message-menu-item delete-item"
+                        @click="promptDeleteMessage(msg)"
+                      >
+                        <span class="item-icon">×</span> Excluir
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -834,31 +878,83 @@ async function openMembersModal() {
   gap: 0.4rem;
 }
 
-.message-actions {
+.message-menu-wrapper {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 0.15rem;
-  opacity: 0.6;
-  transition: opacity 0.15s ease;
-}
-.message-item:hover .message-actions {
-  opacity: 1;
 }
 
-.msg-action-btn {
+.message-menu-trigger {
   background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0.1rem 0.2rem;
-  font-size: 0.72rem;
+  border: 1px solid transparent;
+  font-size: 1rem;
+  font-weight: bold;
   line-height: 1;
+  color: var(--color-muted, #847062);
+  cursor: pointer;
+  padding: 0;
   border-radius: 2px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 18px;
+  height: 18px;
+  transition: all 0.15s ease;
 }
-.msg-action-btn:hover {
-  background-color: rgba(0, 0, 0, 0.08);
+.message-menu-trigger:hover {
+  color: var(--color-primary-800, #5f4120);
+  background-color: var(--color-primary-50, #f8f6f1);
+  border-color: var(--color-border, #d8cdc5);
+}
+
+.message-dropdown-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 2px);
+  background: #ffffff;
+  border: 1px solid var(--color-border, #d8cdc5);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.14);
+  border-radius: 2px;
+  z-index: 30;
+  min-width: 90px;
+  display: flex;
+  flex-direction: column;
+  padding: 0.2rem 0;
+}
+
+.message-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.55rem;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.72rem;
+  font-weight: bold;
+  background: none;
+  border: none;
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.1s ease;
+}
+.message-menu-item .item-icon {
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.message-menu-item.edit-item {
+  color: var(--color-primary-800, #7d5628);
+}
+.message-menu-item.edit-item:hover {
+  background-color: var(--color-primary-50, #fdf8f3);
+}
+
+.message-menu-item.delete-item {
+  color: var(--color-danger, #ef4444);
+}
+.message-menu-item.delete-item:hover {
+  background-color: #fee2e2;
 }
 
 .message-edit-box {
