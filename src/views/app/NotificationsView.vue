@@ -170,6 +170,7 @@ async function handleItemClick(item: AppNotification) {
               <span v-else-if="item.type === 'post_comment' || item.type === 'comment_reply'" class="type-icon">💬</span>
               <span v-else-if="item.type === 'post_mention' || item.type === 'comment_mention'" class="type-icon">🏷️</span>
               <span v-else-if="item.type === 'event_rsvp'" class="type-icon">📅</span>
+              <span v-else-if="item.type === 'birthday_post'" class="type-icon">🎂</span>
               <span v-else class="type-icon">🔔</span>
             </div>
 

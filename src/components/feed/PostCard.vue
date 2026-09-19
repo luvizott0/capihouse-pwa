@@ -47,6 +47,14 @@ const isRecapPost = computed(() => {
   )
 })
 
+const isBirthdayPost = computed(() => {
+  return (
+    props.post.user?.username === 'capivara.rogeria' &&
+    (props.post.content?.includes('#AniversarioCapiHouse') ||
+      props.post.hashtags?.some((h) => h.name.toLowerCase() === 'aniversariocapihouse'))
+  )
+})
+
 // Comment permissions
 function canEditComment(comment: PostComment) {
   return authStore.user?.id === comment.user_id || authStore.isAdmin
@@ -419,6 +427,9 @@ async function confirmDeletePost() {
             <span class="author-handle">@{{ post.user.username }}</span>
             <span v-if="isRecapPost" class="recap-badge" title="Recap Mensal de Sentimentos da Rogéria">
               🐾 Recap Mensal
+            </span>
+            <span v-if="isBirthdayPost" class="birthday-badge" title="Parabéns da Capivara Rogéria">
+              🎂 Aniversário
             </span>
           </div>
           <div class="post-sub-line">
@@ -976,6 +987,29 @@ async function confirmDeletePost() {
   background-color: #78350f;
   color: #fef3c7;
   border-color: #b45309;
+}
+
+.birthday-badge {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.1rem 0.45rem;
+  border-radius: 4px;
+  background-color: #fce7f3;
+  color: #9d174d;
+  border: 1px solid #f472b6;
+  margin-left: 0.4rem;
+  vertical-align: middle;
+  letter-spacing: -0.01em;
+}
+
+:deep([data-theme='dark']) .birthday-badge,
+:global([data-theme='dark']) .birthday-badge {
+  background-color: #831843;
+  color: #fce7f3;
+  border-color: #db2777;
 }
 
 .recap-action-banner {
