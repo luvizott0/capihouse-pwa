@@ -7,6 +7,8 @@ import { useImageViewerStore } from '@/stores/imageViewer'
 import UserAvatar from '@/components/ui/UserAvatar.vue'
 import RetroConfirmModal from '@/components/ui/RetroConfirmModal.vue'
 import PostEditModal from './PostEditModal.vue'
+import RecapCardModal from './RecapCardModal.vue'
+import RecapFeedCard from './RecapFeedCard.vue'
 import FormattedContent from '@/components/ui/FormattedContent.vue'
 import MentionInput from '@/components/ui/MentionInput.vue'
 import { formatRelativeTime } from '@/utils/date'
@@ -34,7 +36,16 @@ const showComments = ref(props.defaultShowComments)
 const commentContent = ref('')
 const isSubmittingComment = ref(false)
 const showEditModal = ref(false)
+const showRecapModal = ref(false)
 const isAuthor = authStore.user?.id === props.post.user_id || authStore.isAdmin
+
+const isRecapPost = computed(() => {
+  return (
+    props.post.user?.username === 'capivara.rogeria' &&
+    (props.post.content?.includes('#RecapRogeria') ||
+      props.post.hashtags?.some((h) => h.name.toLowerCase() === 'recaprogeria'))
+  )
+})
 
 // Comment permissions
 function canEditComment(comment: PostComment) {
@@ -406,6 +417,9 @@ async function confirmDeletePost() {
               {{ post.user.name }}
             </router-link>
             <span class="author-handle">@{{ post.user.username }}</span>
+            <span v-if="isRecapPost" class="recap-badge" title="Recap Mensal de Sentimentos da Rogéria">
+              🐾 Recap Mensal
+            </span>
           </div>
           <div class="post-sub-line">
             <span class="post-time">{{ formatRelativeTime(post.created_at) }}</span>
@@ -437,9 +451,26 @@ async function confirmDeletePost() {
       </div>
     </div>
 
-    <!-- Post Content -->
-    <div v-if="post.content" class="post-body">
-      <FormattedContent :content="post.content" />
+    <!-- Post Content: Card Visual se for Recap, ou texto formatado padrão -->
+    <div v-if="post.content" class="post-body" :class="{ 'recap-body': isRecapPost }">
+      <RecapFeedCard v-if="isRecapPost" :post="post" />
+      <FormattedContent v-else :content="post.content" />
+    </div>
+
+    <!-- Recap Card Action Trigger -->
+    <div v-if="isRecapPost" class="recap-action-banner">
+      <button
+        type="button"
+        class="recap-card-btn"
+        @click="showRecapModal = true"
+      >
+        <span class="recap-card-btn-icon">🖼️</span>
+        <div class="recap-card-btn-content">
+          <span class="recap-card-btn-title">Salvar ou Compartilhar Card</span>
+          <span class="recap-card-btn-subtitle">Baixar imagem em alta definição ou compartilhar nos Stories</span>
+        </div>
+        <span class="recap-card-btn-arrow">→</span>
+      </button>
     </div>
 
     <!-- Media Carousel -->
@@ -792,6 +823,13 @@ async function confirmDeletePost() {
       :post="post"
     />
 
+    <!-- Recap Card Modal -->
+    <RecapCardModal
+      v-if="isRecapPost"
+      v-model="showRecapModal"
+      :post="post"
+    />
+
     <!-- Confirm Delete Post Modal -->
     <RetroConfirmModal
       v-model="showDeleteModal"
@@ -917,6 +955,109 @@ async function confirmDeletePost() {
   text-decoration: underline;
 }
 
+.recap-badge {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.1rem 0.45rem;
+  border-radius: 4px;
+  background-color: #fef3c7;
+  color: #92400e;
+  border: 1px solid #f59e0b;
+  margin-left: 0.4rem;
+  vertical-align: middle;
+  letter-spacing: -0.01em;
+}
+
+:deep([data-theme='dark']) .recap-badge,
+:global([data-theme='dark']) .recap-badge {
+  background-color: #78350f;
+  color: #fef3c7;
+  border-color: #b45309;
+}
+
+.recap-action-banner {
+  padding: 0.25rem 1rem 0.75rem;
+}
+
+.recap-card-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border: 1.5px solid #f59e0b;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.recap-card-btn:hover {
+  background: linear-gradient(135deg, #fde68a 0%, #fcd34d 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+}
+
+.recap-card-btn-icon {
+  font-size: 1.4rem;
+  flex-shrink: 0;
+}
+
+.recap-card-btn-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.recap-card-btn-title {
+  font-family: var(--font-heading, monospace);
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #78350f;
+}
+
+.recap-card-btn-subtitle {
+  font-size: 0.75rem;
+  color: #92400e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recap-card-btn-arrow {
+  font-family: var(--font-heading, monospace);
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: #b45309;
+}
+
+:deep([data-theme='dark']) .recap-card-btn,
+:global([data-theme='dark']) .recap-card-btn {
+  background: linear-gradient(135deg, #451a03 0%, #78350f 100%);
+  border-color: #b45309;
+}
+
+:deep([data-theme='dark']) .recap-card-btn-title,
+:global([data-theme='dark']) .recap-card-btn-title {
+  color: #fef3c7;
+}
+
+:deep([data-theme='dark']) .recap-card-btn-subtitle,
+:global([data-theme='dark']) .recap-card-btn-subtitle {
+  color: #fde68a;
+}
+
+:deep([data-theme='dark']) .recap-card-btn-arrow,
+:global([data-theme='dark']) .recap-card-btn-arrow {
+  color: #fbbf24;
+}
+
 .post-header-actions {
   display: flex;
   align-items: center;
@@ -961,6 +1102,17 @@ async function confirmDeletePost() {
   line-height: 1.5;
   white-space: pre-wrap;
   color: #222222;
+}
+
+.post-body.recap-body {
+  padding: 0.5rem 0.75rem 0.25rem;
+  white-space: normal;
+}
+
+@media (max-width: 480px) {
+  .post-body.recap-body {
+    padding: 0.35rem 0.35rem 0.2rem;
+  }
 }
 
 /* Media Carousel */
