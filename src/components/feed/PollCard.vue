@@ -41,11 +41,11 @@ async function openVotersModal() {
   }
 }
 
-const canSeeResults = computed(() => Boolean(props.poll.can_see_results ?? props.poll.has_voted))
+const canSeeResults = computed(() => Boolean(props.poll?.can_see_results ?? props.poll?.has_voted))
 
 async function handleVote(option: PollOption) {
   if (isVoting.value) return
-  if (props.poll.has_voted && props.poll.user_voted_option_id === option.id) {
+  if (props.poll?.has_voted && props.poll?.user_voted_option_id === option.id) {
     return // Já está votado nesta opção
   }
 
@@ -83,12 +83,12 @@ async function handleVote(option: PollOption) {
     <!-- Options List -->
     <div class="poll-options-list">
       <div
-        v-for="option in poll.options"
+        v-for="option in (poll?.options || [])"
         :key="option.id"
         class="poll-option-item"
         :class="{
-          'is-voted-mine': poll.has_voted && poll.user_voted_option_id === option.id,
-          'is-clickable': !isVoting && (!poll.has_voted || poll.user_voted_option_id !== option.id),
+          'is-voted-mine': poll?.has_voted && poll?.user_voted_option_id === option.id,
+          'is-clickable': !isVoting && (!poll?.has_voted || poll?.user_voted_option_id !== option.id),
           'is-submitting': isVoting && votingOptionId === option.id,
         }"
         @click="handleVote(option)"
@@ -104,8 +104,8 @@ async function handleVote(option: PollOption) {
           <!-- Radio or check visual indicator -->
           <div class="option-marker">
             <span v-if="isVoting && votingOptionId === option.id" class="option-spinner">⌛</span>
-            <span v-else-if="poll.has_voted && poll.user_voted_option_id === option.id" class="option-check">✓</span>
-            <span v-else-if="poll.has_voted" class="option-circle">○</span>
+            <span v-else-if="poll?.has_voted && poll?.user_voted_option_id === option.id" class="option-check">✓</span>
+            <span v-else-if="poll?.has_voted" class="option-circle">○</span>
             <span v-else class="option-radio">◎</span>
           </div>
 
@@ -126,7 +126,7 @@ async function handleVote(option: PollOption) {
       <div class="poll-footer-row">
         <template v-if="canSeeResults">
           <span class="total-votes">
-            👥 {{ poll.total_votes ?? 0 }} {{ (poll.total_votes === 1) ? 'voto' : 'votos' }}
+            👥 {{ poll?.total_votes ?? 0 }} {{ (poll?.total_votes === 1) ? 'voto' : 'votos' }}
           </span>
           <button
             v-if="isAuthor"
@@ -146,7 +146,7 @@ async function handleVote(option: PollOption) {
       </div>
 
       <div v-if="canSeeResults" class="poll-hints-row">
-        <span v-if="poll.has_voted" class="poll-change-hint">
+        <span v-if="poll?.has_voted" class="poll-change-hint">
           • Clique em outra opção para alterar seu voto
         </span>
         <span v-else-if="isAuthor" class="poll-change-hint">

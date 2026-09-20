@@ -38,7 +38,7 @@ const commentContent = ref('')
 const isSubmittingComment = ref(false)
 const showEditModal = ref(false)
 const showRecapModal = ref(false)
-const isAuthor = authStore.user?.id === props.post.user_id || authStore.isAdmin
+const isAuthor = computed(() => Boolean((authStore.user?.id && authStore.user.id === props.post.user_id) || authStore.isAdmin))
 
 const isRecapPost = computed(() => {
   return (
