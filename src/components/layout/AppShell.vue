@@ -94,18 +94,31 @@ function onGroupCreated() {
           <Marquee :text="`★ Olá, ${authStore.user?.name || 'Visitante'}! ★ Explore o CapiHouse ★ A rede dos amigos da casa ★`" />
         </div>
 
-        <!-- Notification Bell Icon (Top Right) -->
-        <router-link
-          to="/notifications"
-          class="top-notif-link"
-          title="Notificações"
-          aria-label="Ver notificações"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" class="top-notif-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-          </svg>
-          <span v-if="notificationsStore.unreadCount > 0" class="top-notif-dot"></span>
-        </router-link>
+        <!-- Top Right Actions: Groups & Notifications -->
+        <div class="header-top-actions">
+          <router-link
+            to="/groups"
+            class="top-action-link"
+            title="Grupos"
+            aria-label="Ver grupos"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="top-action-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+          </router-link>
+
+          <router-link
+            to="/notifications"
+            class="top-action-link"
+            title="Notificações"
+            aria-label="Ver notificações"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="top-action-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+            <span v-if="notificationsStore.unreadCount > 0" class="top-notif-dot"></span>
+          </router-link>
+        </div>
       </div>
 
       <!-- Search & Contextual Action Bar -->
@@ -236,6 +249,14 @@ function onGroupCreated() {
   max-width: 70%;
 }
 
+.header-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.top-action-link,
 .top-notif-link {
   position: relative;
   display: flex;
@@ -251,12 +272,14 @@ function onGroupCreated() {
   flex-shrink: 0;
   transition: all 0.15s ease;
 }
+.top-action-link:hover,
 .top-notif-link:hover {
   background-color: var(--color-primary-100, #fdf8f3);
   border-color: var(--color-primary, #a66130);
   color: var(--color-primary);
   text-decoration: none;
 }
+.top-action-icon,
 .top-notif-icon {
   width: 20px;
   height: 20px;

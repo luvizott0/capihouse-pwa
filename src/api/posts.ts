@@ -8,6 +8,8 @@ export interface GetPostsParams {
   search?: string
   date?: string
   userId?: number
+  category?: string
+  entertainmentType?: string
 }
 
 export function getPosts(paramsOrPage: number | GetPostsParams = 1, groupId?: number) {
@@ -22,6 +24,8 @@ export function getPosts(paramsOrPage: number | GetPostsParams = 1, groupId?: nu
     if (paramsOrPage.search) params.search = paramsOrPage.search
     if (paramsOrPage.date) params.date = paramsOrPage.date
     if (paramsOrPage.userId) params.user_id = paramsOrPage.userId
+    if (paramsOrPage.category) params.category = paramsOrPage.category
+    if (paramsOrPage.entertainmentType) params.entertainment_type = paramsOrPage.entertainmentType
   }
   return apiClient.get('/posts', { params })
 }

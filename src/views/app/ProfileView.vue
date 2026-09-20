@@ -13,7 +13,9 @@ import ImageCropper from '@/components/profile/ImageCropper.vue'
 import ThemeCustomizerModal from '@/components/profile/ThemeCustomizerModal.vue'
 import PostCard from '@/components/feed/PostCard.vue'
 import PostCardSkeleton from '@/components/feed/PostCardSkeleton.vue'
-import { formatBirthDate } from '@/utils/date'
+import LetterboxdCard from '@/components/entertainment/LetterboxdCard.vue'
+import { connectLetterboxd, disconnectLetterboxd, syncLetterboxd } from '@/api/letterboxd'
+import { formatBirthDate, formatRelativeTime } from '@/utils/date'
 import { usePwaUpdate } from '@/composables/usePwaUpdate'
 import { useWebPush } from '@/composables/useWebPush'
 import PullToRefreshIndicator from '@/components/ui/PullToRefreshIndicator.vue'
@@ -120,7 +122,7 @@ async function loadProfile() {
     bioInput.value = user.value.bio || ''
     birthInput.value = user.value.birth ? user.value.birth.substring(0, 10) : ''
     // Fetch posts for this user profile (authored posts and tagged posts)
-    await feedStore.fetchUserPosts(user.value.id)
+    await feedStore.fetchUserPosts(user.value.id, 1, profilePostTab.value)
   }
 }
 
@@ -290,6 +292,75 @@ async function saveSettings() {
 
 // User's own posts and posts where user is tagged
 const userPosts = computed(() => feedStore.userPosts)
+
+// Profile publication tabs: feed vs entertainment
+const profilePostTab = ref<'feed' | 'entertainment'>('feed')
+
+async function setProfilePostTab(tab: 'feed' | 'entertainment') {
+  profilePostTab.value = tab
+  if (user.value) {
+    await feedStore.fetchUserPosts(user.value.id, 1, tab)
+  }
+}
+
+// Letterboxd connection state
+const letterboxdInput = ref('')
+const isConnectingLetterboxd = ref(false)
+const isSyncingLetterboxd = ref(false)
+const isDisconnectingLetterboxd = ref(false)
+const letterboxdMessage = ref('')
+const letterboxdError = ref('')
+
+async function handleConnectLetterboxd() {
+  if (!letterboxdInput.value.trim()) return
+  isConnectingLetterboxd.value = true
+  letterboxdError.value = ''
+  letterboxdMessage.value = ''
+  try {
+    const res = await connectLetterboxd(letterboxdInput.value.trim())
+    await authStore.fetchMe()
+    letterboxdMessage.value = res.data.message
+    letterboxdInput.value = ''
+  } catch (err: any) {
+    letterboxdError.value = err.response?.data?.message || 'Erro ao conectar conta do Letterboxd.'
+  } finally {
+    isConnectingLetterboxd.value = false
+  }
+}
+
+async function handleDisconnectLetterboxd() {
+  isDisconnectingLetterboxd.value = true
+  letterboxdError.value = ''
+  letterboxdMessage.value = ''
+  try {
+    const res = await disconnectLetterboxd()
+    await authStore.fetchMe()
+    letterboxdMessage.value = res.data.message
+  } catch (err: any) {
+    letterboxdError.value = err.response?.data?.message || 'Erro ao desconectar Letterboxd.'
+  } finally {
+    isDisconnectingLetterboxd.value = false
+  }
+}
+
+async function handleSyncLetterboxd() {
+  isSyncingLetterboxd.value = true
+  letterboxdError.value = ''
+  letterboxdMessage.value = ''
+  try {
+    const res = await syncLetterboxd()
+    letterboxdMessage.value = res.data.message
+    if (profilePostTab.value === 'entertainment' && user.value) {
+      setTimeout(() => {
+        if (user.value) feedStore.fetchUserPosts(user.value.id, 1, 'entertainment')
+      }, 1500)
+    }
+  } catch (err: any) {
+    letterboxdError.value = err.response?.data?.message || 'Erro ao iniciar sincronização.'
+  } finally {
+    isSyncingLetterboxd.value = false
+  }
+}
 
 const {
   pullDistance,
@@ -512,17 +583,47 @@ const {
       </div>
     </div>
 
-    <!-- User's Posts Feed -->
+    <!-- User's Posts Feed / Entertainment Section -->
     <div class="user-posts-section">
       <div class="user-posts-header">
-        <h2 class="user-posts-title">» Publicações de {{ user.name }}</h2>
+        <h2 class="user-posts-title">» Atividades de {{ user.name }}</h2>
+
+        <div class="profile-tabs-selector">
+          <button
+            type="button"
+            class="profile-tab-pill"
+            :class="{ active: profilePostTab === 'feed' }"
+            @click="setProfilePostTab('feed')"
+          >
+            📰 Feed
+          </button>
+          <button
+            type="button"
+            class="profile-tab-pill"
+            :class="{ active: profilePostTab === 'entertainment' }"
+            @click="setProfilePostTab('entertainment')"
+          >
+            🍿 Entretenimento
+          </button>
+        </div>
       </div>
+
       <div v-if="feedStore.isLoadingUserPosts && !userPosts.length" class="posts-stream">
         <PostCardSkeleton v-for="i in 2" :key="i" />
       </div>
       <template v-else-if="userPosts.length">
         <div class="posts-stream">
-          <PostCard v-for="post in userPosts" :key="post.id" :post="post" />
+          <template v-if="profilePostTab === 'entertainment'">
+            <LetterboxdCard
+              v-for="post in userPosts"
+              :key="post.id"
+              :post="post"
+              @deleted="feedStore.deletePost(post.id)"
+            />
+          </template>
+          <template v-else>
+            <PostCard v-for="post in userPosts" :key="post.id" :post="post" />
+          </template>
         </div>
         <div v-if="feedStore.hasMoreUserPosts" class="load-more-container">
           <button
@@ -531,12 +632,17 @@ const {
             :disabled="feedStore.isLoadingMoreUserPosts"
             @click="feedStore.loadMoreUserPosts()"
           >
-            {{ feedStore.isLoadingMoreUserPosts ? 'Carregando mais publicações...' : '[ Carregar mais publicações ]' }}
+            {{ feedStore.isLoadingMoreUserPosts ? 'Carregando mais...' : '[ Carregar mais ]' }}
           </button>
         </div>
       </template>
       <div v-else class="retro-box empty-user-posts">
-        <p>Nenhuma publicação feita ainda por este usuário.</p>
+        <p v-if="profilePostTab === 'entertainment'">
+          Nenhuma atividade de entretenimento registrada ainda por este usuário.
+        </p>
+        <p v-else>
+          Nenhuma publicação feita ainda por este usuário no feed.
+        </p>
       </div>
     </div>
 
@@ -656,6 +762,100 @@ const {
                 <svg v-else xmlns="http://www.w3.org/2000/svg" class="eye-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
                 </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Connected Accounts (Contas Conectadas) -->
+        <div class="connected-accounts-box">
+          <h4 class="settings-section-title">
+            <svg xmlns="http://www.w3.org/2000/svg" class="section-title-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+            </svg>
+            Contas Conectadas
+          </h4>
+          <p class="settings-section-desc">
+            Vincule plataformas externas para sincronizar suas atividades automaticamente com a casa.
+          </p>
+
+          <div v-if="letterboxdMessage" class="success-banner mb-2">
+            {{ letterboxdMessage }}
+          </div>
+          <div v-if="letterboxdError" class="error-banner mb-2">
+            {{ letterboxdError }}
+          </div>
+
+          <!-- Letterboxd Connection Card -->
+          <div class="account-item-card">
+            <div class="account-item-header">
+              <div class="account-brand">
+                <span class="account-logo-letterboxd">🍿</span>
+                <div>
+                  <strong class="account-name">Letterboxd</strong>
+                  <div class="account-status">
+                    <span v-if="user.letterboxd_username" class="badge-connected">
+                      ● Conectado como @{{ user.letterboxd_username }}
+                    </span>
+                    <span v-else class="badge-disconnected">
+                      ○ Não conectado
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <span v-if="user.letterboxd_last_synced_at" class="last-synced-label">
+                Sincronizado {{ formatRelativeTime(user.letterboxd_last_synced_at) }}
+              </span>
+            </div>
+
+            <!-- If NOT connected: Input to connect -->
+            <div v-if="!user.letterboxd_username" class="account-connect-form">
+              <div class="letterboxd-input-group">
+                <span class="input-prefix">@</span>
+                <input
+                  v-model="letterboxdInput"
+                  type="text"
+                  class="retro-field letterboxd-field"
+                  placeholder="seu_usuario_letterboxd"
+                  @keyup.enter="handleConnectLetterboxd"
+                />
+                <button
+                  type="button"
+                  class="retro-action-btn primary-action"
+                  :disabled="isConnectingLetterboxd || !letterboxdInput.trim()"
+                  @click="handleConnectLetterboxd"
+                >
+                  {{ isConnectingLetterboxd ? 'Conectando...' : 'Conectar' }}
+                </button>
+              </div>
+              <span class="account-hint">
+                Seu perfil deve ser público no Letterboxd para importarmos suas resenhas e filmes assistidos.
+              </span>
+            </div>
+
+            <!-- If connected: Sync and Disconnect buttons -->
+            <div v-else class="account-connected-actions">
+              <button
+                type="button"
+                class="retro-action-btn primary-action"
+                :disabled="isSyncingLetterboxd"
+                @click="handleSyncLetterboxd"
+              >
+                <svg v-if="isSyncingLetterboxd" class="spin-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                </svg>
+                <span>{{ isSyncingLetterboxd ? 'Sincronizando...' : '🔄 Sincronizar Agora' }}</span>
+              </button>
+
+              <button
+                type="button"
+                class="retro-action-btn danger-action"
+                :disabled="isDisconnectingLetterboxd"
+                @click="handleDisconnectLetterboxd"
+              >
+                {{ isDisconnectingLetterboxd ? 'Desconectando...' : 'Desconectar' }}
               </button>
             </div>
           </div>
@@ -1327,6 +1527,8 @@ const {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
   background-color: var(--color-primary, #a66130);
   border: 1px solid var(--color-primary-800, #5f4120);
   border-radius: 2px;
@@ -1342,10 +1544,149 @@ const {
   margin: 0;
 }
 
+.profile-tabs-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.profile-tab-pill {
+  background-color: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: #ffffff;
+  padding: 0.25rem 0.6rem;
+  border-radius: 2px;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.profile-tab-pill:hover {
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+.profile-tab-pill.active {
+  background-color: #ffffff;
+  color: var(--color-primary-900, #3d2a14);
+  border-color: #ffffff;
+}
+
 .empty-user-posts {
   padding: 2rem;
   text-align: center;
   color: var(--color-muted);
+}
+
+/* Connected Accounts Section */
+.connected-accounts-box {
+  background-color: var(--color-primary-50, #f8f6f1);
+  border: 1px solid var(--color-border, #D8CDC5);
+  border-radius: 2px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.account-item-card {
+  background-color: #ffffff;
+  border: 1px solid var(--color-border, #D8CDC5);
+  border-radius: 4px;
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.account-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.account-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.account-logo-letterboxd {
+  font-size: 1.5rem;
+}
+
+.account-name {
+  display: block;
+  font-family: var(--font-heading, monospace);
+  font-size: 0.95rem;
+  color: var(--color-primary-900, #3d2a14);
+}
+
+.account-status {
+  font-size: 0.75rem;
+  font-family: var(--font-mono, monospace);
+}
+
+.badge-connected {
+  color: #00c030;
+  font-weight: 600;
+}
+
+.badge-disconnected {
+  color: #718096;
+}
+
+.last-synced-label {
+  font-size: 0.75rem;
+  color: #a0aec0;
+  font-family: var(--font-mono, monospace);
+}
+
+.account-connect-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.letterboxd-input-group {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.input-prefix {
+  font-family: var(--font-mono, monospace);
+  font-weight: 700;
+  color: #718096;
+  font-size: 0.95rem;
+}
+
+.letterboxd-field {
+  flex: 1;
+}
+
+.account-hint {
+  font-size: 0.75rem;
+  color: #718096;
+  font-style: italic;
+}
+
+.account-connected-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.danger-action {
+  color: #e53e3e !important;
+  border-color: #feb2b2 !important;
+}
+.danger-action:hover {
+  background-color: #fff5f5 !important;
 }
 
 /* Settings Form in modal */

@@ -44,6 +44,13 @@ const router = createRouter({
           meta: { requiresApproved: true }
         },
         {
+          path: 'entertainment',
+          name: 'entertainment',
+          alias: 'entretenimento',
+          component: () => import('@/views/app/EntertainmentView.vue'),
+          meta: { requiresApproved: true }
+        },
+        {
           path: 'profile',
           name: 'profile',
           component: () => import('@/views/app/ProfileView.vue'),

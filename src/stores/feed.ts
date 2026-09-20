@@ -154,18 +154,22 @@ export const useFeedStore = defineStore('feed', () => {
     await fetchPosts(currentPage.value + 1)
   }
 
-  async function fetchUserPosts(userId: number, page = 1) {
+  const activeProfileCategory = ref<string | undefined>(undefined)
+
+  async function fetchUserPosts(userId: number, page = 1, category?: string) {
     if (page > 1) {
       isLoadingMoreUserPosts.value = true
     } else {
       isLoadingUserPosts.value = true
       activeProfileUserId.value = userId
+      activeProfileCategory.value = category
     }
 
     try {
       const res = await postsApi.getPosts({
         page,
         userId,
+        category,
       })
       if (page === 1) {
         userPosts.value = res.data.data
@@ -185,7 +189,7 @@ export const useFeedStore = defineStore('feed', () => {
 
   async function loadMoreUserPosts() {
     if (isLoadingUserPosts.value || isLoadingMoreUserPosts.value || !hasMoreUserPosts.value || !activeProfileUserId.value) return
-    await fetchUserPosts(activeProfileUserId.value, userPostsCurrentPage.value + 1)
+    await fetchUserPosts(activeProfileUserId.value, userPostsCurrentPage.value + 1, activeProfileCategory.value)
   }
 
   async function fetchEventPosts(eventId: number, page = 1) {

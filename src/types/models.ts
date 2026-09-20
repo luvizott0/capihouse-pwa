@@ -20,6 +20,8 @@ export interface User {
   birth: string | null
   instagram: string | null
   spotify: string | null
+  letterboxd_username?: string | null
+  letterboxd_last_synced_at?: string | null
   initials: string
   is_admin: boolean
   is_online: boolean
@@ -128,6 +130,17 @@ export interface PollVotersResponse {
   options: PollOptionVoters[]
 }
 
+export interface EntertainmentMetadata {
+  film_title?: string | null
+  film_year?: string | number | null
+  rating?: number | null
+  watched_date?: string | null
+  rewatch?: boolean
+  poster_url?: string | null
+  letterboxd_url?: string | null
+  review_text?: string | null
+}
+
 export interface Post {
   id: number
   user_id: number
@@ -135,6 +148,13 @@ export interface Post {
   group?: { id: number; name: string } | null
   event_id?: number | null
   event?: { id: number; name: string } | null
+  category?: 'feed' | 'entertainment'
+  entertainment_type?: 'movie' | 'series' | 'game' | null
+  external_source?: string | null
+  external_id?: string | null
+  metadata?: EntertainmentMetadata | null
+  repost_of_id?: number | null
+  reposted_post?: Post | null
   content: string | null
   likes_count: number
   comments_count: number

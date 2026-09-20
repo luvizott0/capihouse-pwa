@@ -56,6 +56,23 @@ const isBirthdayPost = computed(() => {
   )
 })
 
+function renderRatingStars(rating?: number | null): string {
+  if (rating == null) return ''
+  const full = Math.floor(rating)
+  const half = rating % 1 >= 0.5 ? '½' : ''
+  return '★'.repeat(full) + half
+}
+
+function openPoster(url?: string | null) {
+  if (url) {
+    imageViewer.openImage(
+      url,
+      props.post.reposted_post?.metadata?.film_title || 'Pôster',
+      props.post.reposted_post?.metadata?.film_year ? String(props.post.reposted_post.metadata.film_year) : undefined
+    )
+  }
+}
+
 // Comment permissions
 function canEditComment(comment: PostComment) {
   return authStore.user?.id === comment.user_id || authStore.isAdmin
@@ -452,6 +469,9 @@ async function confirmDeletePost() {
             <span v-if="isBirthdayPost" class="birthday-badge" title="Parabéns da Capivara Rogéria">
               🎂 Aniversário
             </span>
+            <span v-if="post.repost_of_id" class="repost-badge" title="Repost de Entretenimento">
+              🔁 Repost
+            </span>
           </div>
           <div class="post-sub-line">
             <span class="post-time">{{ formatRelativeTime(post.created_at) }}</span>
@@ -510,6 +530,48 @@ async function confirmDeletePost() {
     <div v-if="post.content" class="post-body" :class="{ 'recap-body': isRecapPost }">
       <RecapFeedCard v-if="isRecapPost" :post="post" />
       <FormattedContent v-else :content="post.content" />
+    </div>
+
+    <!-- Embedded Repost Card (if post is a repost) -->
+    <div v-if="post.reposted_post" class="embedded-repost-box">
+      <div class="embedded-repost-header">
+        <span class="embedded-repost-tag">🍿 Letterboxd</span>
+        <span class="embedded-repost-author">
+          Avaliação de <router-link :to="`/profile/${post.reposted_post.user?.username}`" class="embedded-author-link">@{{ post.reposted_post.user?.username }}</router-link>
+        </span>
+      </div>
+      <div class="embedded-repost-body">
+        <img
+          v-if="post.reposted_post.metadata?.poster_url"
+          :src="post.reposted_post.metadata.poster_url"
+          :alt="post.reposted_post.metadata.film_title || 'Pôster'"
+          class="embedded-poster"
+          @click="openPoster(post.reposted_post.metadata.poster_url)"
+          title="Clique para ampliar o pôster"
+        />
+        <div class="embedded-details">
+          <div class="embedded-title-row">
+            <span class="embedded-film-title">{{ post.reposted_post.metadata?.film_title }}</span>
+            <span v-if="post.reposted_post.metadata?.film_year" class="embedded-film-year">({{ post.reposted_post.metadata.film_year }})</span>
+          </div>
+          <div v-if="post.reposted_post.metadata?.rating" class="embedded-rating">
+            <span class="embedded-stars">{{ renderRatingStars(post.reposted_post.metadata.rating) }}</span>
+            <span class="embedded-score">{{ post.reposted_post.metadata.rating }} / 5</span>
+          </div>
+          <p v-if="post.reposted_post.content" class="embedded-review">
+            "{{ post.reposted_post.content }}"
+          </p>
+          <a
+            v-if="post.reposted_post.metadata?.letterboxd_url"
+            :href="post.reposted_post.metadata.letterboxd_url"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="embedded-external-link"
+          >
+            [ Ver no Letterboxd ↗ ]
+          </a>
+        </div>
+      </div>
     </div>
 
     <!-- Post Poll -->
@@ -2033,5 +2095,139 @@ async function confirmDeletePost() {
     font-size: 0.7rem;
     padding: 0.15rem 0.35rem;
   }
+}
+
+/* Repost styles */
+.repost-badge {
+  font-size: 0.7rem;
+  color: #2b6cb0;
+  background-color: #ebf8ff;
+  border: 1px solid #bee3f8;
+  padding: 0.1rem 0.35rem;
+  border-radius: 2px;
+  font-family: var(--font-mono, monospace);
+  font-weight: 700;
+}
+
+.embedded-repost-box {
+  margin: 0.75rem 1rem;
+  background-color: var(--color-primary-50, #f8f6f1);
+  border: 1px solid var(--color-border, #D8CDC5);
+  border-radius: 4px;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.embedded-repost-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.embedded-repost-tag {
+  font-size: 0.7rem;
+  font-weight: 700;
+  background-color: #14181c;
+  color: #00e054;
+  padding: 0.15rem 0.35rem;
+  border-radius: 2px;
+  font-family: var(--font-mono, monospace);
+}
+
+.embedded-repost-author {
+  color: #718096;
+}
+
+.embedded-author-link {
+  color: var(--color-primary-900, #3d2a14);
+  font-weight: 600;
+  text-decoration: none;
+}
+.embedded-author-link:hover {
+  text-decoration: underline;
+}
+
+.embedded-repost-body {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.embedded-poster {
+  width: 50px;
+  height: 75px;
+  object-fit: cover;
+  border: 1px solid var(--color-border, #D8CDC5);
+  border-radius: 2px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.embedded-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.embedded-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.embedded-film-title {
+  font-family: var(--font-heading, monospace);
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--color-primary-900, #3d2a14);
+}
+
+.embedded-film-year {
+  font-size: 0.8rem;
+  color: #718096;
+}
+
+.embedded-rating {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.embedded-stars {
+  color: #00c030;
+  letter-spacing: 1px;
+}
+
+.embedded-score {
+  font-size: 0.75rem;
+  color: #718096;
+  font-family: var(--font-mono, monospace);
+}
+
+.embedded-review {
+  font-size: 0.85rem;
+  color: #4a5568;
+  font-style: italic;
+  margin: 0.2rem 0;
+  line-height: 1.4;
+}
+
+.embedded-external-link {
+  font-size: 0.75rem;
+  color: var(--color-primary, #a66130);
+  font-family: var(--font-mono, monospace);
+  font-weight: 600;
+  text-decoration: none;
+  margin-top: 0.2rem;
+}
+.embedded-external-link:hover {
+  text-decoration: underline;
 }
 </style>
