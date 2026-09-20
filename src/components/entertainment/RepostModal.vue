@@ -18,8 +18,10 @@ const emit = defineEmits<{
 
 const content = ref('')
 const feelingName = ref('')
-const feelingEmoji = ref('')
+const feelingEmoji = ref('😊')
 const showEmojiPicker = ref(false)
+const hashtagInput = ref('')
+const hashtags = ref<string[]>([])
 const isSubmitting = ref(false)
 const errorMessage = ref('')
 
@@ -31,8 +33,20 @@ function selectEmoji(emoji: string) {
 }
 
 function clearFeeling() {
-  feelingEmoji.value = ''
+  feelingEmoji.value = '😊'
   feelingName.value = ''
+}
+
+function addHashtag() {
+  const clean = hashtagInput.value.trim().replace(/^#/, '')
+  if (clean && !hashtags.value.includes(clean)) {
+    hashtags.value.push(clean)
+  }
+  hashtagInput.value = ''
+}
+
+function removeHashtag(tag: string) {
+  hashtags.value = hashtags.value.filter((t) => t !== tag)
 }
 
 function renderRatingStars(rating?: number | null): string {
@@ -54,16 +68,21 @@ async function handleRepost() {
     }
     formData.append('repost_of_id', String(props.post.id))
 
-    if (feelingName.value.trim() && feelingEmoji.value.trim()) {
-      formData.append('feeling_name', feelingName.value.trim())
-      formData.append('feeling_emoji', feelingEmoji.value.trim())
+    if (feelingName.value.trim()) {
+      formData.append('feeling_name', feelingName.value.trim().substring(0, 15))
+      formData.append('feeling_emoji', feelingEmoji.value || '😊')
     }
+
+    hashtags.value.forEach((tag) => {
+      formData.append('hashtags[]', tag)
+    })
 
     const response = await createPost(formData)
     emit('reposted', response.data)
     emit('update:modelValue', false)
     content.value = ''
     clearFeeling()
+    hashtags.value = []
   } catch (err: any) {
     errorMessage.value = err.response?.data?.message || 'Erro ao repostar publicação.'
   } finally {
@@ -121,31 +140,65 @@ async function handleRepost() {
       </div>
 
       <!-- Feeling Section -->
-      <div class="feeling-row">
-        <div v-if="feelingEmoji && feelingName" class="active-feeling-badge">
-          <span>Sentindo-se {{ feelingEmoji }} {{ feelingName }}</span>
-          <button type="button" class="btn-clear-feeling" @click="clearFeeling">×</button>
+      <div class="feeling-section">
+        <label class="form-label">Sentimento:</label>
+        <div class="feeling-row">
+          <div v-if="feelingName.trim()" class="active-feeling-badge">
+            <span>Sentindo-se {{ feelingEmoji }} {{ feelingName }}</span>
+            <button type="button" class="btn-clear-feeling" @click="clearFeeling">×</button>
+          </div>
+          <div v-else class="feeling-inputs">
+            <button
+              type="button"
+              class="btn-pick-emoji"
+              @click="showEmojiPicker = !showEmojiPicker"
+              title="Escolher emoji de sentimento"
+            >
+              {{ feelingEmoji }}
+            </button>
+            <input
+              v-model="feelingName"
+              type="text"
+              class="retro-field feeling-name-field"
+              placeholder="Sentindo-se... (ex: animado, pensativo)"
+              maxlength="15"
+            />
+          </div>
+
+          <div v-if="showEmojiPicker" class="emoji-picker-container">
+            <EmojiPicker @select="selectEmoji" />
+          </div>
         </div>
-        <div v-else class="feeling-inputs">
+      </div>
+
+      <!-- Hashtags Section -->
+      <div class="hashtags-section">
+        <label class="form-label">Hashtags:</label>
+        <div class="hashtag-input-row">
+          <span class="hashtag-prefix">#</span>
+          <input
+            v-model="hashtagInput"
+            type="text"
+            class="retro-field hashtag-field"
+            placeholder="cinema, favorito..."
+            maxlength="50"
+            @keydown.enter.prevent="addHashtag"
+          />
           <button
             type="button"
-            class="btn-pick-emoji"
-            @click="showEmojiPicker = !showEmojiPicker"
-            title="Escolher emoji de sentimento"
+            class="btn-add-hashtag"
+            :disabled="!hashtagInput.trim()"
+            @click="addHashtag"
           >
-            {{ feelingEmoji || '😊' }}
+            + Adicionar
           </button>
-          <input
-            v-model="feelingName"
-            type="text"
-            class="retro-field feeling-name-field"
-            placeholder="Sentindo-se... (ex: animado)"
-            maxlength="15"
-          />
         </div>
 
-        <div v-if="showEmojiPicker" class="emoji-picker-container">
-          <EmojiPicker @select="selectEmoji" />
+        <div v-if="hashtags.length" class="hashtags-list">
+          <span v-for="tag in hashtags" :key="tag" class="hashtag-chip">
+            #{{ tag }}
+            <button type="button" class="btn-remove-tag" @click="removeHashtag(tag)">×</button>
+          </span>
         </div>
       </div>
 
@@ -354,6 +407,80 @@ async function handleRepost() {
   background: #ffffff;
   border: 1px solid var(--color-border, #D8CDC5);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.hashtags-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.hashtag-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.hashtag-prefix {
+  font-family: var(--font-mono, monospace);
+  font-weight: 700;
+  color: var(--color-primary, #a66130);
+  font-size: 1rem;
+}
+
+.hashtag-field {
+  flex: 1;
+}
+
+.btn-add-hashtag {
+  background-color: var(--color-primary-50, #f8f6f1);
+  border: 1px solid var(--color-border, #D8CDC5);
+  color: var(--color-primary-800, #5f4120);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.45rem 0.65rem;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.btn-add-hashtag:hover:not(:disabled) {
+  background-color: var(--color-primary-100, #fdf8f3);
+  border-color: var(--color-primary, #a66130);
+}
+.btn-add-hashtag:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.hashtags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.25rem;
+}
+
+.hashtag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background-color: var(--color-primary-100, #fdf8f3);
+  border: 1px solid var(--color-border, #D8CDC5);
+  color: var(--color-primary-800, #5f4120);
+  padding: 0.2rem 0.5rem;
+  font-size: 0.75rem;
+  font-family: var(--font-mono, monospace);
+  border-radius: 2px;
+}
+
+.btn-remove-tag {
+  background: none;
+  border: none;
+  color: #cc0000;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.85rem;
+  line-height: 1;
 }
 
 .modal-actions {

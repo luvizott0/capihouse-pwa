@@ -587,25 +587,25 @@ const {
     <div class="user-posts-section">
       <div class="user-posts-header">
         <h2 class="user-posts-title">» Atividades de {{ user.name }}</h2>
+      </div>
 
-        <div class="profile-tabs-selector">
-          <button
-            type="button"
-            class="profile-tab-pill"
-            :class="{ active: profilePostTab === 'feed' }"
-            @click="setProfilePostTab('feed')"
-          >
-            📰 Feed
-          </button>
-          <button
-            type="button"
-            class="profile-tab-pill"
-            :class="{ active: profilePostTab === 'entertainment' }"
-            @click="setProfilePostTab('entertainment')"
-          >
-            🍿 Entretenimento
-          </button>
-        </div>
+      <div class="profile-tabs-bar">
+        <button
+          type="button"
+          class="profile-tab-btn"
+          :class="{ active: profilePostTab === 'feed' }"
+          @click="setProfilePostTab('feed')"
+        >
+          📰 Feed
+        </button>
+        <button
+          type="button"
+          class="profile-tab-btn"
+          :class="{ active: profilePostTab === 'entertainment' }"
+          @click="setProfilePostTab('entertainment')"
+        >
+          🍿 Entretenimento
+        </button>
       </div>
 
       <div v-if="feedStore.isLoadingUserPosts && !userPosts.length" class="posts-stream">
@@ -1544,33 +1544,40 @@ const {
   margin: 0;
 }
 
-.profile-tabs-selector {
+.profile-tabs-bar {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
 }
 
-.profile-tab-pill {
-  background-color: rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  color: #ffffff;
-  padding: 0.25rem 0.6rem;
+.profile-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.85rem;
+  background-color: var(--color-primary-50, #f8f6f1);
+  border: 1px solid var(--color-border, #D8CDC5);
+  color: var(--color-primary-800, #5f4120);
   border-radius: 2px;
   font-family: var(--font-mono, monospace);
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
+  box-shadow: 1px 1px 0px rgba(0, 0, 0, 0.05);
 }
 
-.profile-tab-pill:hover {
-  background-color: rgba(255, 255, 255, 0.3);
+.profile-tab-btn:hover {
+  background-color: var(--color-primary-100, #fdf8f3);
+  border-color: var(--color-primary, #a66130);
 }
 
-.profile-tab-pill.active {
-  background-color: #ffffff;
-  color: var(--color-primary-900, #3d2a14);
-  border-color: #ffffff;
+.profile-tab-btn.active {
+  background-color: var(--color-primary, #a66130);
+  color: #ffffff;
+  border-color: var(--color-primary-800, #5f4120);
 }
 
 .empty-user-posts {
