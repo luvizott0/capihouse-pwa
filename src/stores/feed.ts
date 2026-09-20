@@ -327,6 +327,24 @@ export const useFeedStore = defineStore('feed', () => {
     }
   }
 
+  async function votePoll(postId: number, optionId: number) {
+    const res = await postsApi.votePoll(postId, optionId)
+    const updatePostPoll = (post: Post) => {
+      if (post && post.id === postId) {
+        post.poll = res.data
+      }
+    }
+    const postInFeed = posts.value.find(p => p.id === postId)
+    const postInUser = userPosts.value.find(p => p.id === postId)
+    const postInEvent = eventPosts.value.find(p => p.id === postId)
+
+    if (postInFeed) updatePostPoll(postInFeed)
+    if (postInUser) updatePostPoll(postInUser)
+    if (postInEvent) updatePostPoll(postInEvent)
+
+    return res.data
+  }
+
   async function toggleCommentLike(postId: number, commentId: number) {
     const postInFeed = posts.value.find(p => p.id === postId)
     const postInUser = userPosts.value.find(p => p.id === postId)
@@ -619,6 +637,26 @@ export const useFeedStore = defineStore('feed', () => {
         const postInEvent = eventPosts.value.find(p => p.id === data.post_id)
         if (postInEvent) updateCommentLikes(postInEvent)
       })
+      .listen('.PollVoted', (data: { post_id: number; poll_id: number; total_votes: number; options: Array<{ id: number; votes_count: number }> }) => {
+        const applyPollVoteUpdate = (post: Post) => {
+          if (post && post.poll && post.poll.id === data.poll_id && post.poll.has_voted) {
+            post.poll.total_votes = data.total_votes
+            for (const opt of data.options) {
+              const existingOpt = post.poll.options.find(o => o.id === opt.id)
+              if (existingOpt) {
+                existingOpt.votes_count = opt.votes_count
+                existingOpt.percentage = data.total_votes > 0 ? Math.round((opt.votes_count / data.total_votes) * 1000) / 10 : 0
+              }
+            }
+          }
+        }
+        const postInFeed = posts.value.find(p => p.id === data.post_id)
+        if (postInFeed) applyPollVoteUpdate(postInFeed)
+        const postInUser = userPosts.value.find(p => p.id === data.post_id)
+        if (postInUser) applyPollVoteUpdate(postInUser)
+        const postInEvent = eventPosts.value.find(p => p.id === data.post_id)
+        if (postInEvent) applyPollVoteUpdate(postInEvent)
+      })
   }
 
   function unsubscribeFromFeed(groupId?: number, eventId?: number) {
@@ -665,6 +703,7 @@ export const useFeedStore = defineStore('feed', () => {
     createPost,
     updatePost,
     toggleLike,
+    votePoll,
     toggleCommentLike,
     addComment,
     updateComment,

@@ -49,6 +49,10 @@ export function toggleLike(postId: number) {
   return apiClient.post(`/posts/${postId}/like`)
 }
 
+export function votePoll(postId: number, optionId: number) {
+  return apiClient.post(`/posts/${postId}/poll/vote`, { option_id: optionId })
+}
+
 export function toggleCommentLike(commentId: number) {
   return apiClient.post(`/comments/${commentId}/like`)
 }

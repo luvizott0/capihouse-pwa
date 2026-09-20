@@ -40,6 +40,33 @@ const errorMsg = ref('')
 const isCompressing = ref(false)
 const formContainerRef = ref<HTMLElement | null>(null)
 
+// Poll / Enquete state
+const hasPoll = ref(false)
+const pollQuestion = ref('')
+const pollOptions = ref<string[]>(['', ''])
+
+function togglePoll() {
+  hasPoll.value = !hasPoll.value
+  if (!hasPoll.value) {
+    pollQuestion.value = ''
+    pollOptions.value = ['', '']
+  } else if (pollOptions.value.length < 2) {
+    pollOptions.value = ['', '']
+  }
+}
+
+function addPollOption() {
+  if (pollOptions.value.length < 5) {
+    pollOptions.value.push('')
+  }
+}
+
+function removePollOption(index: number) {
+  if (pollOptions.value.length > 2) {
+    pollOptions.value.splice(index, 1)
+  }
+}
+
 const totalFilesSize = computed(() => {
   return selectedFiles.value.reduce((acc, file) => acc + file.size, 0)
 })
@@ -163,8 +190,17 @@ function scrollToError() {
 async function handleSubmit() {
   errorMsg.value = ''
 
-  if (!content.value.trim() && selectedFiles.value.length === 0) {
-    errorMsg.value = 'Escreva algo ou adicione uma imagem para publicar.'
+  const filledPollOptions = pollOptions.value.map(o => o.trim()).filter(Boolean)
+  if (hasPoll.value && filledPollOptions.length < 2) {
+    errorMsg.value = 'A votação precisa de pelo menos 2 opções preenchidas.'
+    scrollToError()
+    return
+  }
+
+  const hasValidPoll = hasPoll.value && filledPollOptions.length >= 2
+
+  if (!content.value.trim() && selectedFiles.value.length === 0 && !hasValidPoll) {
+    errorMsg.value = 'Escreva algo, adicione fotos ou crie uma votação para publicar.'
     scrollToError()
     return
   }
@@ -178,6 +214,14 @@ async function handleSubmit() {
   const formData = new FormData()
   if (content.value.trim()) {
     formData.append('content', content.value)
+  }
+  if (hasValidPoll) {
+    if (pollQuestion.value.trim()) {
+      formData.append('poll[question]', pollQuestion.value.trim())
+    }
+    filledPollOptions.forEach(opt => {
+      formData.append('poll[options][]', opt)
+    })
   }
   if (feelingText.value.trim()) {
     formData.append('feeling_name', feelingText.value.trim().substring(0, 15))
@@ -203,6 +247,9 @@ async function handleSubmit() {
     feelingText.value = ''
     feelingEmoji.value = '😊'
     hashtags.value = []
+    hasPoll.value = false
+    pollQuestion.value = ''
+    pollOptions.value = ['', '']
     cleanupPreviews()
     selectedFiles.value = []
     filePreviews.value = []
@@ -322,15 +369,92 @@ function handleClose() {
           />
           📷 [ Anexar Fotos ]
         </label>
+
+        <button
+          type="button"
+          class="poll-toggle-btn"
+          :class="{ 'is-active': hasPoll }"
+          @click="togglePoll"
+        >
+          📊 {{ hasPoll ? '[ Votação Ativa ✓ ]' : '[ + Votação ]' }}
+        </button>
+
         <span v-if="isCompressing" class="compressing-hint">
           ⚡ Otimizando fotos...
         </span>
-        <span v-else-if="selectedFiles.length === 0" class="muted-hint">
+        <span v-else-if="selectedFiles.length === 0 && !hasPoll" class="muted-hint">
           Máx: 5 fotos (até 20MB cada, 50MB total)
         </span>
-        <span v-else class="media-status-hint" :class="{ 'limit-warning': isOverTotalLimit }">
+        <span v-else-if="selectedFiles.length > 0" class="media-status-hint" :class="{ 'limit-warning': isOverTotalLimit }">
           {{ selectedFiles.length }}/{{ MAX_FILES }} fotos • {{ formatBytes(totalFilesSize) }}
         </span>
+      </div>
+
+      <!-- Poll Creator Section -->
+      <div v-if="hasPoll" class="poll-creator-section">
+        <div class="poll-creator-header">
+          <div class="poll-creator-title">
+            <span class="poll-creator-icon">📊</span>
+            <span class="poll-creator-name">Votação (Enquete)</span>
+            <span class="poll-creator-pill">Máx. 5 opções</span>
+          </div>
+          <button
+            type="button"
+            class="poll-remove-all-btn"
+            title="Cancelar votação"
+            @click="togglePoll"
+          >
+            [ × Remover ]
+          </button>
+        </div>
+
+        <div class="poll-field-group">
+          <label class="poll-field-label">Pergunta (opcional):</label>
+          <input
+            v-model="pollQuestion"
+            type="text"
+            maxlength="255"
+            placeholder="Qual é a pergunta da votação?"
+            class="retro-field-input"
+          />
+        </div>
+
+        <div class="poll-options-group">
+          <label class="poll-field-label">Opções da votação (2 a 5):</label>
+          <div
+            v-for="(_, index) in pollOptions"
+            :key="index"
+            class="poll-option-row"
+          >
+            <span class="poll-option-index">{{ index + 1 }}</span>
+            <input
+              v-model="pollOptions[index]"
+              type="text"
+              maxlength="100"
+              :placeholder="`Opção ${index + 1}`"
+              class="retro-field-input poll-option-field"
+            />
+            <button
+              v-if="pollOptions.length > 2"
+              type="button"
+              class="poll-remove-option-btn"
+              title="Remover opção"
+              @click="removePollOption(index)"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+
+        <div v-if="pollOptions.length < 5" class="poll-add-option-wrapper">
+          <button
+            type="button"
+            class="poll-add-option-btn"
+            @click="addPollOption"
+          >
+            + Adicionar opção ({{ pollOptions.length }}/5)
+          </button>
+        </div>
       </div>
 
       <!-- Hashtags Section -->
@@ -584,6 +708,186 @@ function handleClose() {
   cursor: not-allowed;
   background-color: #eee;
 }
+
+.poll-toggle-btn {
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.85rem;
+  font-weight: bold;
+  color: var(--color-primary-800, #5f4120);
+  cursor: pointer;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--color-border, #D8CDC5);
+  background-color: var(--color-primary-100, #fdf8f3);
+  border-radius: 2px;
+  transition: all 0.15s ease;
+}
+.poll-toggle-btn:hover {
+  background-color: var(--color-primary-200, #e8c9a5);
+}
+.poll-toggle-btn.is-active {
+  background-color: var(--color-primary, #0055ff);
+  color: #ffffff;
+  border-color: var(--color-primary-800, #0033aa);
+}
+
+.poll-creator-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  padding: 0.75rem;
+  background-color: var(--color-primary-50, #fdfaf6);
+  border: 1.5px solid var(--color-border, #D8CDC5);
+  border-radius: 4px;
+  margin-top: 0.5rem;
+}
+
+:global(.dark) .poll-creator-section {
+  background-color: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.poll-creator-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.poll-creator-title {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.poll-creator-name {
+  font-family: var(--font-heading, monospace);
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--color-primary-800, #5f4120);
+}
+
+:global(.dark) .poll-creator-name {
+  color: #f3f4f6;
+}
+
+.poll-creator-pill {
+  font-size: 0.7rem;
+  background: var(--color-border, #e5e7eb);
+  color: #4b5563;
+  padding: 0.1rem 0.35rem;
+  border-radius: 2px;
+}
+
+:global(.dark) .poll-creator-pill {
+  background: rgba(255, 255, 255, 0.15);
+  color: #d1d5db;
+}
+
+.poll-remove-all-btn {
+  background: none;
+  border: none;
+  font-family: var(--font-heading, monospace);
+  font-size: 0.75rem;
+  color: var(--color-danger, #ef4444);
+  cursor: pointer;
+}
+.poll-remove-all-btn:hover {
+  text-decoration: underline;
+}
+
+.poll-field-group,
+.poll-options-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.poll-field-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-muted, #847062);
+  font-family: var(--font-heading, monospace);
+}
+
+.retro-field-input {
+  width: 100%;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--color-border, #D8CDC5);
+  background: #ffffff;
+  border-radius: 2px;
+  color: var(--color-text, #111827);
+  box-sizing: border-box;
+}
+
+:global(.dark) .retro-field-input {
+  background: rgba(0, 0, 0, 0.4);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #f9fafb;
+}
+
+.poll-option-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.poll-option-index {
+  font-family: var(--font-heading, monospace);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-muted, #847062);
+  width: 1.25rem;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.poll-option-field {
+  flex: 1;
+}
+
+.poll-remove-option-btn {
+  width: 1.75rem;
+  height: 1.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid var(--color-border, #D8CDC5);
+  border-radius: 2px;
+  color: var(--color-danger, #ef4444);
+  font-size: 1rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.poll-remove-option-btn:hover {
+  background: #fee2e2;
+}
+
+:global(.dark) .poll-remove-option-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+.poll-add-option-wrapper {
+  margin-top: 0.25rem;
+}
+
+.poll-add-option-btn {
+  font-family: var(--font-heading, monospace);
+  font-size: 0.78rem;
+  color: var(--color-primary, #0055ff);
+  background: none;
+  border: 1px dashed var(--color-primary, #0055ff);
+  border-radius: 2px;
+  padding: 0.35rem 0.6rem;
+  cursor: pointer;
+  width: 100%;
+  text-align: center;
+  transition: background-color 0.15s;
+}
+.poll-add-option-btn:hover {
+  background-color: rgba(0, 85, 255, 0.08);
+}
+
 .muted-hint {
   font-size: 0.8rem;
   color: var(--color-muted, #847062);

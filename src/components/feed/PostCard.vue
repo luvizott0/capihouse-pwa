@@ -11,6 +11,7 @@ import RecapCardModal from './RecapCardModal.vue'
 import RecapFeedCard from './RecapFeedCard.vue'
 import FormattedContent from '@/components/ui/FormattedContent.vue'
 import MentionInput from '@/components/ui/MentionInput.vue'
+import PollCard from './PollCard.vue'
 import { formatRelativeTime } from '@/utils/date'
 import { resolveMediaUrl } from '@/utils/media'
 
@@ -466,6 +467,11 @@ async function confirmDeletePost() {
     <div v-if="post.content" class="post-body" :class="{ 'recap-body': isRecapPost }">
       <RecapFeedCard v-if="isRecapPost" :post="post" />
       <FormattedContent v-else :content="post.content" />
+    </div>
+
+    <!-- Post Poll -->
+    <div v-if="post.poll" class="post-poll-container">
+      <PollCard :post-id="post.id" :poll="post.poll" />
     </div>
 
     <!-- Recap Card Action Trigger -->
@@ -1136,6 +1142,10 @@ async function confirmDeletePost() {
   line-height: 1.5;
   white-space: pre-wrap;
   color: #222222;
+}
+
+.post-poll-container {
+  padding: 0 1rem 0.75rem;
 }
 
 .post-body.recap-body {

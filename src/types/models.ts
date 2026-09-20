@@ -87,6 +87,25 @@ export interface PostLike {
   user_id: number
 }
 
+export interface PollOption {
+  id: number
+  poll_id: number
+  text: string
+  order?: number
+  votes_count?: number | null
+  percentage?: number | null
+}
+
+export interface Poll {
+  id: number
+  post_id: number
+  question?: string | null
+  has_voted: boolean
+  user_voted_option_id?: number | null
+  total_votes?: number | null
+  options: PollOption[]
+}
+
 export interface Post {
   id: number
   user_id: number
@@ -101,6 +120,7 @@ export interface Post {
   user: User
   media: Media[]
   feeling: Feeling | null
+  poll?: Poll | null
   hashtags: Hashtag[]
   mentions?: User[]
   comments: PostComment[]
