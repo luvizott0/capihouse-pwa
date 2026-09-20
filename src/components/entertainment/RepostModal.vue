@@ -17,9 +17,8 @@ const emit = defineEmits<{
 }>()
 
 const content = ref('')
-const feelingName = ref('')
+const feelingText = ref('')
 const feelingEmoji = ref('😊')
-const showEmojiPicker = ref(false)
 const hashtagInput = ref('')
 const hashtags = ref<string[]>([])
 const isSubmitting = ref(false)
@@ -27,14 +26,9 @@ const errorMessage = ref('')
 
 const film = computed(() => props.post?.metadata)
 
-function selectEmoji(emoji: string) {
-  feelingEmoji.value = emoji
-  showEmojiPicker.value = false
-}
-
 function clearFeeling() {
+  feelingText.value = ''
   feelingEmoji.value = '😊'
-  feelingName.value = ''
 }
 
 function addHashtag() {
@@ -68,8 +62,8 @@ async function handleRepost() {
     }
     formData.append('repost_of_id', String(props.post.id))
 
-    if (feelingName.value.trim()) {
-      formData.append('feeling_name', feelingName.value.trim().substring(0, 15))
+    if (feelingText.value.trim()) {
+      formData.append('feeling_name', feelingText.value.trim().substring(0, 15))
       formData.append('feeling_emoji', feelingEmoji.value || '😊')
     }
 
@@ -139,65 +133,49 @@ async function handleRepost() {
         ></textarea>
       </div>
 
-      <!-- Feeling Section -->
-      <div class="feeling-section">
-        <label class="form-label">Sentimento:</label>
-        <div class="feeling-row">
-          <div v-if="feelingName.trim()" class="active-feeling-badge">
-            <span>Sentindo-se {{ feelingEmoji }} {{ feelingName }}</span>
-            <button type="button" class="btn-clear-feeling" @click="clearFeeling">×</button>
-          </div>
-          <div v-else class="feeling-inputs">
-            <button
-              type="button"
-              class="btn-pick-emoji"
-              @click="showEmojiPicker = !showEmojiPicker"
-              title="Escolher emoji de sentimento"
-            >
-              {{ feelingEmoji }}
-            </button>
-            <input
-              v-model="feelingName"
-              type="text"
-              class="retro-field feeling-name-field"
-              placeholder="Sentindo-se... (ex: animado, pensativo)"
-              maxlength="15"
-            />
-          </div>
+      <!-- Feelings Section with EmojiPicker (identical to feed form) -->
+      <div class="feelings-section">
+        <div class="section-label">Como você está se sentindo?</div>
 
-          <div v-if="showEmojiPicker" class="emoji-picker-container">
-            <EmojiPicker @select="selectEmoji" />
+        <div class="custom-feeling-row">
+          <EmojiPicker v-model="feelingEmoji" />
+          <div class="feeling-text-wrapper">
+            <input
+              v-model="feelingText"
+              type="text"
+              maxlength="15"
+              placeholder="Me sentindo..."
+              class="feeling-text-input"
+            />
+            <span class="char-count">{{ feelingText.length }}/15</span>
           </div>
+          <button
+            v-if="feelingText"
+            type="button"
+            class="clear-feeling-btn"
+            @click="clearFeeling"
+            title="Limpar sentimento"
+          >
+            ×
+          </button>
         </div>
       </div>
 
-      <!-- Hashtags Section -->
-      <div class="hashtags-section">
-        <label class="form-label">Hashtags:</label>
-        <div class="hashtag-input-row">
-          <span class="hashtag-prefix">#</span>
+      <!-- Hashtags Section (identical to feed form) -->
+      <div class="hashtag-section">
+        <div class="hashtag-input-group">
           <input
             v-model="hashtagInput"
-            type="text"
-            class="retro-field hashtag-field"
-            placeholder="cinema, favorito..."
-            maxlength="50"
+            placeholder="#adicionar_tag"
+            class="retro-tag-field"
             @keydown.enter.prevent="addHashtag"
           />
-          <button
-            type="button"
-            class="btn-add-hashtag"
-            :disabled="!hashtagInput.trim()"
-            @click="addHashtag"
-          >
-            + Adicionar
-          </button>
+          <button type="button" class="add-tag-btn" @click="addHashtag">[ + ]</button>
         </div>
-
-        <div v-if="hashtags.length" class="hashtags-list">
-          <span v-for="tag in hashtags" :key="tag" class="hashtag-chip">
+        <div v-if="hashtags.length" class="tags-container">
+          <span v-for="tag in hashtags" :key="tag" class="retro-post-tag">
             #{{ tag }}
-            <button type="button" class="btn-remove-tag" @click="removeHashtag(tag)">×</button>
+            <button type="button" class="remove-tag-x" @click="removeHashtag(tag)">×</button>
           </span>
         </div>
       </div>
@@ -343,144 +321,146 @@ async function handleRepost() {
   border-color: var(--color-primary, #a66130);
 }
 
-.feeling-row {
-  position: relative;
-}
-
-.feeling-inputs {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-}
-
-.btn-pick-emoji {
-  width: 38px;
-  height: 38px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: var(--color-primary-50, #f8f6f1);
-  border: 1px solid var(--color-border, #D8CDC5);
-  border-radius: 2px;
-  font-size: 1.25rem;
-  cursor: pointer;
-}
-
-.feeling-name-field {
-  flex: 1;
-}
-
-.retro-field {
-  padding: 0.45rem 0.6rem;
-  border: 1px solid var(--color-border, #D8CDC5);
-  background-color: #ffffff;
-  color: var(--color-primary-900, #3d2a14);
-  font-size: 0.85rem;
-}
-
-.active-feeling-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.35rem 0.6rem;
-  background-color: var(--color-primary-100, #fdf8f3);
-  border: 1px solid var(--color-primary, #a66130);
-  font-size: 0.85rem;
-  color: var(--color-primary-900, #3d2a14);
-}
-
-.btn-clear-feeling {
-  background: none;
-  border: none;
-  color: #cc0000;
-  font-weight: bold;
-  cursor: pointer;
-  padding: 0 0.2rem;
-}
-
-.emoji-picker-container {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  z-index: 50;
-  margin-top: 0.25rem;
-  background: #ffffff;
-  border: 1px solid var(--color-border, #D8CDC5);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.hashtags-section {
+/* Feelings Section (identical to PostCreateModal) */
+.feelings-section {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
 }
 
-.hashtag-input-row {
+.section-label {
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: var(--color-primary-800, #5f4120);
+  margin-bottom: 0.2rem;
+  text-transform: uppercase;
+}
+
+.custom-feeling-row {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.5rem;
+  width: 100%;
+  min-width: 0;
 }
 
-.hashtag-prefix {
-  font-family: var(--font-mono, monospace);
-  font-weight: 700;
-  color: var(--color-primary, #a66130);
-  font-size: 1rem;
+.feeling-text-wrapper {
+  position: relative;
+  flex: 1 1 0%;
+  min-width: 0;
 }
 
-.hashtag-field {
-  flex: 1;
-}
-
-.btn-add-hashtag {
+.feeling-text-input {
+  width: 100%;
+  padding: 0.45rem 2.8rem 0.45rem 0.6rem;
+  font-family: var(--font-body, 'Outfit', sans-serif);
+  font-size: 0.85rem;
+  border: 2px solid var(--color-primary-200, #d5bba2);
   background-color: var(--color-primary-50, #f8f6f1);
-  border: 1px solid var(--color-border, #D8CDC5);
-  color: var(--color-primary-800, #5f4120);
-  font-family: var(--font-mono, monospace);
-  font-size: 0.8rem;
-  font-weight: 600;
-  padding: 0.45rem 0.65rem;
-  cursor: pointer;
   border-radius: 2px;
+  outline: none;
+  box-sizing: border-box;
 }
-.btn-add-hashtag:hover:not(:disabled) {
-  background-color: var(--color-primary-100, #fdf8f3);
+.feeling-text-input:focus {
   border-color: var(--color-primary, #a66130);
 }
-.btn-add-hashtag:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+
+.char-count {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.7rem;
+  font-family: var(--font-heading, monospace);
+  color: var(--color-muted, #847062);
 }
 
-.hashtags-list {
+.clear-feeling-btn {
+  background: none;
+  border: 1px solid var(--color-border, #D8CDC5);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  cursor: pointer;
+  border-radius: 2px;
+  color: var(--color-danger, #ef4444);
+}
+.clear-feeling-btn:hover {
+  background-color: #fee2e2;
+}
+
+/* Hashtags Section (identical to PostCreateModal) */
+.hashtag-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.hashtag-input-group {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.retro-tag-field {
+  flex: 1;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--color-border, #D8CDC5);
+  background: #ffffff;
+  border-radius: 2px;
+  outline: none;
+  box-sizing: border-box;
+}
+.retro-tag-field:focus {
+  border-color: var(--color-primary, #a66130);
+}
+
+.add-tag-btn {
+  font-family: var(--font-heading, monospace);
+  font-weight: bold;
+  background: var(--color-primary, #a66130);
+  color: white;
+  border: none;
+  padding: 0 0.75rem;
+  cursor: pointer;
+  border-radius: 2px;
+  font-size: 0.85rem;
+}
+.add-tag-btn:hover {
+  background-color: var(--color-primary-800, #5f4120);
+}
+
+.tags-container {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
-  margin-top: 0.25rem;
 }
 
-.hashtag-chip {
+.retro-post-tag {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
-  background-color: var(--color-primary-100, #fdf8f3);
-  border: 1px solid var(--color-border, #D8CDC5);
-  color: var(--color-primary-800, #5f4120);
+  gap: 0.25rem;
   padding: 0.2rem 0.5rem;
+  background-color: var(--color-primary, #a66130);
+  color: #ffffff;
+  font-family: var(--font-heading, monospace);
   font-size: 0.75rem;
-  font-family: var(--font-mono, monospace);
   border-radius: 2px;
 }
 
-.btn-remove-tag {
+.remove-tag-x {
   background: none;
   border: none;
-  color: #cc0000;
-  font-weight: bold;
   cursor: pointer;
-  padding: 0;
+  color: #ffffff;
+  font-weight: bold;
   font-size: 0.85rem;
   line-height: 1;
+  padding: 0;
 }
 
 .modal-actions {
