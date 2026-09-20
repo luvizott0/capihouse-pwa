@@ -101,6 +101,7 @@ export interface Poll {
   post_id: number
   question?: string | null
   has_voted: boolean
+  can_see_results?: boolean
   user_voted_option_id?: number | null
   total_votes?: number | null
   options: PollOption[]

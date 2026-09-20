@@ -639,7 +639,7 @@ export const useFeedStore = defineStore('feed', () => {
       })
       .listen('.PollVoted', (data: { post_id: number; poll_id: number; total_votes: number; options: Array<{ id: number; votes_count: number }> }) => {
         const applyPollVoteUpdate = (post: Post) => {
-          if (post && post.poll && post.poll.id === data.poll_id && post.poll.has_voted) {
+          if (post && post.poll && post.poll.id === data.poll_id && (post.poll.has_voted || post.poll.can_see_results)) {
             post.poll.total_votes = data.total_votes
             for (const opt of data.options) {
               const existingOpt = post.poll.options.find(o => o.id === opt.id)

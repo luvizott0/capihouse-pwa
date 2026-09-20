@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import type { Poll, PollOption } from '@/types/models'
 import { useFeedStore } from '@/stores/feed'
 
@@ -12,6 +12,8 @@ const feedStore = useFeedStore()
 const isVoting = ref(false)
 const votingOptionId = ref<number | null>(null)
 const errorMsg = ref('')
+
+const canSeeResults = computed(() => Boolean(props.poll.can_see_results ?? props.poll.has_voted))
 
 async function handleVote(option: PollOption) {
   if (isVoting.value) return
@@ -63,9 +65,9 @@ async function handleVote(option: PollOption) {
         }"
         @click="handleVote(option)"
       >
-        <!-- Background progress bar when user has voted -->
+        <!-- Background progress bar when results are visible -->
         <div
-          v-if="poll.has_voted"
+          v-if="canSeeResults"
           class="poll-option-progress"
           :style="{ width: `${Math.min(100, Math.max(0, option.percentage ?? 0))}%` }"
         ></div>
@@ -82,8 +84,8 @@ async function handleVote(option: PollOption) {
           <!-- Option text -->
           <span class="option-text">{{ option.text }}</span>
 
-          <!-- Vote metrics (shown only after user votes) -->
-          <div v-if="poll.has_voted" class="option-metrics">
+          <!-- Vote metrics (shown when results are visible) -->
+          <div v-if="canSeeResults" class="option-metrics">
             <span class="option-percentage">{{ option.percentage ?? 0 }}%</span>
             <span class="option-count">({{ option.votes_count ?? 0 }})</span>
           </div>
@@ -93,12 +95,15 @@ async function handleVote(option: PollOption) {
 
     <!-- Footer information -->
     <div class="poll-footer">
-      <template v-if="poll.has_voted">
+      <template v-if="canSeeResults">
         <span class="total-votes">
           👥 {{ poll.total_votes ?? 0 }} {{ (poll.total_votes === 1) ? 'voto' : 'votos' }}
         </span>
-        <span class="poll-change-hint">
+        <span v-if="poll.has_voted" class="poll-change-hint">
           • Clique em outra opção para alterar seu voto
+        </span>
+        <span v-else class="poll-change-hint">
+          • Você é o autor (resultados visíveis). Clique em uma opção para votar se desejar.
         </span>
       </template>
       <template v-else>
