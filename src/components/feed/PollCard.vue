@@ -1,17 +1,45 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import type { Poll, PollOption } from '@/types/models'
+import type { Poll, PollOption, PollOptionVoters } from '@/types/models'
 import { useFeedStore } from '@/stores/feed'
+import { getPollVoters } from '@/api/posts'
+import RetroModal from '@/components/ui/RetroModal.vue'
+import UserAvatar from '@/components/ui/UserAvatar.vue'
 
-const props = defineProps<{
-  postId: number
-  poll: Poll
-}>()
+const props = withDefaults(
+  defineProps<{
+    postId: number
+    poll: Poll
+    isAuthor?: boolean
+  }>(),
+  {
+    isAuthor: false,
+  }
+)
 
 const feedStore = useFeedStore()
 const isVoting = ref(false)
 const votingOptionId = ref<number | null>(null)
 const errorMsg = ref('')
+
+const showVotersModal = ref(false)
+const isLoadingVoters = ref(false)
+const votersError = ref('')
+const optionVotersList = ref<PollOptionVoters[]>([])
+
+async function openVotersModal() {
+  showVotersModal.value = true
+  isLoadingVoters.value = true
+  votersError.value = ''
+  try {
+    const res = await getPollVoters(props.postId)
+    optionVotersList.value = res.data.options
+  } catch (err: any) {
+    votersError.value = err?.response?.data?.message || 'Erro ao carregar votantes.'
+  } finally {
+    isLoadingVoters.value = false
+  }
+}
 
 const canSeeResults = computed(() => Boolean(props.poll.can_see_results ?? props.poll.has_voted))
 
@@ -95,23 +123,94 @@ async function handleVote(option: PollOption) {
 
     <!-- Footer information -->
     <div class="poll-footer">
-      <template v-if="canSeeResults">
-        <span class="total-votes">
-          👥 {{ poll.total_votes ?? 0 }} {{ (poll.total_votes === 1) ? 'voto' : 'votos' }}
-        </span>
+      <div class="poll-footer-row">
+        <template v-if="canSeeResults">
+          <span class="total-votes">
+            👥 {{ poll.total_votes ?? 0 }} {{ (poll.total_votes === 1) ? 'voto' : 'votos' }}
+          </span>
+          <button
+            v-if="isAuthor"
+            type="button"
+            class="poll-voters-btn"
+            title="Ver quem votou em cada opção"
+            @click="openVotersModal"
+          >
+            [ 👥 Ver votos ]
+          </button>
+        </template>
+        <template v-else>
+          <span class="poll-secret-hint">
+            🔒 Votos e porcentagens são revelados após você votar.
+          </span>
+        </template>
+      </div>
+
+      <div v-if="canSeeResults" class="poll-hints-row">
         <span v-if="poll.has_voted" class="poll-change-hint">
           • Clique em outra opção para alterar seu voto
         </span>
-        <span v-else class="poll-change-hint">
+        <span v-else-if="isAuthor" class="poll-change-hint">
           • Você é o autor (resultados visíveis). Clique em uma opção para votar se desejar.
         </span>
-      </template>
-      <template v-else>
-        <span class="poll-secret-hint">
-          🔒 Votos e porcentagens são revelados após você votar.
-        </span>
-      </template>
+      </div>
     </div>
+
+    <!-- Voters Modal (Author only) -->
+    <RetroModal
+      v-model="showVotersModal"
+      title="Quem votou na Enquete"
+      size="md"
+    >
+      <div class="poll-voters-modal-body">
+        <div v-if="poll.question" class="voters-question-header">
+          <strong>Enquete:</strong> {{ poll.question }}
+        </div>
+
+        <div v-if="isLoadingVoters" class="voters-loading-state">
+          <span class="loading-spinner">⌛</span> Carregando votos...
+        </div>
+
+        <div v-else-if="votersError" class="voters-error-state">
+          <p class="error-text">⚠️ {{ votersError }}</p>
+          <button type="button" class="retry-btn" @click="openVotersModal">[ Tentar novamente ]</button>
+        </div>
+
+        <div v-else class="voters-options-group">
+          <div
+            v-for="opt in optionVotersList"
+            :key="opt.id"
+            class="voters-option-block"
+          >
+            <div class="voters-option-title-row">
+              <span class="voters-option-title">{{ opt.text }}</span>
+              <span class="voters-option-badge">
+                {{ opt.votes_count }} {{ opt.votes_count === 1 ? 'voto' : 'votos' }}
+              </span>
+            </div>
+
+            <div v-if="!opt.voters || opt.voters.length === 0" class="voters-empty-opt">
+              Nenhum voto nesta opção.
+            </div>
+
+            <div v-else class="voters-user-list">
+              <router-link
+                v-for="voter in opt.voters"
+                :key="voter.id"
+                :to="`/profile/${voter.username}`"
+                class="voter-user-card"
+                @click="showVotersModal = false"
+              >
+                <UserAvatar :user="voter" size="sm" />
+                <div class="voter-info">
+                  <span class="voter-name">{{ voter.name }}</span>
+                  <span class="voter-username">@{{ voter.username }}</span>
+                </div>
+              </router-link>
+            </div>
+          </div>
+        </div>
+      </div>
+    </RetroModal>
   </div>
 </template>
 
@@ -122,7 +221,6 @@ async function handleVote(option: PollOption) {
   background-color: var(--color-bg-alt, #f6f8fa);
   border: 2px solid var(--color-border, #000000);
   border-radius: 4px;
-  box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.2);
   display: flex;
   flex-direction: column;
   gap: 0.625rem;
@@ -131,7 +229,6 @@ async function handleVote(option: PollOption) {
 :global(.dark) .retro-poll-card {
   background-color: rgba(255, 255, 255, 0.04);
   border-color: rgba(255, 255, 255, 0.2);
-  box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.4);
 }
 
 .poll-header {
@@ -328,14 +425,20 @@ async function handleVote(option: PollOption) {
   font-size: 0.75rem;
   color: #6b7280;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.25rem;
+  flex-direction: column;
+  gap: 0.35rem;
   padding-top: 0.25rem;
 }
 
 :global(.dark) .poll-footer {
   color: #9ca3af;
+}
+
+.poll-footer-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .total-votes {
@@ -347,9 +450,212 @@ async function handleVote(option: PollOption) {
   color: #d1d5db;
 }
 
+.poll-voters-btn {
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.72rem;
+  font-weight: bold;
+  background: none;
+  border: 1px solid var(--color-border, #d8cdc5);
+  color: var(--color-primary-800, #5f4120);
+  padding: 0.15rem 0.45rem;
+  border-radius: 2px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  transition: all 0.15s ease;
+}
+
+.poll-voters-btn:hover {
+  background-color: var(--color-primary-50, #fdf8f3);
+  border-color: var(--color-primary, #0055ff);
+}
+
+:global(.dark) .poll-voters-btn {
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #93c5fd;
+}
+
+:global(.dark) .poll-voters-btn:hover {
+  background-color: rgba(59, 130, 246, 0.15);
+  border-color: #60a5fa;
+}
+
+.poll-hints-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
 .poll-change-hint,
 .poll-secret-hint {
   font-style: italic;
+}
+
+/* Voters Modal Styles */
+.poll-voters-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  max-height: 60vh;
+  max-height: 60dvh;
+  overflow-y: auto;
+  padding: 0.25rem 0;
+}
+
+.voters-question-header {
+  font-size: 0.85rem;
+  color: var(--color-text-muted, #555555);
+  padding-bottom: 0.5rem;
+  border-bottom: 1px dashed var(--color-border, #e5ddd5);
+}
+
+:global(.dark) .voters-question-header {
+  color: #9ca3af;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.voters-loading-state,
+.voters-error-state {
+  padding: 1.5rem 1rem;
+  text-align: center;
+  font-family: var(--font-heading, monospace);
+  font-size: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.retry-btn {
+  font-family: var(--font-heading, monospace);
+  font-size: 0.75rem;
+  font-weight: bold;
+  background: none;
+  border: 1px solid var(--color-border, #d8cdc5);
+  color: var(--color-primary, #0055ff);
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.voters-options-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.voters-option-block {
+  border: 1px solid var(--color-border, #d8cdc5);
+  background-color: var(--color-bg-alt, #fafafa);
+  border-radius: 4px;
+  padding: 0.6rem 0.75rem;
+}
+
+:global(.dark) .voters-option-block {
+  background-color: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.voters-option-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.45rem;
+  gap: 0.5rem;
+}
+
+.voters-option-title {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--color-text, #111827);
+  word-break: break-word;
+}
+
+:global(.dark) .voters-option-title {
+  color: #f3f4f6;
+}
+
+.voters-option-badge {
+  font-family: var(--font-heading, monospace);
+  font-size: 0.72rem;
+  font-weight: bold;
+  padding: 0.1rem 0.4rem;
+  background-color: var(--color-primary-100, #e0ecff);
+  color: var(--color-primary-800, #0040aa);
+  border-radius: 2px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+:global(.dark) .voters-option-badge {
+  background-color: rgba(59, 130, 246, 0.2);
+  color: #93c5fd;
+}
+
+.voters-empty-opt {
+  font-size: 0.75rem;
+  font-style: italic;
+  color: var(--color-muted, #888888);
+  padding: 0.25rem 0;
+}
+
+:global(.dark) .voters-empty-opt {
+  color: #9ca3af;
+}
+
+.voters-user-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.voter-user-card {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.45rem;
+  border-radius: 3px;
+  text-decoration: none;
+  color: inherit;
+  transition: background-color 0.15s ease;
+}
+
+.voter-user-card:hover {
+  background-color: var(--color-primary-50, #f0f4ff);
+}
+
+:global(.dark) .voter-user-card:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.voter-info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+  min-width: 0;
+}
+
+.voter-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-text, #111827);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:global(.dark) .voter-name {
+  color: #f3f4f6;
+}
+
+.voter-username {
+  font-size: 0.72rem;
+  color: var(--color-muted, #6b7280);
+}
+
+:global(.dark) .voter-username {
+  color: #9ca3af;
 }
 
 @keyframes pulse {

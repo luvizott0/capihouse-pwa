@@ -1,4 +1,5 @@
 import apiClient from './client'
+import type { PollVotersResponse } from '@/types/models'
 
 export interface GetPostsParams {
   page?: number
@@ -51,6 +52,10 @@ export function toggleLike(postId: number) {
 
 export function votePoll(postId: number, optionId: number) {
   return apiClient.post(`/posts/${postId}/poll/vote`, { option_id: optionId })
+}
+
+export function getPollVoters(postId: number) {
+  return apiClient.get<PollVotersResponse>(`/posts/${postId}/poll/voters`)
 }
 
 export function toggleCommentLike(commentId: number) {

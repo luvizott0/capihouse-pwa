@@ -107,6 +107,27 @@ export interface Poll {
   options: PollOption[]
 }
 
+export interface PollVoter {
+  id: number
+  name: string
+  username: string
+  avatar_url: string | null
+}
+
+export interface PollOptionVoters {
+  id: number
+  text: string
+  votes_count: number
+  voters: PollVoter[]
+}
+
+export interface PollVotersResponse {
+  poll_id: number
+  post_id: number
+  question?: string | null
+  options: PollOptionVoters[]
+}
+
 export interface Post {
   id: number
   user_id: number

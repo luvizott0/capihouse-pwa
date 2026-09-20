@@ -5,7 +5,7 @@ import { computed } from 'vue'
 import { useImageViewerStore } from '@/stores/imageViewer'
 
 const props = defineProps<{
-  user: User | null
+  user: (Partial<User> & { name: string; avatar_url?: string | null }) | null
   size?: 'sm' | 'md' | 'lg' | 'xl'
   zoomable?: boolean
 }>()

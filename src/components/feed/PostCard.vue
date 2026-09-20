@@ -80,10 +80,30 @@ function toggleCommentMenu(commentId: number) {
   }
 }
 
+// Post options menu (3-dots)
+const showPostMenu = ref(false)
+
+function togglePostMenu() {
+  showPostMenu.value = !showPostMenu.value
+}
+
+function handleEditPost() {
+  showPostMenu.value = false
+  showEditModal.value = true
+}
+
+function handleDeletePost() {
+  showPostMenu.value = false
+  showDeleteModal.value = true
+}
+
 function handleDocumentClick(e: MouseEvent) {
   const target = e.target as HTMLElement | null
   if (target && !target.closest('.comment-menu-wrapper')) {
     activeCommentMenuId.value = null
+  }
+  if (target && !target.closest('.post-menu-wrapper')) {
+    showPostMenu.value = false
   }
 }
 
@@ -452,14 +472,37 @@ async function confirmDeletePost() {
         </div>
       </div>
 
-      <!-- Action options for author/admin -->
-      <div v-if="isAuthor" class="post-header-actions">
-        <button type="button" class="action-header-btn edit-post-btn" title="Editar publicação" @click="showEditModal = true">
-          [✎]
+      <!-- Action options for author/admin (3-dots menu) -->
+      <div v-if="isAuthor" class="post-menu-wrapper">
+        <button
+          type="button"
+          class="post-menu-trigger"
+          title="Mais opções"
+          aria-label="Mais opções"
+          @click.stop="togglePostMenu"
+        >
+          ⋮
         </button>
-        <button type="button" class="action-header-btn delete-post-btn" title="Excluir post" @click="showDeleteModal = true">
-          [×]
-        </button>
+        <div
+          v-if="showPostMenu"
+          class="post-dropdown-menu"
+          @click.stop
+        >
+          <button
+            type="button"
+            class="post-menu-item edit-item"
+            @click="handleEditPost"
+          >
+            <span class="item-icon">✎</span> Editar
+          </button>
+          <button
+            type="button"
+            class="post-menu-item delete-item"
+            @click="handleDeletePost"
+          >
+            <span class="item-icon">×</span> Excluir
+          </button>
+        </div>
       </div>
     </div>
 
@@ -471,7 +514,7 @@ async function confirmDeletePost() {
 
     <!-- Post Poll -->
     <div v-if="post.poll" class="post-poll-container">
-      <PollCard :post-id="post.id" :poll="post.poll" />
+      <PollCard :post-id="post.id" :poll="post.poll" :is-author="isAuthor" />
     </div>
 
     <!-- Recap Card Action Trigger -->
@@ -1098,47 +1141,87 @@ async function confirmDeletePost() {
   color: #fbbf24;
 }
 
-.post-header-actions {
-  display: flex;
+.post-menu-wrapper {
+  position: relative;
+  display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
   flex-shrink: 0;
   margin-left: 0.5rem;
 }
 
-.action-header-btn {
+.post-menu-trigger {
   background: none;
-  border: none;
+  border: 1px solid transparent;
+  color: var(--color-muted, #8c7e72);
   font-family: var(--font-heading, 'Space Mono', monospace);
-  font-size: 0.85rem;
-  font-weight: bold;
+  font-size: 1.15rem;
+  line-height: 1;
+  padding: 0;
   cursor: pointer;
-  white-space: nowrap;
-  padding: 0.2rem 0.35rem;
-  min-width: 32px;
-  min-height: 32px;
+  border-radius: 2px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  letter-spacing: -0.05em;
-  line-height: 1;
-  touch-action: manipulation;
+  width: 28px;
+  height: 28px;
+  transition: all 0.15s ease;
 }
 
-.edit-post-btn {
-  color: var(--color-primary-700, #7d5628);
+.post-menu-trigger:hover {
+  color: var(--color-primary-800, #5f4120);
+  background-color: var(--color-primary-50, #f8f6f1);
+  border-color: var(--color-border, #d8cdc5);
 }
-.edit-post-btn:hover {
-  background-color: var(--color-primary-100, #fdf8f3);
+
+.post-dropdown-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  background: var(--color-bg, #ffffff);
+  border: 1px solid var(--color-border, #d8cdc5);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.14);
   border-radius: 2px;
+  z-index: 30;
+  min-width: 100px;
+  display: flex;
+  flex-direction: column;
+  padding: 0.25rem 0;
 }
 
-.delete-post-btn {
+.post-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.65rem;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.75rem;
+  font-weight: bold;
+  background: none;
+  border: none;
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.1s ease;
+}
+
+.post-menu-item .item-icon {
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.post-menu-item.edit-item {
+  color: var(--color-primary-800, #7d5628);
+}
+.post-menu-item.edit-item:hover {
+  background-color: var(--color-primary-50, #fdf8f3);
+}
+
+.post-menu-item.delete-item {
   color: var(--color-danger, #ef4444);
 }
-.delete-post-btn:hover {
+.post-menu-item.delete-item:hover {
   background-color: #fee2e2;
-  border-radius: 2px;
 }
 
 .post-body {
