@@ -96,48 +96,43 @@ onMounted(() => {
       refreshing-text="Buscando novidades de entretenimento..."
     />
 
-    <!-- Header Section -->
-    <header class="entertainment-header retro-box">
-      <div class="header-titles">
-        <h1 class="page-title">» Central de Entretenimento</h1>
-        <p class="page-subtitle">
-          Descubra o que a galera da CapiHouse está assistindo, avaliando e comentando.
-        </p>
-      </div>
-
-      <!-- Navigation Tabs -->
-      <div class="entertainment-tabs">
-        <button
-          type="button"
-          class="tab-btn"
-          :class="{ active: activeTab === 'movies' }"
-          @click="handleTabChange('movies')"
-        >
-          🎬 Filmes
-          <span class="tab-badge">Letterboxd</span>
-        </button>
-
-        <button
-          type="button"
-          class="tab-btn"
-          :class="{ active: activeTab === 'series' }"
-          @click="handleTabChange('series')"
-        >
-          📺 Séries
-          <span class="tab-badge soon-badge">Em breve</span>
-        </button>
-
-        <button
-          type="button"
-          class="tab-btn"
-          :class="{ active: activeTab === 'games' }"
-          @click="handleTabChange('games')"
-        >
-          🎮 Jogos
-          <span class="tab-badge soon-badge">Em breve</span>
-        </button>
-      </div>
+    <!-- Header Section (padrão com cor primária) -->
+    <header class="entertainment-header">
+      <h1 class="page-title">» Mídias</h1>
     </header>
+
+    <!-- Navigation Tabs (abaixo de forma separada, igual ao perfil) -->
+    <div class="entertainment-tabs-bar">
+      <button
+        type="button"
+        class="tab-btn"
+        :class="{ active: activeTab === 'movies' }"
+        @click="handleTabChange('movies')"
+      >
+        🎬 Filmes
+        <span class="tab-badge">Letterboxd</span>
+      </button>
+
+      <button
+        type="button"
+        class="tab-btn"
+        :class="{ active: activeTab === 'series' }"
+        @click="handleTabChange('series')"
+      >
+        📺 Séries
+        <span class="tab-badge soon-badge">Em breve</span>
+      </button>
+
+      <button
+        type="button"
+        class="tab-btn"
+        :class="{ active: activeTab === 'games' }"
+        @click="handleTabChange('games')"
+      >
+        🎮 Jogos
+        <span class="tab-badge soon-badge">Em breve</span>
+      </button>
+    </div>
 
     <!-- Main Content Stream -->
     <main class="entertainment-stream">
@@ -216,36 +211,29 @@ onMounted(() => {
 }
 
 .entertainment-header {
-  background-color: #ffffff;
-  border: 2px solid var(--color-border, #D8CDC5);
-  padding: 1.25rem;
-  box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.08);
-}
-
-.header-titles {
-  margin-bottom: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: var(--color-primary, #a66130);
+  border: 1px solid var(--color-primary-800, #5f4120);
+  border-radius: 2px;
+  padding: 0.6rem 0.85rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .page-title {
-  font-family: var(--font-heading, monospace);
-  font-size: 1.4rem;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 1.05rem;
   font-weight: 700;
-  color: var(--color-primary-900, #3d2a14);
-  margin: 0 0 0.35rem 0;
-}
-
-.page-subtitle {
-  font-size: 0.875rem;
-  color: #718096;
+  color: #ffffff;
   margin: 0;
 }
 
-/* Tabs */
-.entertainment-tabs {
+/* Tabs bar (separada abaixo, igual ao perfil) */
+.entertainment-tabs-bar {
   display: flex;
+  align-items: center;
   gap: 0.5rem;
-  border-bottom: 2px solid var(--color-border, #D8CDC5);
-  padding-bottom: 0.25rem;
   overflow-x: auto;
 }
 
@@ -253,34 +241,33 @@ onMounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  padding: 0.5rem 0.85rem;
+  padding: 0.4rem 0.85rem;
   background-color: var(--color-primary-50, #f8f6f1);
   border: 1px solid var(--color-border, #D8CDC5);
-  border-bottom: none;
-  font-family: var(--font-mono, monospace);
-  font-size: 0.85rem;
-  font-weight: 600;
   color: var(--color-primary-800, #5f4120);
+  border-radius: 2px;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.82rem;
+  font-weight: 600;
   cursor: pointer;
-  border-radius: 4px 4px 0 0;
   transition: all 0.15s ease;
   white-space: nowrap;
+  box-shadow: 1px 1px 0px rgba(0, 0, 0, 0.05);
 }
 
 .tab-btn:hover {
   background-color: var(--color-primary-100, #fdf8f3);
+  border-color: var(--color-primary, #a66130);
 }
 
 .tab-btn.active {
-  background-color: #ffffff;
-  border-color: var(--color-primary, #a66130);
-  border-bottom: 2px solid #ffffff;
-  margin-bottom: -2px;
-  color: var(--color-primary, #a66130);
+  background-color: var(--color-primary, #a66130);
+  color: #ffffff;
+  border-color: var(--color-primary-800, #5f4120);
 }
 
 .tab-badge {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   padding: 0.1rem 0.35rem;
   border-radius: 2px;
   background-color: #14181c;
@@ -291,6 +278,11 @@ onMounted(() => {
 .tab-badge.soon-badge {
   background-color: #edf2f7;
   color: #718096;
+}
+
+.tab-btn.active .tab-badge.soon-badge {
+  background-color: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
 }
 
 /* Stream & States */

@@ -604,7 +604,7 @@ const {
           :class="{ active: profilePostTab === 'entertainment' }"
           @click="setProfilePostTab('entertainment')"
         >
-          🍿 Entretenimento
+          🍿 Mídias
         </button>
       </div>
 
@@ -638,7 +638,7 @@ const {
       </template>
       <div v-else class="retro-box empty-user-posts">
         <p v-if="profilePostTab === 'entertainment'">
-          Nenhuma atividade de entretenimento registrada ainda por este usuário.
+          Nenhuma atividade de mídias registrada ainda por este usuário.
         </p>
         <p v-else>
           Nenhuma publicação feita ainda por este usuário no feed.

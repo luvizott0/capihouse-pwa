@@ -46,7 +46,7 @@ const router = createRouter({
         {
           path: 'entertainment',
           name: 'entertainment',
-          alias: 'entretenimento',
+          alias: ['entretenimento', 'midias', 'mídias'],
           component: () => import('@/views/app/EntertainmentView.vue'),
           meta: { requiresApproved: true }
         },
