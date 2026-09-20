@@ -1114,9 +1114,15 @@ async function confirmDeletePost() {
   font-weight: bold;
   cursor: pointer;
   white-space: nowrap;
-  padding: 0.15rem 0.35rem;
+  padding: 0.2rem 0.35rem;
+  min-width: 32px;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   letter-spacing: -0.05em;
   line-height: 1;
+  touch-action: manipulation;
 }
 
 .edit-post-btn {

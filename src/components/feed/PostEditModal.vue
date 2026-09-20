@@ -60,7 +60,7 @@ function removeHashtag(tag: string) {
 
 async function handleSubmit() {
   errorMsg.value = ''
-  if (!content.value.trim() && (!props.post.media || props.post.media.length === 0)) {
+  if (!content.value.trim() && (!props.post.media || props.post.media.length === 0) && !props.post.poll) {
     errorMsg.value = 'A publicação precisa de texto ou imagem.'
     return
   }
@@ -219,17 +219,19 @@ function handleClose() {
   align-items: center;
   gap: 0.5rem;
   margin-bottom: 0.5rem;
+  width: 100%;
+  box-sizing: border-box;
 }
-
-
 
 .feeling-text-wrapper {
   position: relative;
   flex: 1;
+  min-width: 0;
 }
 
 .feeling-text-input {
   width: 100%;
+  box-sizing: border-box;
   padding: 0.45rem 2.8rem 0.45rem 0.6rem;
   font-family: var(--font-body);
   font-size: 0.85rem;
@@ -264,6 +266,8 @@ function handleClose() {
   cursor: pointer;
   border-radius: 2px;
   color: var(--color-danger);
+  touch-action: manipulation;
+  flex-shrink: 0;
 }
 .clear-feeling-btn:hover {
   background-color: #fee2e2;
@@ -273,15 +277,21 @@ function handleClose() {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .hashtag-input-group {
   display: flex;
   gap: 0.5rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .retro-tag-field {
   flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
   padding: 0.45rem 0.6rem;
   font-size: 0.85rem;
   border: 1px solid var(--color-border);
@@ -299,6 +309,8 @@ function handleClose() {
   padding: 0 0.6rem;
   border-radius: 2px;
   cursor: pointer;
+  touch-action: manipulation;
+  flex-shrink: 0;
 }
 
 .tags-container {
