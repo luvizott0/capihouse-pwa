@@ -501,6 +501,10 @@ function handleClose() {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .error-banner {
@@ -516,6 +520,8 @@ function handleClose() {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  width: 100%;
+  min-width: 0;
 }
 .audience-label {
   font-family: var(--font-heading);
@@ -524,9 +530,13 @@ function handleClose() {
   color: var(--color-primary-800);
   text-transform: uppercase;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 .audience-select {
-  flex: 1;
+  flex: 1 1 0%;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
   padding: 0.45rem 0.6rem;
   font-family: var(--font-heading);
   font-size: 0.8rem;
@@ -537,10 +547,15 @@ function handleClose() {
   border-radius: 2px;
   outline: none;
   cursor: pointer;
+  box-sizing: border-box;
+  text-overflow: ellipsis;
+  overflow: hidden;
 }
 
 .event-locked-badge {
-  flex: 1;
+  flex: 1 1 0%;
+  min-width: 0;
+  max-width: 100%;
   font-family: var(--font-heading, 'Space Mono', monospace);
   font-size: 0.8rem;
   font-weight: bold;
@@ -549,6 +564,10 @@ function handleClose() {
   border: 1px solid var(--color-primary-200, #eed9c4);
   padding: 0.45rem 0.6rem;
   border-radius: 2px;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .audience-select:focus {
   border-color: var(--color-primary);
@@ -584,11 +603,14 @@ function handleClose() {
   align-items: center;
   gap: 0.5rem;
   margin-bottom: 0.5rem;
+  width: 100%;
+  min-width: 0;
 }
 
 .feeling-text-wrapper {
   position: relative;
-  flex: 1;
+  flex: 1 1 0%;
+  min-width: 0;
 }
 
 .feeling-text-input {
@@ -975,5 +997,38 @@ function handleClose() {
   margin-top: 0.5rem;
   border-top: 1px solid var(--color-border);
   padding-top: 0.75rem;
+}
+
+@media (max-width: 480px) {
+  .audience-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.35rem;
+  }
+
+  .audience-label {
+    align-self: flex-start;
+  }
+
+  .audience-select {
+    width: 100%;
+  }
+
+  .event-locked-badge {
+    width: 100%;
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  .media-upload-row {
+    gap: 0.5rem;
+  }
+
+  .upload-label-btn,
+  .poll-toggle-btn {
+    font-size: 0.8rem;
+    padding: 0.35rem 0.5rem;
+    text-align: center;
+  }
 }
 </style>
