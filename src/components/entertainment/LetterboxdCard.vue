@@ -544,52 +544,44 @@ async function handleAddComment() {
       </div>
     </div>
 
-    <!-- Card Footer: Likes, Comments Toggle, Repost -->
-    <footer class="card-footer">
-      <div class="footer-actions-left">
-        <!-- Like Button -->
-        <button
-          type="button"
-          class="action-btn like-btn"
-          :class="{ 'is-liked': isLiked }"
-          @click="handleLikeToggle"
-        >
-          <span class="action-icon">{{ isLiked ? '♥' : '♡' }}</span>
-          <span class="action-label">{{ likesCount }}</span>
-        </button>
+    <!-- Action Bar: Likes, Comments, Repost -->
+    <div class="post-actions">
+      <!-- Like Button -->
+      <button
+        type="button"
+        class="action-btn like-btn"
+        :class="{ liked: isLiked }"
+        @click="handleLikeToggle"
+      >
+        <span class="icon">{{ isLiked ? '❤️' : '🤍' }}</span>
+        <span>{{ likesCount }} {{ likesCount === 1 ? 'curtida' : 'curtidas' }}</span>
+      </button>
 
-        <!-- Comment Toggle Button -->
-        <button
-          type="button"
-          class="action-btn comment-btn"
-          :class="{ active: showComments }"
-          @click="showComments = !showComments"
-        >
-          <span class="action-icon">💬</span>
-          <span class="action-label">
-            {{ post.comments_count || 0 }}
-            {{ post.comments_count === 1 ? 'comentário' : 'comentários' }}
-          </span>
-        </button>
+      <!-- Comment Toggle Button -->
+      <button
+        type="button"
+        class="action-btn comment-btn"
+        @click="showComments = !showComments"
+      >
+        <span class="icon">💬</span>
+        <span>
+          {{ post.comments_count || 0 }}
+          {{ post.comments_count === 1 ? 'comentário' : 'comentários' }}
+        </span>
+      </button>
 
-        <!-- Repost Button (Only visible for the author) -->
-        <button
-          v-if="isAuthor"
-          type="button"
-          class="action-btn repost-btn"
-          title="Compartilhar esta avaliação no feed principal"
-          @click="showRepostModal = true"
-        >
-          <span class="action-icon">🔁</span>
-          <span class="action-label">Repostar no Feed</span>
-        </button>
-      </div>
-
-      <div class="footer-actions-right">
-        <!-- Letterboxd mini watermark -->
-        <span class="source-tag">cinema</span>
-      </div>
-    </footer>
+      <!-- Repost Button (Only visible for the author) -->
+      <button
+        v-if="isAuthor"
+        type="button"
+        class="action-btn repost-btn"
+        title="Compartilhar esta avaliação no feed principal"
+        @click="showRepostModal = true"
+      >
+        <span class="icon">🔁</span>
+        <span>Repostar no Feed</span>
+      </button>
+    </div>
 
     <!-- Comments Section (Collapsible) -->
     <div v-if="showComments" class="comments-section">
@@ -1145,66 +1137,48 @@ async function handleAddComment() {
   text-decoration: underline;
 }
 
-/* Footer */
-.card-footer {
+/* Action Bar / Post Actions (identical to feed) */
+.post-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--color-border, #D8CDC5);
-}
-
-.footer-actions-left {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
+  gap: 1.25rem;
   flex-wrap: wrap;
+  padding: 0.6rem 0.85rem;
+  border-top: 1px solid var(--color-border, #D8CDC5);
+  background-color: var(--color-primary-50, #f8f6f1);
+  border-radius: 2px;
 }
 
 .action-btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.4rem;
   background: none;
-  border: 1px solid var(--color-border, #D8CDC5);
-  background-color: var(--color-primary-50, #f8f6f1);
+  border: none;
+  padding: 0;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.8rem;
+  font-weight: 600;
   color: var(--color-primary-800, #5f4120);
-  padding: 0.3rem 0.6rem;
-  font-size: 0.82rem;
-  font-family: var(--font-mono, monospace);
   cursor: pointer;
-  border-radius: 2px;
-  transition: all 0.15s ease;
+  transition: color 0.15s ease;
 }
 
 .action-btn:hover {
-  background-color: var(--color-primary-100, #fdf8f3);
-  border-color: var(--color-primary, #a66130);
-}
-
-.like-btn.is-liked {
-  color: #e53e3e;
-  border-color: #feb2b2;
-  background-color: #fff5f5;
-}
-
-.comment-btn.active {
-  background-color: var(--color-primary-100, #fdf8f3);
-  border-color: var(--color-primary, #a66130);
   color: var(--color-primary, #a66130);
 }
 
-.repost-btn:hover {
-  color: #2b6cb0;
-  border-color: #63b3ed;
-  background-color: #ebf8ff;
+.action-btn .icon {
+  font-size: 0.95rem;
+  line-height: 1;
 }
 
-.source-tag {
-  font-size: 0.7rem;
-  color: #a0aec0;
-  font-family: var(--font-mono, monospace);
-  text-transform: uppercase;
+.like-btn.liked {
+  color: #dc2626;
+}
+
+.repost-btn:hover {
+  color: var(--color-primary, #a66130);
 }
 
 /* =============================================================
