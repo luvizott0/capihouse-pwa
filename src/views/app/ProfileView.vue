@@ -128,6 +128,7 @@ async function loadProfile() {
 
 // Restore own theme when leaving a visited profile page
 onUnmounted(() => {
+  stopSyncPolling()
   if (wasVisitingOther.value) {
     themeStore.loadThemeFromUser(authStore.user)
   }
@@ -310,6 +311,34 @@ const isSyncingLetterboxd = ref(false)
 const isDisconnectingLetterboxd = ref(false)
 const letterboxdMessage = ref('')
 const letterboxdError = ref('')
+let letterboxdPollTimer: ReturnType<typeof setInterval> | null = null
+
+function stopSyncPolling() {
+  if (letterboxdPollTimer) {
+    clearInterval(letterboxdPollTimer)
+    letterboxdPollTimer = null
+  }
+}
+
+function startSyncPolling() {
+  stopSyncPolling()
+  isSyncingLetterboxd.value = true
+  let attempts = 0
+  const maxAttempts = 20
+
+  letterboxdPollTimer = setInterval(async () => {
+    attempts++
+    const updated = await authStore.fetchMe()
+    const isSyncing = updated?.letterboxd_is_syncing ?? false
+    if (!isSyncing || attempts >= maxAttempts) {
+      stopSyncPolling()
+      isSyncingLetterboxd.value = false
+      if (profilePostTab.value === 'entertainment' && user.value) {
+        feedStore.fetchUserPosts(user.value.id, 1, 'entertainment')
+      }
+    }
+  }, 2500)
+}
 
 async function handleConnectLetterboxd() {
   if (!letterboxdInput.value.trim()) return
@@ -318,9 +347,13 @@ async function handleConnectLetterboxd() {
   letterboxdMessage.value = ''
   try {
     const res = await connectLetterboxd(letterboxdInput.value.trim())
+    if (res.data.user) {
+      authStore.updateUser(res.data.user)
+    }
     await authStore.fetchMe()
     letterboxdMessage.value = res.data.message
     letterboxdInput.value = ''
+    startSyncPolling()
   } catch (err: any) {
     letterboxdError.value = err.response?.data?.message || 'Erro ao conectar conta do Letterboxd.'
   } finally {
@@ -332,10 +365,15 @@ async function handleDisconnectLetterboxd() {
   isDisconnectingLetterboxd.value = true
   letterboxdError.value = ''
   letterboxdMessage.value = ''
+  stopSyncPolling()
   try {
     const res = await disconnectLetterboxd()
+    if (res.data.user) {
+      authStore.updateUser(res.data.user)
+    }
     await authStore.fetchMe()
     letterboxdMessage.value = res.data.message
+    isSyncingLetterboxd.value = false
   } catch (err: any) {
     letterboxdError.value = err.response?.data?.message || 'Erro ao desconectar Letterboxd.'
   } finally {
@@ -344,20 +382,17 @@ async function handleDisconnectLetterboxd() {
 }
 
 async function handleSyncLetterboxd() {
-  isSyncingLetterboxd.value = true
   letterboxdError.value = ''
   letterboxdMessage.value = ''
   try {
     const res = await syncLetterboxd()
-    letterboxdMessage.value = res.data.message
-    if (profilePostTab.value === 'entertainment' && user.value) {
-      setTimeout(() => {
-        if (user.value) feedStore.fetchUserPosts(user.value.id, 1, 'entertainment')
-      }, 1500)
+    if (res.data.user) {
+      authStore.updateUser(res.data.user)
     }
+    letterboxdMessage.value = res.data.message
+    startSyncPolling()
   } catch (err: any) {
     letterboxdError.value = err.response?.data?.message || 'Erro ao iniciar sincronização.'
-  } finally {
     isSyncingLetterboxd.value = false
   }
 }
@@ -794,9 +829,18 @@ const {
                 <div>
                   <strong class="account-name">Letterboxd</strong>
                   <div class="account-status">
-                    <span v-if="user.letterboxd_username" class="badge-connected">
-                      ● Conectado como @{{ user.letterboxd_username }}
-                    </span>
+                    <template v-if="user.letterboxd_username">
+                      <span class="badge-connected">
+                        ● Conectado: <strong>@{{ user.letterboxd_username }}</strong>
+                      </span>
+                      <span v-if="isSyncingLetterboxd || user.letterboxd_is_syncing" class="badge-syncing" title="Sincronizando atividades do Letterboxd...">
+                        <svg class="spin-icon sync-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                        </svg>
+                        <span>Sincronizando...</span>
+                      </span>
+                    </template>
                     <span v-else class="badge-disconnected">
                       ○ Não conectado
                     </span>
@@ -804,7 +848,7 @@ const {
                 </div>
               </div>
 
-              <span v-if="user.letterboxd_last_synced_at" class="last-synced-label">
+              <span v-if="user.letterboxd_last_synced_at && !isSyncingLetterboxd && !user.letterboxd_is_syncing" class="last-synced-label">
                 Sincronizado {{ formatRelativeTime(user.letterboxd_last_synced_at) }}
               </span>
             </div>
@@ -834,29 +878,33 @@ const {
               </span>
             </div>
 
-            <!-- If connected: Sync and Disconnect buttons -->
+            <!-- If connected: Sync and Remove buttons -->
             <div v-else class="account-connected-actions">
               <button
                 type="button"
                 class="retro-action-btn primary-action"
-                :disabled="isSyncingLetterboxd"
+                :disabled="isSyncingLetterboxd || user.letterboxd_is_syncing"
                 @click="handleSyncLetterboxd"
               >
-                <svg v-if="isSyncingLetterboxd" class="spin-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <svg v-if="isSyncingLetterboxd || user.letterboxd_is_syncing" class="spin-icon sync-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                   <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
                 </svg>
-                <span>{{ isSyncingLetterboxd ? 'Sincronizando...' : '🔄 Sincronizar Agora' }}</span>
+                <span>{{ (isSyncingLetterboxd || user.letterboxd_is_syncing) ? 'Sincronizando...' : '🔄 Sincronizar Agora' }}</span>
               </button>
 
               <button
                 type="button"
                 class="retro-action-btn danger-action"
-                :disabled="isDisconnectingLetterboxd"
+                :disabled="isDisconnectingLetterboxd || isSyncingLetterboxd"
                 @click="handleDisconnectLetterboxd"
               >
-                {{ isDisconnectingLetterboxd ? 'Desconectando...' : 'Desconectar' }}
+                {{ isDisconnectingLetterboxd ? 'Removendo...' : 'Remover Conta' }}
               </button>
+
+              <span class="account-hint connected-hint">
+                Para conectar com outro perfil, remova a conta atual e insira novamente o nome de usuário.
+              </span>
             </div>
           </div>
         </div>
@@ -1644,6 +1692,35 @@ const {
 
 .badge-disconnected {
   color: #718096;
+}
+
+.badge-syncing {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-primary-800, #5f4120);
+  background-color: var(--color-primary-100, #fdf8f3);
+  border: 1px dashed var(--color-primary-400, #c4884e);
+  padding: 0.15rem 0.45rem;
+  border-radius: 2px;
+  animation: pulse-sync 1.8s infinite ease-in-out;
+}
+
+.sync-spin {
+  animation: pwa-spin 1s linear infinite;
+}
+
+@keyframes pulse-sync {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+.connected-hint {
+  width: 100%;
+  margin-top: 0.15rem;
 }
 
 .last-synced-label {

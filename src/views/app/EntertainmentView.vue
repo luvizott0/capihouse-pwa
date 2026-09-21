@@ -98,7 +98,7 @@ onMounted(() => {
 
     <!-- Header Section (padrão com cor primária) -->
     <header class="entertainment-header">
-      <h1 class="page-title">» Mídias</h1>
+      <h1 class="page-title">» Atividades e Análises</h1>
     </header>
 
     <!-- Navigation Tabs (abaixo de forma separada, igual ao perfil) -->
@@ -110,7 +110,6 @@ onMounted(() => {
         @click="handleTabChange('movies')"
       >
         🎬 Filmes
-        <span class="tab-badge">Letterboxd</span>
       </button>
 
       <button

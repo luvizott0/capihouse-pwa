@@ -22,6 +22,7 @@ export interface User {
   spotify: string | null
   letterboxd_username?: string | null
   letterboxd_last_synced_at?: string | null
+  letterboxd_is_syncing?: boolean
   initials: string
   is_admin: boolean
   is_online: boolean

@@ -13,6 +13,7 @@ export interface DisconnectLetterboxdResponse {
 
 export interface SyncLetterboxdResponse {
   message: string
+  user?: User
 }
 
 export const connectLetterboxd = (username: string) =>
