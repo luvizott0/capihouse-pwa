@@ -24,6 +24,7 @@ const selectedUserId = ref<number | null>(null)
 function getScopeFromRoutePath(path: string): SearchScope {
   if (path.startsWith('/events')) return 'events'
   if (path.startsWith('/groups')) return 'groups'
+  if (path.startsWith('/entertainment') || path.startsWith('/midias') || path.startsWith('/entretenimento')) return 'entertainment'
   return 'posts'
 }
 
@@ -61,6 +62,8 @@ function executeSearch() {
     ? '/events'
     : selectedScope.value === 'groups'
     ? '/groups'
+    : selectedScope.value === 'entertainment'
+    ? '/entertainment'
     : '/feed'
 
   const query: Record<string, string> = {}
@@ -143,7 +146,7 @@ const currentAction = computed(() => {
         <input
           v-model="searchQuery"
           type="text"
-          :placeholder="selectedScope === 'events' ? 'Buscar eventos...' : selectedScope === 'groups' ? 'Buscar grupos...' : 'Buscar no CapiHouse...'"
+          :placeholder="selectedScope === 'events' ? 'Buscar eventos...' : selectedScope === 'groups' ? 'Buscar grupos...' : selectedScope === 'entertainment' ? 'Buscar mídias e filmes...' : 'Buscar no CapiHouse...'"
           class="retro-search-input"
           aria-label="Campo de busca"
         />

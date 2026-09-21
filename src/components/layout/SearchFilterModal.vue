@@ -4,7 +4,7 @@ import type { User } from '@/types/models'
 import { getUsers } from '@/api/users'
 import RetroModal from '@/components/ui/RetroModal.vue'
 
-export type SearchScope = 'posts' | 'events' | 'groups'
+export type SearchScope = 'posts' | 'entertainment' | 'events' | 'groups'
 
 export interface SearchFilterState {
   scope: SearchScope
@@ -100,6 +100,21 @@ function handleClear() {
 
           <label
             class="scope-option"
+            :class="{ active: scope === 'entertainment' }"
+          >
+            <input
+              type="radio"
+              name="search-scope"
+              value="entertainment"
+              v-model="scope"
+              class="sr-only"
+            />
+            <span class="scope-icon">🎬</span>
+            <span class="scope-text">Mídias</span>
+          </label>
+
+          <label
+            class="scope-option"
             :class="{ active: scope === 'events' }"
           >
             <input
@@ -152,7 +167,7 @@ function handleClear() {
           />
         </div>
         <small class="filter-hint">
-          {{ scope === 'events' ? 'Filtra eventos marcados para este dia.' : 'Filtra publicações ou grupos criados nesta data.' }}
+          {{ scope === 'events' ? 'Filtra eventos marcados para este dia.' : scope === 'entertainment' ? 'Filtra mídias assistidas nesta data.' : 'Filtra publicações ou grupos criados nesta data.' }}
         </small>
       </div>
 
@@ -185,7 +200,7 @@ function handleClear() {
           </option>
         </select>
         <small class="filter-hint">
-          {{ scope === 'groups' ? 'Filtra grupos criados por este usuário.' : 'Filtra posts ou eventos criados por este usuário.' }}
+          {{ scope === 'groups' ? 'Filtra grupos criados por este usuário.' : scope === 'entertainment' ? 'Filtra mídias avaliadas por este usuário.' : 'Filtra posts ou eventos criados por este usuário.' }}
         </small>
       </div>
     </div>
@@ -261,8 +276,14 @@ function handleClear() {
 /* Escopo selector */
 .scope-options {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 0.5rem;
+}
+
+@media (max-width: 480px) {
+  .scope-options {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 .scope-option {
