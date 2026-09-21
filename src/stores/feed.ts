@@ -524,6 +524,8 @@ export const useFeedStore = defineStore('feed', () => {
       .listen('.PostCreated', (data: { post: Post }) => {
         // Don't show banner for the author's own post (already prepended locally)
         if (data.post.user_id === currentUserId) return
+        // Don't show entertainment posts in general feed
+        if (data.post.category === 'entertainment') return
         if (eventId) {
           const exists = eventPosts.value.some(p => p.id === data.post.id)
           if (!exists) {

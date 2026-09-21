@@ -1,25 +1,22 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import type { Post } from '@/types/models'
-import { getPosts } from '@/api/posts'
+import { useAuthStore } from '@/stores/auth'
+import { useEntertainmentStore, type EntertainmentTab } from '@/stores/entertainment'
 import LetterboxdCard from '@/components/entertainment/LetterboxdCard.vue'
 import PostCardSkeleton from '@/components/feed/PostCardSkeleton.vue'
 import PullToRefreshIndicator from '@/components/ui/PullToRefreshIndicator.vue'
 import { usePullToRefresh } from '@/composables/usePullToRefresh'
 
-type EntertainmentTab = 'movies' | 'series' | 'games'
-
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
+const entertainmentStore = useEntertainmentStore()
 
-const activeTab = ref<EntertainmentTab>('movies')
-const posts = ref<Post[]>([])
-const isLoading = ref(true)
-const isLoadingMore = ref(false)
-const currentPage = ref(1)
-const lastPage = ref(1)
-const hasMore = ref(false)
+const activeTab = computed({
+  get: () => entertainmentStore.activeTab,
+  set: (val: EntertainmentTab) => entertainmentStore.setActiveTab(val),
+})
 
 const sentinelRef = ref<HTMLElement | null>(null)
 let scrollObserver: IntersectionObserver | null = null
@@ -34,43 +31,29 @@ const searchTerms = computed(() => {
 const filterDate = computed(() => (route.query.date as string) || '')
 const filterUserId = computed(() => (route.query.user_id ? Number(route.query.user_id) : null))
 
-async function fetchEntertainmentPosts(page = 1, isRefresh = false) {
-  if (page === 1 && !isRefresh) {
-    isLoading.value = true
+async function loadPostsForCurrentRoute(force = false) {
+  // Se já temos posts carregados da rede nesta sessão, não é um reload forçado nem há filtros de busca ativos, reutiliza o estado do Pinia
+  if (
+    !force &&
+    !hasSearchFilters.value &&
+    entertainmentStore.hasLoaded &&
+    entertainmentStore.posts.length > 0 &&
+    !entertainmentStore.isFiltered
+  ) {
+    return
   }
 
-  try {
-    const response = await getPosts({
-      page,
-      category: 'entertainment',
-      entertainmentType: activeTab.value === 'movies' ? 'movie' : undefined,
-      search: searchTerms.value || undefined,
-      date: filterDate.value || undefined,
-      userId: filterUserId.value || undefined,
-    })
-
-    const data = response.data
-    if (page === 1) {
-      posts.value = data.data || []
-    } else {
-      posts.value = [...posts.value, ...(data.data || [])]
-    }
-
-    currentPage.value = data.current_page || 1
-    lastPage.value = data.last_page || 1
-    hasMore.value = currentPage.value < lastPage.value
-  } catch (error) {
-    console.error('Erro ao buscar posts de entretenimento:', error)
-  } finally {
-    isLoading.value = false
-    isLoadingMore.value = false
-  }
+  await entertainmentStore.fetchEntertainmentPosts(1, {
+    search: searchTerms.value || undefined,
+    date: filterDate.value || undefined,
+    userId: filterUserId.value || undefined,
+    forceRefresh: force,
+  })
 }
 
 async function loadMore() {
-  if (isLoadingMore.value || !hasMore.value) return
-  isLoadingMore.value = true
-  await fetchEntertainmentPosts(currentPage.value + 1)
+  if (entertainmentStore.isLoadingMore || !entertainmentStore.hasMorePages) return
+  await entertainmentStore.loadMorePosts()
 }
 
 function clearSearch() {
@@ -78,19 +61,20 @@ function clearSearch() {
 }
 
 function handleTabChange(tab: EntertainmentTab) {
-  activeTab.value = tab
-  if (tab === 'movies') {
-    currentPage.value = 1
-    fetchEntertainmentPosts(1)
-  }
+  entertainmentStore.setActiveTab(tab)
 }
 
 function handlePostDeleted(deletedId: number) {
-  posts.value = posts.value.filter((p) => p.id !== deletedId)
+  entertainmentStore.deletePost(deletedId)
 }
 
 function checkSentinelIntersection() {
-  if (!sentinelRef.value || !hasMore.value || isLoading.value || isLoadingMore.value) {
+  if (
+    !sentinelRef.value ||
+    !entertainmentStore.hasMorePages ||
+    entertainmentStore.isLoading ||
+    entertainmentStore.isLoadingMore
+  ) {
     return
   }
   const rect = sentinelRef.value.getBoundingClientRect()
@@ -109,9 +93,9 @@ function setupScrollObserver() {
       const first = entries[0]
       if (
         first?.isIntersecting &&
-        hasMore.value &&
-        !isLoading.value &&
-        !isLoadingMore.value
+        entertainmentStore.hasMorePages &&
+        !entertainmentStore.isLoading &&
+        !entertainmentStore.isLoadingMore
       ) {
         loadMore()
       }
@@ -134,8 +118,8 @@ const {
   handleTouchMove,
   handleTouchEnd,
 } = usePullToRefresh(async () => {
-  if (activeTab.value === 'movies') {
-    await fetchEntertainmentPosts(1, true)
+  if (entertainmentStore.activeTab === 'movies') {
+    await loadPostsForCurrentRoute(true)
   }
 })
 
@@ -150,16 +134,15 @@ watch(
   ([name, q, search, date, userId], [, oldQ, oldSearch, oldDate, oldUserId]) => {
     if (name !== 'entertainment') return
     if (q !== oldQ || search !== oldSearch || date !== oldDate || userId !== oldUserId) {
-      currentPage.value = 1
-      fetchEntertainmentPosts(1)
+      loadPostsForCurrentRoute(true)
     }
   }
 )
 
 watch(
-  () => isLoading.value,
+  () => entertainmentStore.isLoading,
   (loading) => {
-    if (!loading && hasMore.value && sentinelRef.value) {
+    if (!loading && entertainmentStore.hasMorePages && sentinelRef.value) {
       nextTick(() => {
         checkSentinelIntersection()
       })
@@ -175,7 +158,8 @@ watch(sentinelRef, (newEl) => {
 
 onMounted(() => {
   setupScrollObserver()
-  fetchEntertainmentPosts(1)
+  entertainmentStore.subscribeToEntertainment(authStore.user?.id)
+  loadPostsForCurrentRoute()
 })
 
 onUnmounted(() => {
@@ -254,13 +238,13 @@ onUnmounted(() => {
     <main class="entertainment-stream">
       <!-- Movies Tab (Letterboxd) -->
       <section v-if="activeTab === 'movies'" class="tab-content">
-        <div v-if="isLoading" class="loading-skeletons">
+        <div v-if="entertainmentStore.isLoading && !entertainmentStore.posts.length" class="loading-skeletons">
           <PostCardSkeleton v-for="i in 3" :key="i" />
         </div>
 
-        <template v-else-if="posts.length">
+        <template v-else-if="entertainmentStore.posts.length">
           <LetterboxdCard
-            v-for="post in posts"
+            v-for="post in entertainmentStore.posts"
             :key="post.id"
             :post="post"
             @deleted="handlePostDeleted"
@@ -270,13 +254,13 @@ onUnmounted(() => {
           <div ref="sentinelRef" class="sentinel-element"></div>
 
           <!-- Loading Mais Avaliações Indicator -->
-          <div v-if="isLoadingMore" class="infinite-loading-bar">
+          <div v-if="entertainmentStore.isLoadingMore" class="infinite-loading-bar">
             <span class="refresh-dot"></span>
             <span>Carregando mais filmes...</span>
           </div>
 
           <!-- Final do Feed de Mídias -->
-          <div v-else-if="!hasMore && posts.length" class="infinite-end-card">
+          <div v-else-if="!entertainmentStore.hasMorePages && entertainmentStore.posts.length" class="infinite-end-card">
             <span class="end-marker">🎬</span>
             <span class="end-text">Você visualizou todas as avaliações de cinema!</span>
           </div>

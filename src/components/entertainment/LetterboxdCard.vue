@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import type { Post, PostComment } from '@/types/models'
 import { useAuthStore } from '@/stores/auth'
 import { useFeedStore } from '@/stores/feed'
+import { useEntertainmentStore } from '@/stores/entertainment'
 import { useImageViewerStore } from '@/stores/imageViewer'
 import {
   toggleLike,
@@ -19,9 +20,15 @@ import MentionInput from '@/components/ui/MentionInput.vue'
 import FormattedContent from '@/components/ui/FormattedContent.vue'
 import { formatRelativeTime } from '@/utils/date'
 
-const props = defineProps<{
-  post: Post
-}>()
+const props = withDefaults(
+  defineProps<{
+    post: Post
+    defaultShowComments?: boolean
+  }>(),
+  {
+    defaultShowComments: false,
+  }
+)
 
 const emit = defineEmits<{
   (e: 'deleted', postId: number): void
@@ -30,14 +37,29 @@ const emit = defineEmits<{
 
 const authStore = useAuthStore()
 const feedStore = useFeedStore()
+const entertainmentStore = useEntertainmentStore()
 const imageViewer = useImageViewerStore()
 
 const isLiked = ref(props.post.is_liked || false)
 const likesCount = ref(props.post.likes_count || 0)
-const showComments = ref(false)
+const showComments = ref(props.defaultShowComments)
 const showDeleteModal = ref(false)
 const showRepostModal = ref(false)
 const isDeleting = ref(false)
+
+watch(
+  () => props.post.is_liked,
+  (val) => {
+    isLiked.value = val ?? false
+  }
+)
+
+watch(
+  () => props.post.likes_count,
+  (val) => {
+    likesCount.value = val ?? 0
+  }
+)
 
 const isAuthor = computed(() => {
   return (authStore.user?.id && authStore.user.id === props.post.user_id) || authStore.isAdmin
@@ -63,15 +85,35 @@ function formatDate(dateStr?: string | null): string {
 }
 
 async function handleLikeToggle() {
-  try {
-    const previousState = isLiked.value
-    isLiked.value = !previousState
-    likesCount.value += previousState ? -1 : 1
+  const previousState = isLiked.value
+  const previousCount = likesCount.value
+  const nextLiked = !previousState
+  const nextCount = Math.max(0, previousCount + (nextLiked ? 1 : -1))
 
-    await toggleLike(props.post.id)
+  isLiked.value = nextLiked
+  likesCount.value = nextCount
+
+  try {
+    const res = await toggleLike(props.post.id)
+    isLiked.value = res.data.is_liked
+    likesCount.value = res.data.likes_count
+    props.post.is_liked = res.data.is_liked
+    props.post.likes_count = res.data.likes_count
+
+    const postInEnt = entertainmentStore.posts.find(p => p.id === props.post.id)
+    if (postInEnt && postInEnt !== props.post) {
+      postInEnt.is_liked = res.data.is_liked
+      postInEnt.likes_count = res.data.likes_count
+    }
+
+    const postInUser = feedStore.userPosts.find(p => p.id === props.post.id)
+    if (postInUser && postInUser !== props.post) {
+      postInUser.is_liked = res.data.is_liked
+      postInUser.likes_count = res.data.likes_count
+    }
   } catch {
-    isLiked.value = !isLiked.value
-    likesCount.value += isLiked.value ? 1 : -1
+    isLiked.value = previousState
+    likesCount.value = previousCount
   }
 }
 
@@ -278,6 +320,8 @@ async function saveEditComment(commentId: number) {
       }
     }
     updateInList(props.post)
+    const postInEnt = entertainmentStore.posts.find((p) => p.id === props.post.id)
+    if (postInEnt && postInEnt !== props.post) updateInList(postInEnt)
     const postInUser = feedStore.userPosts.find((p) => p.id === props.post.id)
     if (postInUser && postInUser !== props.post) updateInList(postInUser)
 
@@ -314,6 +358,8 @@ async function confirmDeleteComment() {
       }
     }
     removeInList(props.post)
+    const postInEnt = entertainmentStore.posts.find((p) => p.id === props.post.id)
+    if (postInEnt && postInEnt !== props.post) removeInList(postInEnt)
     const postInUser = feedStore.userPosts.find((p) => p.id === props.post.id)
     if (postInUser && postInUser !== props.post) removeInList(postInUser)
 
@@ -367,16 +413,19 @@ async function submitReply(parentId: number) {
   isSubmittingReply.value = true
   try {
     const res = await addComment(props.post.id, replyContent.value.trim(), parentId)
-    if (!props.post.comments) props.post.comments = []
-    props.post.comments.push(res.data)
-    props.post.comments_count = (props.post.comments_count || 0) + 1
-
-    const postInUser = feedStore.userPosts.find((p) => p.id === props.post.id)
-    if (postInUser && postInUser !== props.post) {
-      if (!postInUser.comments) postInUser.comments = []
-      postInUser.comments.push(res.data)
-      postInUser.comments_count = (postInUser.comments_count || 0) + 1
+    const appendToList = (p: Post) => {
+      if (!p.comments) p.comments = []
+      const idx = p.comments.findIndex(c => c.id === res.data.id)
+      if (idx === -1) {
+        p.comments.push(res.data)
+        p.comments_count = (p.comments_count || 0) + 1
+      }
     }
+    appendToList(props.post)
+    const postInEnt = entertainmentStore.posts.find((p) => p.id === props.post.id)
+    if (postInEnt && postInEnt !== props.post) appendToList(postInEnt)
+    const postInUser = feedStore.userPosts.find((p) => p.id === props.post.id)
+    if (postInUser && postInUser !== props.post) appendToList(postInUser)
 
     replyContent.value = ''
     replyingToCommentId.value = null
@@ -418,16 +467,19 @@ async function handleAddComment() {
   isSubmittingComment.value = true
   try {
     const res = await addComment(props.post.id, commentContent.value.trim(), null)
-    if (!props.post.comments) props.post.comments = []
-    props.post.comments.push(res.data)
-    props.post.comments_count = (props.post.comments_count || 0) + 1
-
-    const postInUser = feedStore.userPosts.find((p) => p.id === props.post.id)
-    if (postInUser && postInUser !== props.post) {
-      if (!postInUser.comments) postInUser.comments = []
-      postInUser.comments.push(res.data)
-      postInUser.comments_count = (postInUser.comments_count || 0) + 1
+    const appendToList = (p: Post) => {
+      if (!p.comments) p.comments = []
+      const idx = p.comments.findIndex(c => c.id === res.data.id)
+      if (idx === -1) {
+        p.comments.push(res.data)
+        p.comments_count = (p.comments_count || 0) + 1
+      }
     }
+    appendToList(props.post)
+    const postInEnt = entertainmentStore.posts.find((p) => p.id === props.post.id)
+    if (postInEnt && postInEnt !== props.post) appendToList(postInEnt)
+    const postInUser = feedStore.userPosts.find((p) => p.id === props.post.id)
+    if (postInUser && postInUser !== props.post) appendToList(postInUser)
 
     commentContent.value = ''
   } catch (err) {
