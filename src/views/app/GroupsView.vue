@@ -26,14 +26,32 @@ const {
 } = usePullToRefresh(() => loadGroups(true))
 
 const hasSearchFilters = computed(() => {
-  return !!(route.query.q || route.query.search || route.query.date || route.query.user_id)
+  return !!(route.query.q || route.query.search || route.query.start_date || route.query.end_date || route.query.date || route.query.user_id)
 })
 
 const searchTerms = computed(() => {
   return (route.query.q as string) || (route.query.search as string) || ''
 })
+const filterStartDate = computed(() => (route.query.start_date as string) || '')
+const filterEndDate = computed(() => (route.query.end_date as string) || '')
 const filterDate = computed(() => (route.query.date as string) || '')
 const filterUserId = computed(() => route.query.user_id ? Number(route.query.user_id) : null)
+
+const dateFilterLabel = computed(() => {
+  if (filterStartDate.value && filterEndDate.value) {
+    return `Período: ${filterStartDate.value} até ${filterEndDate.value}`
+  }
+  if (filterStartDate.value) {
+    return `A partir de: ${filterStartDate.value}`
+  }
+  if (filterEndDate.value) {
+    return `Até: ${filterEndDate.value}`
+  }
+  if (filterDate.value) {
+    return `Data: ${filterDate.value}`
+  }
+  return ''
+})
 
 async function loadGroups(force = false) {
   if (!force && !hasSearchFilters.value && (groupsStore.hasLoaded || groupsStore.myGroups.length > 0)) {
@@ -43,6 +61,8 @@ async function loadGroups(force = false) {
   await groupsStore.fetchMyGroups({
     search: searchTerms.value || undefined,
     date: filterDate.value || undefined,
+    startDate: filterStartDate.value || undefined,
+    endDate: filterEndDate.value || undefined,
     userId: filterUserId.value || undefined,
   })
 }
@@ -52,12 +72,14 @@ watch(
     route.name,
     route.query.q,
     route.query.search,
+    route.query.start_date,
+    route.query.end_date,
     route.query.date,
     route.query.user_id,
   ],
-  ([name, q, search, date, userId], [, oldQ, oldSearch, oldDate, oldUserId]) => {
+  ([name, q, search, startDate, endDate, date, userId], [, oldQ, oldSearch, oldStartDate, oldEndDate, oldDate, oldUserId]) => {
     if (name !== 'groups') return
-    if (q !== oldQ || search !== oldSearch || date !== oldDate || userId !== oldUserId) {
+    if (q !== oldQ || search !== oldSearch || startDate !== oldStartDate || endDate !== oldEndDate || date !== oldDate || userId !== oldUserId) {
       loadGroups(true)
     }
   }
@@ -128,7 +150,7 @@ function onGroupCreated() {
       <div class="search-filter-info">
         <span class="search-filter-title">🔍 Filtro de grupos:</span>
         <span v-if="searchTerms" class="search-tag">Texto: "{{ searchTerms }}"</span>
-        <span v-if="filterDate" class="search-tag">Data: {{ filterDate }}</span>
+        <span v-if="dateFilterLabel" class="search-tag">{{ dateFilterLabel }}</span>
         <span v-if="filterUserId" class="search-tag">Criador ID: {{ filterUserId }}</span>
       </div>
       <button type="button" class="clear-search-link" @click="clearSearch">

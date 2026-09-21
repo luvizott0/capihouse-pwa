@@ -1,8 +1,21 @@
 import apiClient from './client'
 import type { Group, GroupMessage, User } from '@/types/models'
 
-export function getGroups(params?: { my_groups?: boolean; page?: number; search?: string; date?: string; user_id?: number }) {
-  return apiClient.get<{ data: Group[]; current_page: number; last_page: number }>('/groups', { params })
+export function getGroups(params?: {
+  my_groups?: boolean
+  page?: number
+  search?: string
+  date?: string
+  startDate?: string
+  endDate?: string
+  start_date?: string
+  end_date?: string
+  user_id?: number
+}) {
+  const queryParams: Record<string, unknown> = { ...params }
+  if (params?.startDate) queryParams.start_date = params.startDate
+  if (params?.endDate) queryParams.end_date = params.endDate
+  return apiClient.get<{ data: Group[]; current_page: number; last_page: number }>('/groups', { params: queryParams })
 }
 
 export function getGroup(id: number) {

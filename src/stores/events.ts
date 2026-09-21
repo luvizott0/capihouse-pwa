@@ -35,11 +35,11 @@ export const useEventsStore = defineStore('events', () => {
 
   const hasMorePages = computed(() => currentPage.value < lastPage.value)
 
-  const activeFilters = ref<{ search?: string; date?: string; userId?: number }>({})
+  const activeFilters = ref<{ search?: string; date?: string; startDate?: string; endDate?: string; userId?: number }>({})
 
   async function fetchEvents(
     page = 1,
-    options?: { search?: string; date?: string; userId?: number }
+    options?: { search?: string; date?: string; startDate?: string; endDate?: string; userId?: number }
   ) {
     if (page > 1) {
       isLoadingMore.value = true
@@ -51,6 +51,8 @@ export const useEventsStore = defineStore('events', () => {
       activeFilters.value = {
         search: options.search || undefined,
         date: options.date || undefined,
+        startDate: options.startDate || undefined,
+        endDate: options.endDate || undefined,
         userId: options.userId || undefined,
       }
     } else if (page === 1) {
@@ -61,12 +63,14 @@ export const useEventsStore = defineStore('events', () => {
         page,
         search: activeFilters.value.search,
         date: activeFilters.value.date,
+        startDate: activeFilters.value.startDate,
+        endDate: activeFilters.value.endDate,
         userId: activeFilters.value.userId,
       })
       if (page === 1) {
         events.value = res.data.data
         hasLoaded.value = true
-        if (!activeFilters.value.search && !activeFilters.value.date && !activeFilters.value.userId) {
+        if (!activeFilters.value.search && !activeFilters.value.date && !activeFilters.value.startDate && !activeFilters.value.endDate && !activeFilters.value.userId) {
           saveEventsCache(res.data.data)
         }
       } else {

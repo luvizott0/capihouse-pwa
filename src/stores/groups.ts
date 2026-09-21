@@ -33,14 +33,16 @@ export const useGroupsStore = defineStore('groups', () => {
   const isSending = ref(false)
   const hasLoaded = ref(initialGroups.length > 0)
 
-  const activeFilters = ref<{ search?: string; date?: string; userId?: number }>({})
+  const activeFilters = ref<{ search?: string; date?: string; startDate?: string; endDate?: string; userId?: number }>({})
 
-  async function fetchMyGroups(options?: { search?: string; date?: string; userId?: number }) {
+  async function fetchMyGroups(options?: { search?: string; date?: string; startDate?: string; endDate?: string; userId?: number }) {
     isLoading.value = true
     if (options) {
       activeFilters.value = {
         search: options.search || undefined,
         date: options.date || undefined,
+        startDate: options.startDate || undefined,
+        endDate: options.endDate || undefined,
         userId: options.userId || undefined,
       }
     } else {
@@ -50,11 +52,13 @@ export const useGroupsStore = defineStore('groups', () => {
       const res = await groupsApi.getGroups({
         search: activeFilters.value.search,
         date: activeFilters.value.date,
+        startDate: activeFilters.value.startDate,
+        endDate: activeFilters.value.endDate,
         user_id: activeFilters.value.userId,
       })
       myGroups.value = res.data.data
       hasLoaded.value = true
-      if (!activeFilters.value.search && !activeFilters.value.date && !activeFilters.value.userId) {
+      if (!activeFilters.value.search && !activeFilters.value.date && !activeFilters.value.startDate && !activeFilters.value.endDate && !activeFilters.value.userId) {
         saveGroupsCache(res.data.data)
       }
     } catch (err) {

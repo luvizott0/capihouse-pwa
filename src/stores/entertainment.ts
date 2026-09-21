@@ -56,13 +56,13 @@ export const useEntertainmentStore = defineStore('entertainment', () => {
 
   const hasMorePages = computed(() => currentPage.value < lastPage.value)
 
-  const activeFilters = ref<{ search?: string; date?: string; userId?: number }>({})
+  const activeFilters = ref<{ search?: string; date?: string; startDate?: string; endDate?: string; userId?: number }>({})
   const isFiltered = ref(false)
   let isSubscribed = false
 
   async function fetchEntertainmentPosts(
     page = 1,
-    options?: { search?: string; date?: string; userId?: number; forceRefresh?: boolean }
+    options?: { search?: string; date?: string; startDate?: string; endDate?: string; userId?: number; forceRefresh?: boolean }
   ) {
     if (page > 1) {
       isLoadingMore.value = true
@@ -77,6 +77,8 @@ export const useEntertainmentStore = defineStore('entertainment', () => {
       activeFilters.value = {
         search: options.search || undefined,
         date: options.date || undefined,
+        startDate: options.startDate || undefined,
+        endDate: options.endDate || undefined,
         userId: options.userId || undefined,
       }
     } else if (page === 1) {
@@ -86,6 +88,8 @@ export const useEntertainmentStore = defineStore('entertainment', () => {
     const hasAnyFilter = Boolean(
       activeFilters.value.search ||
       activeFilters.value.date ||
+      activeFilters.value.startDate ||
+      activeFilters.value.endDate ||
       activeFilters.value.userId
     )
 
@@ -96,6 +100,8 @@ export const useEntertainmentStore = defineStore('entertainment', () => {
         entertainmentType: activeTab.value === 'movies' ? 'movie' : undefined,
         search: activeFilters.value.search,
         date: activeFilters.value.date,
+        startDate: activeFilters.value.startDate,
+        endDate: activeFilters.value.endDate,
         userId: activeFilters.value.userId,
       })
 

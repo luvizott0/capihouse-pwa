@@ -4,6 +4,8 @@ export interface GetEventsParams {
   page?: number
   search?: string
   date?: string
+  startDate?: string
+  endDate?: string
   userId?: number
 }
 
@@ -15,6 +17,8 @@ export function getEvents(paramsOrPage: number | GetEventsParams = 1) {
     if (paramsOrPage.page) params.page = paramsOrPage.page
     if (paramsOrPage.search) params.search = paramsOrPage.search
     if (paramsOrPage.date) params.date = paramsOrPage.date
+    if (paramsOrPage.startDate) params.start_date = paramsOrPage.startDate
+    if (paramsOrPage.endDate) params.end_date = paramsOrPage.endDate
     if (paramsOrPage.userId) params.user_id = paramsOrPage.userId
   }
   return apiClient.get('/events', { params })

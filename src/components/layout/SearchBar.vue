@@ -17,7 +17,8 @@ const showFilterModal = ref(false)
 // Search fields
 const searchQuery = ref('')
 const selectedScope = ref<SearchScope>('posts')
-const selectedDate = ref('')
+const selectedStartDate = ref('')
+const selectedEndDate = ref('')
 const selectedUserId = ref<number | null>(null)
 
 // Deduce default scope from current route
@@ -31,7 +32,10 @@ function getScopeFromRoutePath(path: string): SearchScope {
 // Sync fields from route query and path
 function syncFromRoute() {
   searchQuery.value = typeof route.query.q === 'string' ? route.query.q : (typeof route.query.search === 'string' ? route.query.search : '')
-  selectedDate.value = typeof route.query.date === 'string' ? route.query.date : ''
+  selectedStartDate.value = typeof route.query.start_date === 'string'
+    ? route.query.start_date
+    : (typeof route.query.date === 'string' ? route.query.date : '')
+  selectedEndDate.value = typeof route.query.end_date === 'string' ? route.query.end_date : ''
   selectedUserId.value = route.query.user_id ? Number(route.query.user_id) : null
   selectedScope.value = getScopeFromRoutePath(route.path)
 }
@@ -50,7 +54,7 @@ watch(
 // Active filter count (excluding query text, counting date and user)
 const activeFilterCount = computed(() => {
   let count = 0
-  if (selectedDate.value) count++
+  if (selectedStartDate.value || selectedEndDate.value) count++
   if (selectedUserId.value !== null) count++
   return count
 })
@@ -69,7 +73,8 @@ function executeSearch() {
   const query: Record<string, string> = {}
   const trimmed = searchQuery.value.trim()
   if (trimmed) query.q = trimmed
-  if (selectedDate.value) query.date = selectedDate.value
+  if (selectedStartDate.value) query.start_date = selectedStartDate.value
+  if (selectedEndDate.value) query.end_date = selectedEndDate.value
   if (selectedUserId.value !== null) query.user_id = String(selectedUserId.value)
 
   router.push({
@@ -85,13 +90,15 @@ function clearSearch() {
 
 function handleApplyFilters(filters: SearchFilterState) {
   selectedScope.value = filters.scope
-  selectedDate.value = filters.date
+  selectedStartDate.value = filters.startDate
+  selectedEndDate.value = filters.endDate
   selectedUserId.value = filters.userId
   executeSearch()
 }
 
 function handleClearFilters() {
-  selectedDate.value = ''
+  selectedStartDate.value = ''
+  selectedEndDate.value = ''
   selectedUserId.value = null
   executeSearch()
 }
@@ -187,7 +194,8 @@ const currentAction = computed(() => {
     <SearchFilterModal
       v-model="showFilterModal"
       :initial-scope="selectedScope"
-      :initial-date="selectedDate"
+      :initial-start-date="selectedStartDate"
+      :initial-end-date="selectedEndDate"
       :initial-user-id="selectedUserId"
       @apply="handleApplyFilters"
       @clear="handleClearFilters"

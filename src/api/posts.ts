@@ -7,6 +7,8 @@ export interface GetPostsParams {
   eventId?: number
   search?: string
   date?: string
+  startDate?: string
+  endDate?: string
   userId?: number
   category?: string
   entertainmentType?: string
@@ -23,6 +25,8 @@ export function getPosts(paramsOrPage: number | GetPostsParams = 1, groupId?: nu
     if (paramsOrPage.eventId) params.event_id = paramsOrPage.eventId
     if (paramsOrPage.search) params.search = paramsOrPage.search
     if (paramsOrPage.date) params.date = paramsOrPage.date
+    if (paramsOrPage.startDate) params.start_date = paramsOrPage.startDate
+    if (paramsOrPage.endDate) params.end_date = paramsOrPage.endDate
     if (paramsOrPage.userId) params.user_id = paramsOrPage.userId
     if (paramsOrPage.category) params.category = paramsOrPage.category
     if (paramsOrPage.entertainmentType) params.entertainment_type = paramsOrPage.entertainmentType

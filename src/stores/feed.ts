@@ -61,7 +61,7 @@ export const useFeedStore = defineStore('feed', () => {
   /** Holds incoming posts that haven't been prepended yet (shown via banner). */
   const pendingPosts = ref<Post[]>([])
 
-  const activeFilters = ref<{ search?: string; date?: string; userId?: number }>({})
+  const activeFilters = ref<{ search?: string; date?: string; startDate?: string; endDate?: string; userId?: number }>({})
   const isFiltered = ref(false)
 
   // Profile-specific posts to avoid polluting the main feed
@@ -83,7 +83,7 @@ export const useFeedStore = defineStore('feed', () => {
 
   async function fetchPosts(
     page = 1,
-    options?: { groupId?: number; eventId?: number; search?: string; date?: string; userId?: number; forceRefresh?: boolean } | number
+    options?: { groupId?: number; eventId?: number; search?: string; date?: string; startDate?: string; endDate?: string; userId?: number; forceRefresh?: boolean } | number
   ) {
     if (page > 1) {
       isLoadingMore.value = true
@@ -100,6 +100,8 @@ export const useFeedStore = defineStore('feed', () => {
       activeFilters.value = {
         search: options.search || undefined,
         date: options.date || undefined,
+        startDate: options.startDate || undefined,
+        endDate: options.endDate || undefined,
         userId: options.userId || undefined,
       }
     } else if (page === 1) {
@@ -115,6 +117,8 @@ export const useFeedStore = defineStore('feed', () => {
       targetGroupId ||
       activeFilters.value.search ||
       activeFilters.value.date ||
+      activeFilters.value.startDate ||
+      activeFilters.value.endDate ||
       activeFilters.value.userId
     )
 
@@ -124,6 +128,8 @@ export const useFeedStore = defineStore('feed', () => {
         groupId: targetGroupId,
         search: activeFilters.value.search,
         date: activeFilters.value.date,
+        startDate: activeFilters.value.startDate,
+        endDate: activeFilters.value.endDate,
         userId: activeFilters.value.userId,
       })
       currentPage.value = res.data.current_page

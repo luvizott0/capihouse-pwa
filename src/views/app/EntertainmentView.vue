@@ -22,14 +22,32 @@ const sentinelRef = ref<HTMLElement | null>(null)
 let scrollObserver: IntersectionObserver | null = null
 
 const hasSearchFilters = computed(() => {
-  return !!(route.query.q || route.query.search || route.query.date || route.query.user_id)
+  return !!(route.query.q || route.query.search || route.query.start_date || route.query.end_date || route.query.date || route.query.user_id)
 })
 
 const searchTerms = computed(() => {
   return (route.query.q as string) || (route.query.search as string) || ''
 })
+const filterStartDate = computed(() => (route.query.start_date as string) || '')
+const filterEndDate = computed(() => (route.query.end_date as string) || '')
 const filterDate = computed(() => (route.query.date as string) || '')
 const filterUserId = computed(() => (route.query.user_id ? Number(route.query.user_id) : null))
+
+const dateFilterLabel = computed(() => {
+  if (filterStartDate.value && filterEndDate.value) {
+    return `Período: ${filterStartDate.value} até ${filterEndDate.value}`
+  }
+  if (filterStartDate.value) {
+    return `A partir de: ${filterStartDate.value}`
+  }
+  if (filterEndDate.value) {
+    return `Até: ${filterEndDate.value}`
+  }
+  if (filterDate.value) {
+    return `Data: ${filterDate.value}`
+  }
+  return ''
+})
 
 async function loadPostsForCurrentRoute(force = false) {
   // Se já temos posts carregados da rede nesta sessão, não é um reload forçado nem há filtros de busca ativos, reutiliza o estado do Pinia
@@ -46,6 +64,8 @@ async function loadPostsForCurrentRoute(force = false) {
   await entertainmentStore.fetchEntertainmentPosts(1, {
     search: searchTerms.value || undefined,
     date: filterDate.value || undefined,
+    startDate: filterStartDate.value || undefined,
+    endDate: filterEndDate.value || undefined,
     userId: filterUserId.value || undefined,
     forceRefresh: force,
   })
@@ -128,12 +148,14 @@ watch(
     route.name,
     route.query.q,
     route.query.search,
+    route.query.start_date,
+    route.query.end_date,
     route.query.date,
     route.query.user_id,
   ],
-  ([name, q, search, date, userId], [, oldQ, oldSearch, oldDate, oldUserId]) => {
+  ([name, q, search, startDate, endDate, date, userId], [, oldQ, oldSearch, oldStartDate, oldEndDate, oldDate, oldUserId]) => {
     if (name !== 'entertainment') return
-    if (q !== oldQ || search !== oldSearch || date !== oldDate || userId !== oldUserId) {
+    if (q !== oldQ || search !== oldSearch || startDate !== oldStartDate || endDate !== oldEndDate || date !== oldDate || userId !== oldUserId) {
       loadPostsForCurrentRoute(true)
     }
   }
@@ -194,7 +216,7 @@ onUnmounted(() => {
       <div class="search-filter-info">
         <span class="search-filter-title">🔍 Filtro de busca:</span>
         <span v-if="searchTerms" class="search-tag">Texto: "{{ searchTerms }}"</span>
-        <span v-if="filterDate" class="search-tag">Data: {{ filterDate }}</span>
+        <span v-if="dateFilterLabel" class="search-tag">{{ dateFilterLabel }}</span>
         <span v-if="filterUserId" class="search-tag">Usuário ID: {{ filterUserId }}</span>
       </div>
       <button type="button" class="clear-search-link" @click="clearSearch">

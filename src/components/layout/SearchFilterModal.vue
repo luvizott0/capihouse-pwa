@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch } from 'vue'
 import type { User } from '@/types/models'
 import { getUsers } from '@/api/users'
 import RetroModal from '@/components/ui/RetroModal.vue'
@@ -8,7 +8,9 @@ export type SearchScope = 'posts' | 'entertainment' | 'events' | 'groups'
 
 export interface SearchFilterState {
   scope: SearchScope
-  date: string
+  date?: string
+  startDate: string
+  endDate: string
   userId: number | null
 }
 
@@ -16,6 +18,8 @@ const props = defineProps<{
   modelValue: boolean
   initialScope?: SearchScope
   initialDate?: string
+  initialStartDate?: string
+  initialEndDate?: string
   initialUserId?: number | null
 }>()
 
@@ -26,7 +30,8 @@ const emit = defineEmits<{
 }>()
 
 const scope = ref<SearchScope>(props.initialScope || 'posts')
-const date = ref(props.initialDate || '')
+const startDate = ref(props.initialStartDate || props.initialDate || '')
+const endDate = ref(props.initialEndDate || '')
 const userId = ref<number | null>(props.initialUserId ?? null)
 
 const availableUsers = ref<User[]>([])
@@ -48,23 +53,31 @@ async function loadUsers() {
 watch(() => props.modelValue, (isOpen) => {
   if (isOpen) {
     scope.value = props.initialScope || 'posts'
-    date.value = props.initialDate || ''
+    startDate.value = props.initialStartDate || props.initialDate || ''
+    endDate.value = props.initialEndDate || ''
     userId.value = props.initialUserId ?? null
     loadUsers()
   }
 })
 
+function clearDates() {
+  startDate.value = ''
+  endDate.value = ''
+}
+
 function handleApply() {
   emit('apply', {
     scope: scope.value,
-    date: date.value,
+    date: startDate.value && !endDate.value ? startDate.value : '',
+    startDate: startDate.value,
+    endDate: endDate.value,
     userId: userId.value,
   })
   emit('update:modelValue', false)
 }
 
 function handleClear() {
-  date.value = ''
+  clearDates()
   userId.value = null
   emit('clear')
   emit('update:modelValue', false)
@@ -75,7 +88,7 @@ function handleClear() {
   <RetroModal
     :model-value="modelValue"
     title="Filtros de Pesquisa"
-    size="sm"
+    size="md"
     @update:model-value="emit('update:modelValue', $event)"
   >
     <div class="filter-modal-body">
@@ -145,29 +158,43 @@ function handleClear() {
         </div>
       </div>
 
-      <!-- Filtro por Data -->
+      <!-- Filtro por Intervalo de Datas (Date Range) -->
       <div class="filter-section">
         <div class="filter-label-row">
-          <label for="filter-date-input" class="filter-label">Filtrar por data:</label>
+          <label class="filter-label">Filtrar por período:</label>
           <button
-            v-if="date"
+            v-if="startDate || endDate"
             type="button"
             class="clear-field-link"
-            @click="date = ''"
+            @click="clearDates"
           >
-            Limpar data
+            Limpar período
           </button>
         </div>
-        <div class="input-with-clear">
-          <input
-            id="filter-date-input"
-            type="date"
-            v-model="date"
-            class="retro-filter-input"
-          />
+        <div class="date-range-grid">
+          <div class="date-field-group">
+            <label for="filter-start-date" class="date-sublabel">Data inicial:</label>
+            <input
+              id="filter-start-date"
+              type="date"
+              v-model="startDate"
+              class="retro-filter-input"
+              :max="endDate || undefined"
+            />
+          </div>
+          <div class="date-field-group">
+            <label for="filter-end-date" class="date-sublabel">Data final:</label>
+            <input
+              id="filter-end-date"
+              type="date"
+              v-model="endDate"
+              class="retro-filter-input"
+              :min="startDate || undefined"
+            />
+          </div>
         </div>
         <small class="filter-hint">
-          {{ scope === 'events' ? 'Filtra eventos marcados para este dia.' : scope === 'entertainment' ? 'Filtra mídias assistidas nesta data.' : 'Filtra publicações ou grupos criados nesta data.' }}
+          {{ scope === 'events' ? 'Filtra eventos marcados neste intervalo de datas.' : scope === 'entertainment' ? 'Filtra mídias assistidas neste intervalo de datas.' : 'Filtra publicações ou grupos criados neste intervalo de datas.' }}
         </small>
       </div>
 
@@ -232,18 +259,25 @@ function handleClear() {
   flex-direction: column;
   gap: 1.1rem;
   padding: 0.25rem 0;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .filter-section {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .filter-label-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  width: 100%;
 }
 
 .filter-label {
@@ -267,6 +301,38 @@ function handleClear() {
   color: #d32f2f;
 }
 
+.date-range-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+@media (max-width: 480px) {
+  .date-range-grid {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+}
+
+.date-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.date-sublabel {
+  font-family: var(--font-heading, monospace);
+  font-size: 0.72rem;
+  font-weight: bold;
+  color: var(--color-primary-800, #4E342E);
+}
+
 .filter-hint {
   font-size: 0.7rem;
   color: #795548;
@@ -278,6 +344,8 @@ function handleClear() {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 0.5rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 @media (max-width: 480px) {
@@ -298,6 +366,8 @@ function handleClear() {
   cursor: pointer;
   transition: all 0.15s ease;
   user-select: none;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .scope-option:hover {
@@ -321,6 +391,7 @@ function handleClear() {
   font-family: var(--font-heading, monospace);
   font-size: 0.78rem;
   font-weight: bold;
+  text-align: center;
 }
 
 .scope-option.active .scope-text {
@@ -331,6 +402,8 @@ function handleClear() {
 .retro-filter-input,
 .retro-filter-select {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   padding: 0.5rem 0.6rem;
   font-family: var(--font-body, monospace);
   font-size: 0.85rem;
@@ -366,6 +439,7 @@ function handleClear() {
   justify-content: flex-end;
   gap: 0.5rem;
   width: 100%;
+  box-sizing: border-box;
 }
 
 .btn-clear-filters {
