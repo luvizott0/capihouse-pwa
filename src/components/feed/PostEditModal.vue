@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import type { Post } from '@/types/models'
+import { ref, computed, watch, onUnmounted } from 'vue'
+import type { Post, Media } from '@/types/models'
 import { useFeedStore } from '@/stores/feed'
 import RetroModal from '@/components/ui/RetroModal.vue'
 import RetroButton from '@/components/ui/RetroButton.vue'
 import EmojiPicker from '@/components/ui/EmojiPicker.vue'
 import MentionInput from '@/components/ui/MentionInput.vue'
+import { compressImageFile } from '@/utils/imageCompressor'
 
 const props = defineProps<{
   modelValue: boolean
@@ -19,12 +20,48 @@ const emit = defineEmits<{
 
 const feedStore = useFeedStore()
 
+const MAX_FILES = 5
+const MAX_FILE_SIZE = 20 * 1024 * 1024 // 20 MB por arquivo
+const MAX_TOTAL_SIZE = 50 * 1024 * 1024 // 50 MB total do lote
+
 const content = ref('')
 const feelingEmoji = ref('😊')
 const feelingText = ref('')
 const hashtagInput = ref('')
 const hashtags = ref<string[]>([])
+const existingMedia = ref<Media[]>([])
+const removedMediaIds = ref<number[]>([])
+const selectedFiles = ref<File[]>([])
+const filePreviews = ref<string[]>([])
 const errorMsg = ref('')
+const isCompressing = ref(false)
+
+const totalMediaCount = computed(() => {
+  return existingMedia.value.length + selectedFiles.value.length
+})
+
+const totalFilesSize = computed(() => {
+  return selectedFiles.value.reduce((acc, file) => acc + file.size, 0)
+})
+
+const isOverTotalLimit = computed(() => {
+  return totalFilesSize.value > MAX_TOTAL_SIZE
+})
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B'
+  const mb = bytes / (1024 * 1024)
+  if (mb >= 1) {
+    return `${mb.toFixed(1)} MB`
+  }
+  const kb = bytes / 1024
+  return `${kb.toFixed(0)} KB`
+}
+
+function cleanupPreviews() {
+  filePreviews.value.forEach(url => URL.revokeObjectURL(url))
+  filePreviews.value = []
+}
 
 function populate() {
   if (props.post) {
@@ -32,13 +69,25 @@ function populate() {
     feelingEmoji.value = props.post.feeling?.emoji || '😊'
     feelingText.value = props.post.feeling?.name || ''
     hashtags.value = (props.post.hashtags || []).map(h => h.name)
+    existingMedia.value = props.post.media ? [...props.post.media] : []
+    removedMediaIds.value = []
+    cleanupPreviews()
+    selectedFiles.value = []
     errorMsg.value = ''
   }
 }
 
 watch(() => props.post, populate, { immediate: true })
 watch(() => props.modelValue, (isOpen) => {
-  if (isOpen) populate()
+  if (isOpen) {
+    populate()
+  } else {
+    cleanupPreviews()
+  }
+})
+
+onUnmounted(() => {
+  cleanupPreviews()
 })
 
 function clearFeeling() {
@@ -58,28 +107,130 @@ function removeHashtag(tag: string) {
   hashtags.value = hashtags.value.filter(t => t !== tag)
 }
 
+function removeExistingMedia(index: number) {
+  const media = existingMedia.value[index]
+  if (media) {
+    removedMediaIds.value.push(media.id)
+    existingMedia.value.splice(index, 1)
+  }
+  errorMsg.value = ''
+}
+
+function removeNewFile(index: number) {
+  const [removedUrl] = filePreviews.value.splice(index, 1)
+  if (removedUrl) {
+    URL.revokeObjectURL(removedUrl)
+  }
+  selectedFiles.value.splice(index, 1)
+  errorMsg.value = ''
+}
+
+async function handleFileSelect(e: Event) {
+  errorMsg.value = ''
+  const input = e.target as HTMLInputElement
+  if (!input.files || input.files.length === 0) return
+
+  const files = Array.from(input.files)
+  isCompressing.value = true
+
+  try {
+    for (const file of files) {
+      if (totalMediaCount.value >= MAX_FILES) {
+        errorMsg.value = `Você pode anexar no máximo ${MAX_FILES} arquivos por publicação.`
+        break
+      }
+
+      // Validar tipo de arquivo
+      const isValidType = file.type.startsWith('image/') || file.type.startsWith('video/')
+      if (!isValidType) {
+        errorMsg.value = `O arquivo "${file.name}" não é suportado. Use imagens (JPG, PNG, GIF, WEBP) ou vídeos (MP4, MOV).`
+        continue
+      }
+
+      // Validar tamanho individual original (20 MB)
+      if (file.size > MAX_FILE_SIZE) {
+        errorMsg.value = `O arquivo "${file.name}" (${formatBytes(file.size)}) ultrapassa o limite de 20MB por arquivo.`
+        continue
+      }
+
+      // Se for imagem, comprime para economizar dados e acelerar upload
+      let finalFile = file
+      if (file.type.startsWith('image/') && file.type !== 'image/gif') {
+        finalFile = await compressImageFile(file)
+      }
+
+      // Validar se excede tamanho total seguro de 50 MB
+      if (totalFilesSize.value + finalFile.size > MAX_TOTAL_SIZE) {
+        errorMsg.value = `Adicionar "${file.name}" ultrapassaria o limite total de 50MB para a publicação.`
+        continue
+      }
+
+      selectedFiles.value.push(finalFile)
+      filePreviews.value.push(URL.createObjectURL(finalFile))
+    }
+  } finally {
+    isCompressing.value = false
+    input.value = ''
+  }
+}
+
 async function handleSubmit() {
   errorMsg.value = ''
-  if (!content.value.trim() && (!props.post.media || props.post.media.length === 0) && !props.post.poll) {
+  const hasContent = !!content.value.trim()
+  const hasPoll = !!props.post.poll
+  const isRepost = !!props.post.repost_of_id
+
+  if (!hasContent && totalMediaCount.value === 0 && !hasPoll && !isRepost) {
     errorMsg.value = 'A publicação precisa de texto ou imagem.'
     return
   }
 
-  try {
-    await feedStore.updatePost(props.post.id, {
-      content: content.value.trim(),
-      feeling_name: feelingText.value.trim() ? feelingText.value.trim().substring(0, 15) : undefined,
-      feeling_emoji: feelingText.value.trim() ? (feelingEmoji.value || '😊') : undefined,
-      hashtags: hashtags.value,
+  if (isOverTotalLimit.value) {
+    errorMsg.value = `O tamanho total dos arquivos (${formatBytes(totalFilesSize.value)}) ultrapassa o limite seguro de 50MB. Remova algumas imagens.`
+    return
+  }
+
+  const formData = new FormData()
+  formData.append('content', content.value)
+
+  if (feelingText.value.trim()) {
+    formData.append('feeling_name', feelingText.value.trim().substring(0, 15))
+    formData.append('feeling_emoji', feelingEmoji.value || '😊')
+  }
+
+  if (hashtags.value.length === 0) {
+    formData.append('clear_hashtags', '1')
+  } else {
+    hashtags.value.forEach(tag => {
+      formData.append('hashtags[]', tag)
     })
+  }
+
+  removedMediaIds.value.forEach(id => {
+    formData.append('remove_media_ids[]', id.toString())
+  })
+
+  selectedFiles.value.forEach(file => {
+    formData.append('media[]', file)
+  })
+
+  try {
+    await feedStore.updatePost(props.post.id, formData)
+    cleanupPreviews()
+    selectedFiles.value = []
     emit('updated')
     emit('update:modelValue', false)
   } catch (err: any) {
-    errorMsg.value = err.response?.data?.message || 'Erro ao salvar alterações.'
+    if (err.response?.status === 413) {
+      errorMsg.value = 'Os arquivos enviados excedem o limite de tamanho do servidor (413 Payload Too Large). Tente reduzir a resolução ou quantidade das fotos.'
+    } else {
+      errorMsg.value = err.response?.data?.message || 'Erro ao salvar alterações.'
+    }
   }
 }
 
 function handleClose() {
+  cleanupPreviews()
   emit('update:modelValue', false)
 }
 </script>
@@ -127,6 +278,94 @@ function handleClose() {
             ×
           </button>
         </div>
+      </div>
+
+      <!-- Media Attachments Preview -->
+      <div v-if="existingMedia.length || filePreviews.length" class="media-previews">
+        <!-- Existing Media Items -->
+        <div
+          v-for="(item, index) in existingMedia"
+          :key="'existing-' + item.id"
+          class="preview-item"
+        >
+          <video
+            v-if="item.type === 'video'"
+            :src="item.url || item.path"
+            class="preview-thumb"
+          />
+          <img
+            v-else
+            :src="item.url || item.path"
+            alt="Mídia existente"
+            class="preview-thumb"
+          />
+          <button
+            type="button"
+            class="remove-thumb-btn"
+            title="Remover mídia"
+            @click="removeExistingMedia(index)"
+          >
+            ×
+          </button>
+        </div>
+
+        <!-- New Selected Files -->
+        <div
+          v-for="(preview, index) in filePreviews"
+          :key="'new-' + index"
+          class="preview-item"
+        >
+          <video
+            v-if="selectedFiles[index]?.type.startsWith('video/')"
+            :src="preview"
+            class="preview-thumb"
+          />
+          <img
+            v-else
+            :src="preview"
+            alt="Nova mídia"
+            class="preview-thumb"
+          />
+          <span v-if="selectedFiles[index]" class="preview-size-badge">
+            {{ formatBytes(selectedFiles[index].size) }}
+          </span>
+          <button
+            type="button"
+            class="remove-thumb-btn"
+            title="Remover mídia"
+            @click="removeNewFile(index)"
+          >
+            ×
+          </button>
+        </div>
+      </div>
+
+      <!-- Actions: Upload media -->
+      <div class="media-upload-row">
+        <label class="upload-label-btn" :class="{ 'disabled-btn': totalMediaCount >= MAX_FILES }">
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/quicktime"
+            multiple
+            :disabled="totalMediaCount >= MAX_FILES"
+            class="hidden-file-input"
+            @change="handleFileSelect"
+          />
+          📷 [ Anexar Fotos ]
+        </label>
+
+        <span v-if="isCompressing" class="compressing-hint">
+          ⚡ Otimizando fotos...
+        </span>
+        <span v-else-if="totalMediaCount === 0" class="muted-hint">
+          Máx: 5 fotos (até 20MB cada, 50MB total)
+        </span>
+        <span v-else class="media-status-hint" :class="{ 'limit-warning': isOverTotalLimit }">
+          {{ totalMediaCount }}/{{ MAX_FILES }} fotos
+          <template v-if="selectedFiles.length > 0">
+            • novas: {{ formatBytes(totalFilesSize) }}
+          </template>
+        </span>
       </div>
 
       <!-- Hashtags Section -->
@@ -187,22 +426,6 @@ function handleClose() {
   color: #b91c1c;
   font-size: 0.85rem;
   border-radius: 2px;
-}
-
-.retro-textarea {
-  width: 100%;
-  padding: 0.75rem;
-  font-family: var(--font-body, 'Outfit', sans-serif);
-  font-size: 0.95rem;
-  border: 2px solid var(--color-primary-200, #e8c9a5);
-  background-color: var(--color-primary-50, #f8f6f1);
-  border-radius: 2px;
-  outline: none;
-  resize: vertical;
-  min-height: 90px;
-}
-.retro-textarea:focus {
-  border-color: var(--color-primary, #a66130);
 }
 
 .section-label {
@@ -271,6 +494,119 @@ function handleClose() {
 }
 .clear-feeling-btn:hover {
   background-color: #fee2e2;
+}
+
+.media-previews {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.preview-item {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  border: 2px solid var(--color-border);
+  border-radius: 2px;
+  overflow: hidden;
+  background-color: #000;
+}
+
+.preview-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.remove-thumb-btn {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  background: rgba(0, 0, 0, 0.75);
+  color: white;
+  border: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease;
+}
+.remove-thumb-btn:hover {
+  background: #dc2626;
+}
+
+.preview-size-badge {
+  position: absolute;
+  bottom: 2px;
+  left: 2px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #ffffff;
+  font-family: var(--font-heading, monospace);
+  font-size: 0.65rem;
+  padding: 1px 4px;
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.media-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.25rem 0;
+  flex-wrap: wrap;
+}
+
+.hidden-file-input {
+  display: none;
+}
+
+.upload-label-btn {
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.85rem;
+  font-weight: bold;
+  color: var(--color-primary-800, #5f4120);
+  cursor: pointer;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--color-border, #D8CDC5);
+  background-color: var(--color-primary-100, #fdf8f3);
+  border-radius: 2px;
+  transition: all 0.15s ease;
+}
+.upload-label-btn:hover:not(.disabled-btn) {
+  background-color: var(--color-primary-200, #e8c9a5);
+}
+.upload-label-btn.disabled-btn {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: #eee;
+}
+
+.compressing-hint {
+  font-family: var(--font-heading, monospace);
+  font-size: 0.78rem;
+  color: var(--color-primary);
+  animation: pulse 1s infinite alternate;
+}
+
+.muted-hint {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+}
+
+.media-status-hint {
+  font-family: var(--font-heading, monospace);
+  font-size: 0.78rem;
+  color: var(--color-primary-800);
+}
+
+.limit-warning {
+  color: #dc2626 !important;
+  font-weight: bold;
 }
 
 .hashtag-section {
@@ -351,5 +687,14 @@ function handleClose() {
   border-top: 1px solid var(--color-border);
   padding-top: 0.75rem;
   margin-top: 0.5rem;
+}
+
+@keyframes pulse {
+  from {
+    opacity: 0.6;
+  }
+  to {
+    opacity: 1;
+  }
 }
 </style>

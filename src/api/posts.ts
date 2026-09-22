@@ -1,5 +1,6 @@
 import apiClient from './client'
-import type { PollVotersResponse } from '@/types/models'
+import type { Post, PollVotersResponse } from '@/types/models'
+
 
 export interface GetPostsParams {
   page?: number
@@ -50,8 +51,24 @@ export function deletePost(postId: number) {
   return apiClient.delete(`/posts/${postId}`)
 }
 
-export function updatePost(postId: number, data: { content?: string | null, feeling_name?: string, feeling_emoji?: string, hashtags?: string[] }) {
-  return apiClient.put(`/posts/${postId}`, data)
+export interface UpdatePostData {
+  content?: string | null
+  feeling_name?: string
+  feeling_emoji?: string
+  hashtags?: string[]
+  remove_media_ids?: number[]
+}
+
+export function updatePost(postId: number, data: FormData | UpdatePostData) {
+  if (data instanceof FormData) {
+    data.append('_method', 'PUT')
+    return apiClient.post<Post>(`/posts/${postId}`, data, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+  }
+  return apiClient.put<Post>(`/posts/${postId}`, data)
 }
 
 export function toggleLike(postId: number) {

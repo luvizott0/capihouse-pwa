@@ -482,7 +482,7 @@ export const useFeedStore = defineStore('feed', () => {
     eventPosts.value = eventPosts.value.filter(p => p.id !== postId)
   }
 
-  async function updatePost(postId: number, data: { content?: string | null, feeling_name?: string, feeling_emoji?: string, hashtags?: string[] }) {
+  async function updatePost(postId: number, data: FormData | postsApi.UpdatePostData) {
     isSubmitting.value = true
     try {
       const res = await postsApi.updatePost(postId, data)
