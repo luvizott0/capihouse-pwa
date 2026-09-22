@@ -23,6 +23,10 @@ export interface User {
   letterboxd_username?: string | null
   letterboxd_last_synced_at?: string | null
   letterboxd_is_syncing?: boolean
+  xbox_gamertag?: string | null
+  xbox_xuid?: string | null
+  xbox_last_synced_at?: string | null
+  xbox_is_syncing?: boolean
   initials: string
   is_admin: boolean
   is_online: boolean
@@ -132,14 +136,30 @@ export interface PollVotersResponse {
 }
 
 export interface EntertainmentMetadata {
+  // Movie (Letterboxd)
   film_title?: string | null
   film_year?: string | number | null
-  rating?: number | null
   watched_date?: string | null
   rewatch?: boolean
   poster_url?: string | null
   letterboxd_url?: string | null
   review_text?: string | null
+
+  // Game (Xbox / Manual)
+  game_title?: string | null
+  platform?: string | null
+  box_art_url?: string | null
+  game_status?: 'playing' | 'completed' | 'mastered' | 'dropped' | 'wishlist' | string | null
+  gamerscore?: number | null
+  gamerscore_total?: number | null
+  achievements_count?: number | null
+  achievements_total?: number | null
+  progress_percentage?: number | null
+  xbox_title_id?: string | null
+  hours_played?: number | null
+
+  // Shared
+  rating?: number | null
 }
 
 export interface Post {

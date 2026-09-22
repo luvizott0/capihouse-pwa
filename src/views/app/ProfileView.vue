@@ -14,7 +14,8 @@ import ThemeCustomizerModal from '@/components/profile/ThemeCustomizerModal.vue'
 import PostCard from '@/components/feed/PostCard.vue'
 import PostCardSkeleton from '@/components/feed/PostCardSkeleton.vue'
 import LetterboxdCard from '@/components/entertainment/LetterboxdCard.vue'
-import { connectLetterboxd, disconnectLetterboxd, syncLetterboxd } from '@/api/letterboxd'
+import GameCard from '@/components/entertainment/GameCard.vue'
+import ConnectedAccountsModal from '@/components/profile/ConnectedAccountsModal.vue'
 import { formatBirthDate, formatRelativeTime } from '@/utils/date'
 import { usePwaUpdate } from '@/composables/usePwaUpdate'
 import { useWebPush } from '@/composables/useWebPush'
@@ -128,7 +129,6 @@ async function loadProfile() {
 
 // Restore own theme when leaving a visited profile page
 onUnmounted(() => {
-  stopSyncPolling()
   if (wasVisitingOther.value) {
     themeStore.loadThemeFromUser(authStore.user)
   }
@@ -304,96 +304,18 @@ async function setProfilePostTab(tab: 'feed' | 'entertainment') {
   }
 }
 
-// Letterboxd connection state
-const letterboxdInput = ref('')
-const isConnectingLetterboxd = ref(false)
-const isSyncingLetterboxd = ref(false)
-const isDisconnectingLetterboxd = ref(false)
-const letterboxdMessage = ref('')
-const letterboxdError = ref('')
-let letterboxdPollTimer: ReturnType<typeof setInterval> | null = null
+// Connected Accounts Modal state
+const showConnectedAccountsModal = ref(false)
 
-function stopSyncPolling() {
-  if (letterboxdPollTimer) {
-    clearInterval(letterboxdPollTimer)
-    letterboxdPollTimer = null
+function handleConnectedUserUpdated(updatedUser: any) {
+  if (authStore.user) {
+    authStore.updateUser(updatedUser)
   }
-}
-
-function startSyncPolling() {
-  stopSyncPolling()
-  isSyncingLetterboxd.value = true
-  let attempts = 0
-  const maxAttempts = 20
-
-  letterboxdPollTimer = setInterval(async () => {
-    attempts++
-    const updated = await authStore.fetchMe()
-    const isSyncing = updated?.letterboxd_is_syncing ?? false
-    if (!isSyncing || attempts >= maxAttempts) {
-      stopSyncPolling()
-      isSyncingLetterboxd.value = false
-      if (profilePostTab.value === 'entertainment' && user.value) {
-        feedStore.fetchUserPosts(user.value.id, 1, 'entertainment')
-      }
-    }
-  }, 2500)
-}
-
-async function handleConnectLetterboxd() {
-  if (!letterboxdInput.value.trim()) return
-  isConnectingLetterboxd.value = true
-  letterboxdError.value = ''
-  letterboxdMessage.value = ''
-  try {
-    const res = await connectLetterboxd(letterboxdInput.value.trim())
-    if (res.data.user) {
-      authStore.updateUser(res.data.user)
-    }
-    await authStore.fetchMe()
-    letterboxdMessage.value = res.data.message
-    letterboxdInput.value = ''
-    startSyncPolling()
-  } catch (err: any) {
-    letterboxdError.value = err.response?.data?.message || 'Erro ao conectar conta do Letterboxd.'
-  } finally {
-    isConnectingLetterboxd.value = false
+  if (user.value) {
+    Object.assign(user.value, updatedUser)
   }
-}
-
-async function handleDisconnectLetterboxd() {
-  isDisconnectingLetterboxd.value = true
-  letterboxdError.value = ''
-  letterboxdMessage.value = ''
-  stopSyncPolling()
-  try {
-    const res = await disconnectLetterboxd()
-    if (res.data.user) {
-      authStore.updateUser(res.data.user)
-    }
-    await authStore.fetchMe()
-    letterboxdMessage.value = res.data.message
-    isSyncingLetterboxd.value = false
-  } catch (err: any) {
-    letterboxdError.value = err.response?.data?.message || 'Erro ao desconectar Letterboxd.'
-  } finally {
-    isDisconnectingLetterboxd.value = false
-  }
-}
-
-async function handleSyncLetterboxd() {
-  letterboxdError.value = ''
-  letterboxdMessage.value = ''
-  try {
-    const res = await syncLetterboxd()
-    if (res.data.user) {
-      authStore.updateUser(res.data.user)
-    }
-    letterboxdMessage.value = res.data.message
-    startSyncPolling()
-  } catch (err: any) {
-    letterboxdError.value = err.response?.data?.message || 'Erro ao iniciar sincronização.'
-    isSyncingLetterboxd.value = false
+  if (profilePostTab.value === 'entertainment' && user.value) {
+    feedStore.fetchUserPosts(user.value.id, 1, 'entertainment')
   }
 }
 
@@ -481,6 +403,17 @@ const {
 
             <!-- Settings / Actions (Compact Icons) -->
             <div v-if="isOwner" class="owner-actions">
+              <button
+                type="button"
+                class="profile-icon-btn connected-accounts-btn"
+                title="Contas Conectadas & Integrações"
+                aria-label="Contas Conectadas & Integrações"
+                @click="showConnectedAccountsModal = true"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                </svg>
+              </button>
               <button
                 type="button"
                 class="profile-icon-btn settings-btn"
@@ -649,12 +582,18 @@ const {
       <template v-else-if="userPosts.length">
         <div class="posts-stream">
           <template v-if="profilePostTab === 'entertainment'">
-            <LetterboxdCard
-              v-for="post in userPosts"
-              :key="post.id"
-              :post="post"
-              @deleted="feedStore.deletePost(post.id)"
-            />
+            <template v-for="post in userPosts" :key="post.id">
+              <GameCard
+                v-if="post.entertainment_type === 'game'"
+                :post="post"
+                @deleted="feedStore.deletePost(post.id)"
+              />
+              <LetterboxdCard
+                v-else
+                :post="post"
+                @deleted="feedStore.deletePost(post.id)"
+              />
+            </template>
           </template>
           <template v-else>
             <PostCard v-for="post in userPosts" :key="post.id" :post="post" />
@@ -802,112 +741,7 @@ const {
           </div>
         </div>
 
-        <!-- Connected Accounts (Contas Conectadas) -->
-        <div class="connected-accounts-box">
-          <h4 class="settings-section-title">
-            <svg xmlns="http://www.w3.org/2000/svg" class="section-title-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-            </svg>
-            Contas Conectadas
-          </h4>
-          <p class="settings-section-desc">
-            Vincule plataformas externas para sincronizar suas atividades automaticamente com a casa.
-          </p>
 
-          <div v-if="letterboxdMessage" class="success-banner mb-2">
-            {{ letterboxdMessage }}
-          </div>
-          <div v-if="letterboxdError" class="error-banner mb-2">
-            {{ letterboxdError }}
-          </div>
-
-          <!-- Letterboxd Connection Card -->
-          <div class="account-item-card">
-            <div class="account-item-header">
-              <div class="account-brand">
-                <span class="account-logo-letterboxd">🍿</span>
-                <div>
-                  <strong class="account-name">Letterboxd</strong>
-                  <div class="account-status">
-                    <template v-if="user.letterboxd_username">
-                      <span class="badge-connected">
-                        ● Conectado: <strong>@{{ user.letterboxd_username }}</strong>
-                      </span>
-                      <span v-if="isSyncingLetterboxd || user.letterboxd_is_syncing" class="badge-syncing" title="Sincronizando atividades do Letterboxd...">
-                        <svg class="spin-icon sync-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-                        </svg>
-                        <span>Sincronizando...</span>
-                      </span>
-                    </template>
-                    <span v-else class="badge-disconnected">
-                      ○ Não conectado
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <span v-if="user.letterboxd_last_synced_at && !isSyncingLetterboxd && !user.letterboxd_is_syncing" class="last-synced-label">
-                Sincronizado {{ formatRelativeTime(user.letterboxd_last_synced_at) }}
-              </span>
-            </div>
-
-            <!-- If NOT connected: Input to connect -->
-            <div v-if="!user.letterboxd_username" class="account-connect-form">
-              <div class="letterboxd-input-group">
-                <span class="input-prefix">@</span>
-                <input
-                  v-model="letterboxdInput"
-                  type="text"
-                  class="retro-field letterboxd-field"
-                  placeholder="seu_usuario_letterboxd"
-                  @keyup.enter="handleConnectLetterboxd"
-                />
-                <button
-                  type="button"
-                  class="retro-action-btn primary-action"
-                  :disabled="isConnectingLetterboxd || !letterboxdInput.trim()"
-                  @click="handleConnectLetterboxd"
-                >
-                  {{ isConnectingLetterboxd ? 'Conectando...' : 'Conectar' }}
-                </button>
-              </div>
-              <span class="account-hint">
-                Seu perfil deve ser público no Letterboxd para importarmos suas resenhas e filmes assistidos.
-              </span>
-            </div>
-
-            <!-- If connected: Sync and Remove buttons -->
-            <div v-else class="account-connected-actions">
-              <button
-                type="button"
-                class="retro-action-btn primary-action"
-                :disabled="isSyncingLetterboxd || user.letterboxd_is_syncing"
-                @click="handleSyncLetterboxd"
-              >
-                <svg v-if="isSyncingLetterboxd || user.letterboxd_is_syncing" class="spin-icon sync-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-                </svg>
-                <span>{{ (isSyncingLetterboxd || user.letterboxd_is_syncing) ? 'Sincronizando...' : '🔄 Sincronizar Agora' }}</span>
-              </button>
-
-              <button
-                type="button"
-                class="retro-action-btn danger-action"
-                :disabled="isDisconnectingLetterboxd || isSyncingLetterboxd"
-                @click="handleDisconnectLetterboxd"
-              >
-                {{ isDisconnectingLetterboxd ? 'Removendo...' : 'Remover Conta' }}
-              </button>
-
-              <span class="account-hint connected-hint">
-                Para conectar com outro perfil, remova a conta atual e insira novamente o nome de usuário.
-              </span>
-            </div>
-          </div>
-        </div>
 
         <!-- Push Notifications & Preferences Section -->
         <div class="push-notifications-box">
@@ -1165,6 +999,14 @@ const {
       cancelText="Cancelar"
       variant="danger"
       @confirm="handleLogout"
+    />
+
+    <!-- Connected Accounts Modal -->
+    <ConnectedAccountsModal
+      v-if="user"
+      v-model="showConnectedAccountsModal"
+      :user="user"
+      @userUpdated="handleConnectedUserUpdated"
     />
   </div>
 

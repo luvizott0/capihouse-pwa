@@ -4,6 +4,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useEntertainmentStore, type EntertainmentTab } from '@/stores/entertainment'
 import LetterboxdCard from '@/components/entertainment/LetterboxdCard.vue'
+import GameCard from '@/components/entertainment/GameCard.vue'
+import GameReviewModal from '@/components/entertainment/GameReviewModal.vue'
 import PostCardSkeleton from '@/components/feed/PostCardSkeleton.vue'
 import PullToRefreshIndicator from '@/components/ui/PullToRefreshIndicator.vue'
 import { usePullToRefresh } from '@/composables/usePullToRefresh'
@@ -78,6 +80,15 @@ async function loadMore() {
 
 function clearSearch() {
   router.push({ path: '/entertainment' })
+}
+
+const showGameReviewModal = ref(false)
+
+function handleGameCreated(newPost: any) {
+  entertainmentStore.addPost(newPost)
+  if (activeTab.value !== 'games') {
+    entertainmentStore.setActiveTab('games')
+  }
 }
 
 function handleTabChange(tab: EntertainmentTab) {
@@ -209,6 +220,14 @@ onUnmounted(() => {
     <!-- Header Section (padrão com cor primária) -->
     <header class="entertainment-header">
       <h1 class="page-title">» Atividades e Análises</h1>
+      <button
+        v-if="activeTab === 'games'"
+        type="button"
+        class="btn-new-review"
+        @click="showGameReviewModal = true"
+      >
+        [ + Nova Análise ]
+      </button>
     </header>
 
     <!-- Search Results Banner -->
@@ -252,7 +271,6 @@ onUnmounted(() => {
         @click="handleTabChange('games')"
       >
         🎮 Jogos
-        <span class="tab-badge soon-badge">Em breve</span>
       </button>
     </div>
 
@@ -315,21 +333,105 @@ onUnmounted(() => {
         </div>
       </section>
 
-      <!-- Games Tab (Placeholder) -->
+      <!-- Games Tab -->
       <section v-else-if="activeTab === 'games'" class="tab-content">
-        <div class="retro-box upcoming-box">
-          <span class="upcoming-icon">🎮</span>
-          <h3 class="upcoming-title">Em breve: Jogos e Conquistas</h3>
-          <p class="upcoming-desc">
-            Em breve você poderá conectar plataformas de jogos e compartilhar o que está jogando e platinando com a casa!
+        <div v-if="entertainmentStore.isLoading && !entertainmentStore.posts.length" class="loading-skeletons">
+          <PostCardSkeleton v-for="i in 3" :key="i" />
+        </div>
+
+        <template v-else-if="entertainmentStore.posts.length">
+          <GameCard
+            v-for="post in entertainmentStore.posts"
+            :key="post.id"
+            :post="post"
+            @deleted="handlePostDeleted"
+          />
+
+          <!-- Sentinel para Infinite Scroll -->
+          <div ref="sentinelRef" class="sentinel-element"></div>
+
+          <!-- Loading Mais Avaliações Indicator -->
+          <div v-if="entertainmentStore.isLoadingMore" class="infinite-loading-bar">
+            <span class="refresh-dot"></span>
+            <span>Carregando mais jogos...</span>
+          </div>
+
+          <!-- Final do Feed de Jogos -->
+          <div v-else-if="!entertainmentStore.hasMorePages && entertainmentStore.posts.length" class="infinite-end-card">
+            <span class="end-marker">🎮</span>
+            <span class="end-text">Você visualizou todas as atividades e análises de jogos!</span>
+          </div>
+        </template>
+
+        <!-- Empty State -->
+        <div v-else class="retro-box empty-state">
+          <span class="empty-icon">{{ hasSearchFilters ? '🔍' : '🎮' }}</span>
+          <h3 class="empty-title">{{ hasSearchFilters ? 'Nenhum jogo encontrado' : 'Nenhuma atividade de jogo ainda' }}</h3>
+          <p class="empty-desc">
+            {{ hasSearchFilters ? 'Tente ajustar os filtros ou pesquisar por outros termos.' : 'Vincule sua Gamertag do Xbox em Contas Conectadas ou publique uma análise com as suas próprias palavras agora mesmo!' }}
           </p>
+          <div class="empty-actions-row">
+            <button type="button" class="btn-create-game-empty" @click="showGameReviewModal = true">
+              [ + Escrever Análise de Jogo ]
+            </button>
+            <router-link to="/profile" class="empty-action-link">
+              [ Ir para o Perfil e Conectar Xbox ]
+            </router-link>
+          </div>
         </div>
       </section>
     </main>
+
+    <!-- Modal para Escrever Análise de Jogo -->
+    <GameReviewModal
+      v-model="showGameReviewModal"
+      @created="handleGameCreated"
+    />
   </div>
 </template>
 
 <style scoped>
+.btn-new-review {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  padding: 0.25rem 0.65rem;
+  border-radius: 3px;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-new-review:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.empty-actions-row {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.btn-create-game-empty {
+  background: var(--color-primary, #a66130);
+  color: #fff;
+  border: 1px solid var(--color-primary-800, #5f4120);
+  padding: 0.4rem 0.85rem;
+  border-radius: 3px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.btn-create-game-empty:hover {
+  opacity: 0.9;
+}
 .entertainment-page {
   max-width: 680px;
   margin: 0 auto;

@@ -535,28 +535,35 @@ async function confirmDeletePost() {
     <!-- Embedded Repost Card (if post is a repost) -->
     <div v-if="post.reposted_post" class="embedded-repost-box">
       <div class="embedded-repost-header">
-        <span class="embedded-repost-tag">🍿 Letterboxd</span>
+        <span v-if="post.reposted_post.entertainment_type === 'game'" class="embedded-repost-tag game-tag">
+          {{ post.reposted_post.external_source === 'xbox' ? '🎮 Xbox Live' : '🕹️ Análise Gamer' }}
+        </span>
+        <span v-else class="embedded-repost-tag">🍿 Letterboxd</span>
         <span class="embedded-repost-author">
           Avaliação de <router-link :to="`/profile/${post.reposted_post.user?.username}`" class="embedded-author-link">@{{ post.reposted_post.user?.username }}</router-link>
         </span>
       </div>
       <div class="embedded-repost-body">
         <img
-          v-if="post.reposted_post.metadata?.poster_url"
-          :src="post.reposted_post.metadata.poster_url"
-          :alt="post.reposted_post.metadata.film_title || 'Pôster'"
+          v-if="post.reposted_post.metadata?.poster_url || post.reposted_post.metadata?.box_art_url"
+          :src="post.reposted_post.metadata?.poster_url || post.reposted_post.metadata?.box_art_url || ''"
+          :alt="post.reposted_post.metadata?.film_title || post.reposted_post.metadata?.game_title || 'Pôster/Capa'"
           class="embedded-poster"
-          @click="openPoster(post.reposted_post.metadata.poster_url)"
-          title="Clique para ampliar o pôster"
+          @click="openPoster(post.reposted_post.metadata?.poster_url || post.reposted_post.metadata?.box_art_url)"
+          title="Clique para ampliar"
         />
         <div class="embedded-details">
           <div class="embedded-title-row">
-            <span class="embedded-film-title">{{ post.reposted_post.metadata?.film_title }}</span>
+            <span class="embedded-film-title">{{ post.reposted_post.metadata?.film_title || post.reposted_post.metadata?.game_title }}</span>
             <span v-if="post.reposted_post.metadata?.film_year" class="embedded-film-year">({{ post.reposted_post.metadata.film_year }})</span>
+            <span v-else-if="post.reposted_post.metadata?.platform" class="embedded-film-year">[{{ post.reposted_post.metadata.platform }}]</span>
           </div>
           <div v-if="post.reposted_post.metadata?.rating" class="embedded-rating">
             <span class="embedded-stars">{{ renderRatingStars(post.reposted_post.metadata.rating) }}</span>
             <span class="embedded-score">{{ post.reposted_post.metadata.rating }} / 5</span>
+          </div>
+          <div v-else-if="post.reposted_post.metadata?.gamerscore != null" class="embedded-rating">
+            <span class="embedded-score">🎮 {{ post.reposted_post.metadata.gamerscore }} G</span>
           </div>
           <p v-if="post.reposted_post.content" class="embedded-review">
             "{{ post.reposted_post.content }}"

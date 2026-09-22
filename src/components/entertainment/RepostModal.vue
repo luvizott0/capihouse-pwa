@@ -97,23 +97,30 @@ async function handleRepost() {
         {{ errorMessage }}
       </div>
 
-      <!-- Preview of Film to be reposted -->
+      <!-- Preview of Film/Game to be reposted -->
       <div v-if="film" class="film-preview-card">
         <img
-          v-if="film.poster_url"
-          :src="film.poster_url"
-          :alt="film.film_title || 'Poster'"
+          v-if="film.poster_url || film.box_art_url"
+          :src="film.poster_url || film.box_art_url || ''"
+          :alt="film.film_title || film.game_title || 'Capa/Poster'"
           class="preview-poster"
         />
         <div class="preview-info">
-          <span class="preview-badge">🍿 Letterboxd</span>
+          <span v-if="post?.entertainment_type === 'game'" class="preview-badge game-badge">
+            {{ post?.external_source === 'xbox' ? '🎮 Xbox Live' : '🕹️ Análise de Jogo' }}
+          </span>
+          <span v-else class="preview-badge">🍿 Letterboxd</span>
           <h4 class="preview-title">
-            {{ film.film_title }}
+            {{ film.film_title || film.game_title }}
             <span v-if="film.film_year" class="preview-year">({{ film.film_year }})</span>
+            <span v-else-if="film.platform" class="preview-year">[{{ film.platform }}]</span>
           </h4>
           <div v-if="film.rating" class="preview-rating">
             <span class="stars">{{ renderRatingStars(film.rating) }}</span>
             <span class="numeric-rating">{{ film.rating }} / 5</span>
+          </div>
+          <div v-else-if="film.gamerscore != null" class="preview-rating">
+            <span class="numeric-rating">🎮 {{ film.gamerscore }} G</span>
           </div>
           <p v-if="post?.content" class="preview-snippet">
             "{{ post.content.length > 100 ? post.content.slice(0, 100) + '...' : post.content }}"

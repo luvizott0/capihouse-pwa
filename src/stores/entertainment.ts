@@ -97,7 +97,7 @@ export const useEntertainmentStore = defineStore('entertainment', () => {
       const res = await postsApi.getPosts({
         page,
         category: 'entertainment',
-        entertainmentType: activeTab.value === 'movies' ? 'movie' : undefined,
+        entertainmentType: activeTab.value === 'movies' ? 'movie' : (activeTab.value === 'games' ? 'game' : undefined),
         search: activeFilters.value.search,
         date: activeFilters.value.date,
         startDate: activeFilters.value.startDate,
@@ -112,7 +112,7 @@ export const useEntertainmentStore = defineStore('entertainment', () => {
       if (page === 1) {
         posts.value = res.data.data || []
         isFiltered.value = hasAnyFilter
-        // Salva no cache local offline-first apenas se for a lista padrão sem filtros
+        // Salva no cache local offline-first apenas se for a lista padrão de filmes sem filtros
         if (!hasAnyFilter && activeTab.value === 'movies') {
           saveEntertainmentCache(res.data.data || [], res.data.last_page || 1)
         }
@@ -135,10 +135,13 @@ export const useEntertainmentStore = defineStore('entertainment', () => {
   }
 
   function setActiveTab(tab: EntertainmentTab) {
+    if (activeTab.value === tab) return
     activeTab.value = tab
-    if (tab === 'movies') {
-      currentPage.value = 1
-      fetchEntertainmentPosts(1)
+    currentPage.value = 1
+    posts.value = []
+    hasLoaded.value = false
+    if (tab === 'movies' || tab === 'games') {
+      fetchEntertainmentPosts(1, { forceRefresh: true })
     }
   }
 
@@ -243,6 +246,8 @@ export const useEntertainmentStore = defineStore('entertainment', () => {
     channel
       .listen('.PostCreated', (data: { post: Post }) => {
         if (data.post.category !== 'entertainment') return
+        if (activeTab.value === 'movies' && data.post.entertainment_type !== 'movie') return
+        if (activeTab.value === 'games' && data.post.entertainment_type !== 'game') return
         const exists = posts.value.some(p => p.id === data.post.id)
         if (!exists) {
           posts.value.unshift(data.post)
@@ -301,6 +306,13 @@ export const useEntertainmentStore = defineStore('entertainment', () => {
       })
   }
 
+  function addPost(newPost: Post) {
+    const exists = posts.value.some(p => p.id === newPost.id)
+    if (!exists) {
+      posts.value.unshift(newPost)
+    }
+  }
+
   return {
     posts,
     isLoading,
@@ -315,6 +327,7 @@ export const useEntertainmentStore = defineStore('entertainment', () => {
     fetchEntertainmentPosts,
     loadMorePosts,
     setActiveTab,
+    addPost,
     toggleLike,
     addComment,
     updateComment,
