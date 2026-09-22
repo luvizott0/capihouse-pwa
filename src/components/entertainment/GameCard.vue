@@ -67,6 +67,15 @@ const isAuthor = computed(() => {
 
 const game = computed(() => props.post.metadata)
 
+const displayReviewText = computed(() => {
+  const text = props.post.content || game.value?.review_text || ''
+  if (!text) return ''
+  if (text.startsWith('🏆 100% Miletado!') || text.includes('100% Miletado! Conquistei todos os')) {
+    return ''
+  }
+  return text
+})
+
 function renderRatingStars(rating?: number | null): string {
   if (rating == null) return ''
   const full = Math.floor(rating)
@@ -366,9 +375,9 @@ const statusLabel = computed(() => {
         </div>
 
         <!-- Review Text if present -->
-        <div v-if="post.content || game?.review_text" class="review-box">
+        <div v-if="displayReviewText" class="review-box">
           <p class="review-quote">
-            <FormattedContent :content="post.content || game?.review_text || ''" />
+            <FormattedContent :content="displayReviewText" />
           </p>
         </div>
       </div>

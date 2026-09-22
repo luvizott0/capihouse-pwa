@@ -420,14 +420,6 @@ async function handleSyncXbox() {
               Jogos recentes e quando você <strong>miletar (100%)</strong> aparecerão automaticamente na aba 🎮 Jogos!
             </p>
           </div>
-
-          <!-- Dica sobre a chave OPENXBL_API_KEY -->
-          <div class="api-help-note">
-            <span class="note-icon">💡</span>
-            <div class="note-text">
-              Para sincronizar jogos e conquistas automaticamente, adicione <code>OPENXBL_API_KEY</code> no arquivo <code>.env</code> do servidor. Obtenha sua chave gratuita em <a href="https://xbl.io" target="_blank" rel="noopener noreferrer" class="link-external">xbl.io ↗</a>.
-            </div>
-          </div>
         </div>
 
         <!-- ======================= FUTURAS INTEGRAÇÕES ======================= -->
