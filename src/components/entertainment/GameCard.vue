@@ -278,7 +278,7 @@ const statusLabel = computed(() => {
               title="Análise publicada na casa"
             >
               <span class="badge-dot"></span>
-              Análise Gamer
+              Análise
             </span>
           </div>
         </div>

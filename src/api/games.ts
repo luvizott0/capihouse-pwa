@@ -42,3 +42,17 @@ export const createGameReview = (payload: CreateGameReviewPayload | FormData) =>
     },
   })
 }
+
+export interface GameSearchResult {
+  id: string
+  title: string
+  cover_url: string | null
+  source?: string
+}
+
+export const searchGames = (q: string) => {
+  return client.get<{ data: GameSearchResult[] }>('/entertainment/games/search', {
+    params: { q },
+  })
+}
+

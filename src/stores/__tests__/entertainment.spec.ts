@@ -125,4 +125,122 @@ describe('Entertainment Store', () => {
     expect(store.posts).toHaveLength(1)
     expect(store.posts[0]!.id).toBe(102)
   })
+
+  it('keeps separate post lists for movies and games and avoids refetching when tab is already loaded', async () => {
+    const store = useEntertainmentStore()
+
+    // 1. Initial tab is movies. Fetch page 1 for movies
+    vi.mocked(postsApi.getPosts).mockResolvedValueOnce({
+      data: {
+        data: [{ id: 1, entertainment_type: 'movie', category: 'entertainment' }],
+        current_page: 1,
+        last_page: 2,
+      },
+    } as any)
+
+    await store.fetchEntertainmentPosts(1, { tab: 'movies' })
+    expect(store.moviePosts).toHaveLength(1)
+    expect(store.posts).toHaveLength(1)
+    expect(store.hasLoaded).toBe(true)
+
+    // 2. Switch to games tab: since games are not loaded yet, setActiveTab triggers fetch for games
+    vi.mocked(postsApi.getPosts).mockResolvedValueOnce({
+      data: {
+        data: [{ id: 2, entertainment_type: 'game', category: 'entertainment' }],
+        current_page: 1,
+        last_page: 1,
+      },
+    } as any)
+
+    store.setActiveTab('games')
+    // Wait for the async fetch triggered by setActiveTab
+    await vi.waitFor(() => expect(store.gamePosts).toHaveLength(1))
+    expect(store.activeTab).toBe('games')
+    expect(store.posts).toHaveLength(1)
+    expect(store.posts[0]!.id).toBe(2)
+    // Verify movie posts were preserved!
+    expect(store.moviePosts).toHaveLength(1)
+    expect(store.moviePosts[0]!.id).toBe(1)
+
+    // 3. Switch back to movies tab: already loaded, should NOT call getPosts again
+    const callsBefore = vi.mocked(postsApi.getPosts).mock.calls.length
+    store.setActiveTab('movies')
+    expect(store.activeTab).toBe('movies')
+    expect(store.posts).toHaveLength(1)
+    expect(store.posts[0]!.id).toBe(1)
+    expect(vi.mocked(postsApi.getPosts).mock.calls.length).toBe(callsBefore)
+  })
+
+  it('supports pending posts and flushing for real-time updates', async () => {
+    const store = useEntertainmentStore()
+    expect(store.pendingCount).toBe(0)
+
+    // Setup Echo listener
+    let postCreatedCallback: ((data: any) => void) | null = null
+    const mockChannel = {
+      listen: vi.fn((event: string, cb: any) => {
+        if (event === '.PostCreated') postCreatedCallback = cb
+        return mockChannel
+      }),
+    }
+    const { connectEcho } = await import('@/services/echo')
+    vi.mocked(connectEcho).mockReturnValue({
+      channel: vi.fn(() => mockChannel),
+      leaveChannel: vi.fn(),
+    } as any)
+
+    store.subscribeToEntertainment(999) // Current user ID is 999
+    expect(postCreatedCallback).not.toBeNull()
+
+    // 1. Post from another user in movies category
+    postCreatedCallback!({
+      post: {
+        id: 301,
+        user_id: 888,
+        category: 'entertainment',
+        entertainment_type: 'movie',
+      },
+    })
+
+    expect(store.pendingCount).toBe(1)
+    expect(store.pendingPosts).toHaveLength(1)
+    expect(store.posts).toHaveLength(0) // Not yet prepended
+
+    // 2. Flush pending posts
+    store.flushPendingPosts()
+    expect(store.pendingCount).toBe(0)
+    expect(store.posts).toHaveLength(1)
+    expect(store.posts[0]!.id).toBe(301)
+  })
+
+  it('loads more posts on infinite scroll correctly', async () => {
+    const store = useEntertainmentStore()
+
+    vi.mocked(postsApi.getPosts).mockResolvedValueOnce({
+      data: {
+        data: [{ id: 10, entertainment_type: 'game', category: 'entertainment' }],
+        current_page: 1,
+        last_page: 2,
+      },
+    } as any)
+
+    store.setActiveTab('games')
+    await vi.waitFor(() => expect(store.gamePosts).toHaveLength(1))
+    expect(store.hasMorePages).toBe(true)
+    expect(store.currentPage).toBe(1)
+
+    // Load page 2
+    vi.mocked(postsApi.getPosts).mockResolvedValueOnce({
+      data: {
+        data: [{ id: 11, entertainment_type: 'game', category: 'entertainment' }],
+        current_page: 2,
+        last_page: 2,
+      },
+    } as any)
+
+    await store.loadMorePosts()
+    expect(store.gamePosts).toHaveLength(2)
+    expect(store.currentPage).toBe(2)
+    expect(store.hasMorePages).toBe(false)
+  })
 })

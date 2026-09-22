@@ -540,7 +540,7 @@ async function confirmDeletePost() {
           class="embedded-repost-tag"
           :class="post.reposted_post.external_source === 'xbox' ? 'xbox-tag' : 'game-tag'"
         >
-          {{ post.reposted_post.external_source === 'xbox' ? '🎮 Xbox Live' : '🕹️ Análise Gamer' }}
+          {{ post.reposted_post.external_source === 'xbox' ? '🎮 Xbox Live' : '🕹️ Análise' }}
         </span>
         <span v-else class="embedded-repost-tag letterboxd-tag">🍿 Letterboxd</span>
         <span class="embedded-repost-author">

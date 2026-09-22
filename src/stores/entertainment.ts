@@ -46,29 +46,90 @@ function saveEntertainmentCache(data: Post[], lastPage: number) {
 
 export const useEntertainmentStore = defineStore('entertainment', () => {
   const initialCache = loadInitialEntertainmentCache()
-  const posts = ref<Post[]>(initialCache.posts)
+
+  // Movie state
+  const moviePosts = ref<Post[]>(initialCache.posts)
+  const movieCurrentPage = ref(1)
+  const movieLastPage = ref(initialCache.lastPage)
+  const movieHasLoaded = ref(initialCache.posts.length > 0)
+  const movieIsLoadingMore = ref(false)
+  const pendingMoviePosts = ref<Post[]>([])
+
+  // Games state
+  const gamePosts = ref<Post[]>([])
+  const gameCurrentPage = ref(1)
+  const gameLastPage = ref(1)
+  const gameHasLoaded = ref(false)
+  const gameIsLoadingMore = ref(false)
+  const pendingGamePosts = ref<Post[]>([])
+
   const isLoading = ref(false)
-  const isLoadingMore = ref(false)
-  const currentPage = ref(1)
-  const lastPage = ref(initialCache.lastPage)
-  const hasLoaded = ref(initialCache.posts.length > 0)
   const activeTab = ref<EntertainmentTab>('movies')
 
+  // Unified reactive views for current tab
+  const posts = computed<Post[]>({
+    get: () => (activeTab.value === 'games' ? gamePosts.value : moviePosts.value),
+    set: (val: Post[]) => {
+      if (activeTab.value === 'games') {
+        gamePosts.value = val
+      } else {
+        moviePosts.value = val
+      }
+    },
+  })
+
+  const currentPage = computed(() =>
+    activeTab.value === 'games' ? gameCurrentPage.value : movieCurrentPage.value
+  )
+  const lastPage = computed(() =>
+    activeTab.value === 'games' ? gameLastPage.value : movieLastPage.value
+  )
+  const hasLoaded = computed(() =>
+    activeTab.value === 'games' ? gameHasLoaded.value : movieHasLoaded.value
+  )
+  const isLoadingMore = computed(() =>
+    activeTab.value === 'games' ? gameIsLoadingMore.value : movieIsLoadingMore.value
+  )
   const hasMorePages = computed(() => currentPage.value < lastPage.value)
 
-  const activeFilters = ref<{ search?: string; date?: string; startDate?: string; endDate?: string; userId?: number }>({})
+  const pendingPosts = computed(() =>
+    activeTab.value === 'games' ? pendingGamePosts.value : pendingMoviePosts.value
+  )
+  const pendingCount = computed(() => pendingPosts.value.length)
+
+  const activeFilters = ref<{
+    search?: string
+    date?: string
+    startDate?: string
+    endDate?: string
+    userId?: number
+  }>({})
   const isFiltered = ref(false)
   let isSubscribed = false
 
   async function fetchEntertainmentPosts(
     page = 1,
-    options?: { search?: string; date?: string; startDate?: string; endDate?: string; userId?: number; forceRefresh?: boolean }
+    options?: {
+      search?: string
+      date?: string
+      startDate?: string
+      endDate?: string
+      userId?: number
+      forceRefresh?: boolean
+      tab?: EntertainmentTab
+    }
   ) {
+    const targetTab = options?.tab || activeTab.value
+
     if (page > 1) {
-      isLoadingMore.value = true
+      if (targetTab === 'games') {
+        gameIsLoadingMore.value = true
+      } else {
+        movieIsLoadingMore.value = true
+      }
     } else {
-      // Se não temos dados em cache ou é forceRefresh, exibe loading visual
-      if (options?.forceRefresh || posts.value.length === 0) {
+      const currentList = targetTab === 'games' ? gamePosts.value : moviePosts.value
+      if (options?.forceRefresh || currentList.length === 0) {
         isLoading.value = true
       }
     }
@@ -97,7 +158,7 @@ export const useEntertainmentStore = defineStore('entertainment', () => {
       const res = await postsApi.getPosts({
         page,
         category: 'entertainment',
-        entertainmentType: activeTab.value === 'movies' ? 'movie' : (activeTab.value === 'games' ? 'game' : undefined),
+        entertainmentType: targetTab === 'movies' ? 'movie' : (targetTab === 'games' ? 'game' : undefined),
         search: activeFilters.value.search,
         date: activeFilters.value.date,
         startDate: activeFilters.value.startDate,
@@ -105,27 +166,49 @@ export const useEntertainmentStore = defineStore('entertainment', () => {
         userId: activeFilters.value.userId,
       })
 
-      currentPage.value = res.data.current_page || 1
-      lastPage.value = res.data.last_page || 1
-      hasLoaded.value = true
+      const resCurrentPage = res?.data?.current_page ?? 1
+      const resLastPage = res?.data?.last_page ?? 1
+      const resData: Post[] = res?.data?.data ?? []
 
-      if (page === 1) {
-        posts.value = res.data.data || []
-        isFiltered.value = hasAnyFilter
-        // Salva no cache local offline-first apenas se for a lista padrão de filmes sem filtros
-        if (!hasAnyFilter && activeTab.value === 'movies') {
-          saveEntertainmentCache(res.data.data || [], res.data.last_page || 1)
+      if (targetTab === 'games') {
+        gameCurrentPage.value = resCurrentPage
+        gameLastPage.value = resLastPage
+        gameHasLoaded.value = true
+
+        if (page === 1) {
+          gamePosts.value = resData
+          isFiltered.value = hasAnyFilter
+        } else {
+          const existingIds = new Set(gamePosts.value.map(p => p.id))
+          const newUnique = resData.filter((p: Post) => !existingIds.has(p.id))
+          gamePosts.value.push(...newUnique)
         }
       } else {
-        const existingIds = new Set(posts.value.map(p => p.id))
-        const newUniquePosts = (res.data.data || []).filter((p: Post) => !existingIds.has(p.id))
-        posts.value.push(...newUniquePosts)
+        movieCurrentPage.value = resCurrentPage
+        movieLastPage.value = resLastPage
+        movieHasLoaded.value = true
+
+        if (page === 1) {
+          moviePosts.value = resData
+          isFiltered.value = hasAnyFilter
+          if (!hasAnyFilter) {
+            saveEntertainmentCache(resData, resLastPage)
+          }
+        } else {
+          const existingIds = new Set(moviePosts.value.map(p => p.id))
+          const newUnique = resData.filter((p: Post) => !existingIds.has(p.id))
+          moviePosts.value.push(...newUnique)
+        }
       }
 
       return res.data
     } finally {
       isLoading.value = false
-      isLoadingMore.value = false
+      if (targetTab === 'games') {
+        gameIsLoadingMore.value = false
+      } else {
+        movieIsLoadingMore.value = false
+      }
     }
   }
 
@@ -137,16 +220,34 @@ export const useEntertainmentStore = defineStore('entertainment', () => {
   function setActiveTab(tab: EntertainmentTab) {
     if (activeTab.value === tab) return
     activeTab.value = tab
-    currentPage.value = 1
-    posts.value = []
-    hasLoaded.value = false
-    if (tab === 'movies' || tab === 'games') {
-      fetchEntertainmentPosts(1, { forceRefresh: true })
+
+    // Se a aba selecionada ainda não carregou dados, busca a primeira página
+    const alreadyLoaded = tab === 'games' ? gameHasLoaded.value : movieHasLoaded.value
+    if (!alreadyLoaded && (tab === 'movies' || tab === 'games')) {
+      fetchEntertainmentPosts(1, { tab })
+    }
+  }
+
+  function flushPendingPosts() {
+    if (activeTab.value === 'games') {
+      if (pendingGamePosts.value.length === 0) return
+      const existingIds = new Set(gamePosts.value.map(p => p.id))
+      const fresh = pendingGamePosts.value.filter(p => !existingIds.has(p.id))
+      gamePosts.value.unshift(...fresh)
+      pendingGamePosts.value = []
+    } else {
+      if (pendingMoviePosts.value.length === 0) return
+      const existingIds = new Set(moviePosts.value.map(p => p.id))
+      const fresh = pendingMoviePosts.value.filter(p => !existingIds.has(p.id))
+      moviePosts.value.unshift(...fresh)
+      pendingMoviePosts.value = []
     }
   }
 
   async function toggleLike(postId: number) {
-    const targetPost = posts.value.find(p => p.id === postId)
+    const postInMovies = moviePosts.value.find(p => p.id === postId)
+    const postInGames = gamePosts.value.find(p => p.id === postId)
+    const targetPost = postInMovies || postInGames
     if (!targetPost) return
 
     const previousLiked = targetPost.is_liked
@@ -154,60 +255,86 @@ export const useEntertainmentStore = defineStore('entertainment', () => {
     const nextLiked = !previousLiked
     const nextCount = Math.max(0, previousCount + (nextLiked ? 1 : -1))
 
-    targetPost.is_liked = nextLiked
-    targetPost.likes_count = nextCount
+    if (postInMovies) {
+      postInMovies.is_liked = nextLiked
+      postInMovies.likes_count = nextCount
+    }
+    if (postInGames) {
+      postInGames.is_liked = nextLiked
+      postInGames.likes_count = nextCount
+    }
 
     try {
       const res = await postsApi.toggleLike(postId)
-      targetPost.is_liked = res.data.is_liked
-      targetPost.likes_count = res.data.likes_count
+      if (postInMovies) {
+        postInMovies.is_liked = res.data.is_liked
+        postInMovies.likes_count = res.data.likes_count
+      }
+      if (postInGames) {
+        postInGames.is_liked = res.data.is_liked
+        postInGames.likes_count = res.data.likes_count
+      }
       return res.data
     } catch (err) {
-      targetPost.is_liked = previousLiked
-      targetPost.likes_count = previousCount
+      if (postInMovies) {
+        postInMovies.is_liked = previousLiked
+        postInMovies.likes_count = previousCount
+      }
+      if (postInGames) {
+        postInGames.is_liked = previousLiked
+        postInGames.likes_count = previousCount
+      }
       throw err
     }
   }
 
   async function addComment(postId: number, content: string, parentId?: number | null) {
     const res = await postsApi.addComment(postId, content, parentId)
-    const targetPost = posts.value.find(p => p.id === postId)
-    if (targetPost) {
-      if (!targetPost.comments) targetPost.comments = []
-      const existsIndex = targetPost.comments.findIndex(c => Number(c.id) === Number(res.data.id))
+    const updateTarget = (post?: Post) => {
+      if (!post) return
+      if (!post.comments) post.comments = []
+      const existsIndex = post.comments.findIndex(c => Number(c.id) === Number(res.data.id))
       if (existsIndex === -1) {
-        targetPost.comments.push(res.data)
-        targetPost.comments_count = (targetPost.comments_count || 0) + 1
+        post.comments.push(res.data)
+        post.comments_count = (post.comments_count || 0) + 1
       } else {
-        targetPost.comments[existsIndex] = res.data
+        post.comments[existsIndex] = res.data
       }
     }
+    updateTarget(moviePosts.value.find(p => p.id === postId))
+    updateTarget(gamePosts.value.find(p => p.id === postId))
     return res.data
   }
 
   async function updateComment(postId: number, commentId: number, content: string) {
     const res = await postsApi.updateComment(commentId, content)
-    const targetPost = posts.value.find(p => p.id === postId)
-    if (targetPost && targetPost.comments) {
-      const existsIndex = targetPost.comments.findIndex(c => Number(c.id) === Number(commentId))
+    const updateTarget = (post?: Post) => {
+      if (!post || !post.comments) return
+      const existsIndex = post.comments.findIndex(c => Number(c.id) === Number(commentId))
       if (existsIndex !== -1) {
-        targetPost.comments[existsIndex] = res.data
+        post.comments[existsIndex] = res.data
       }
     }
+    updateTarget(moviePosts.value.find(p => p.id === postId))
+    updateTarget(gamePosts.value.find(p => p.id === postId))
     return res.data
   }
 
   async function deleteComment(postId: number, commentId: number) {
     await postsApi.deleteComment(commentId)
-    const targetPost = posts.value.find(p => p.id === postId)
-    if (targetPost && targetPost.comments) {
-      targetPost.comments = targetPost.comments.filter(c => Number(c.id) !== Number(commentId))
-      targetPost.comments_count = Math.max(0, (targetPost.comments_count || 1) - 1)
+    const updateTarget = (post?: Post) => {
+      if (!post || !post.comments) return
+      post.comments = post.comments.filter(c => Number(c.id) !== Number(commentId))
+      post.comments_count = Math.max(0, (post.comments_count || 1) - 1)
     }
+    updateTarget(moviePosts.value.find(p => p.id === postId))
+    updateTarget(gamePosts.value.find(p => p.id === postId))
   }
 
   async function toggleCommentLike(postId: number, commentId: number) {
-    const targetPost = posts.value.find(p => p.id === postId)
+    const postInMovies = moviePosts.value.find(p => p.id === postId)
+    const postInGames = gamePosts.value.find(p => p.id === postId)
+    const targetPost = postInMovies || postInGames
     const targetComment = targetPost?.comments?.find(c => Number(c.id) === Number(commentId))
     if (!targetComment) return
 
@@ -216,24 +343,62 @@ export const useEntertainmentStore = defineStore('entertainment', () => {
     const nextLiked = !prevLiked
     const nextCount = Math.max(0, prevCount + (nextLiked ? 1 : -1))
 
-    targetComment.is_liked = nextLiked
-    targetComment.likes_count = nextCount
+    const updateCommentLikesLocally = (post?: Post) => {
+      const c = post?.comments?.find(comm => Number(comm.id) === Number(commentId))
+      if (c) {
+        c.is_liked = nextLiked
+        c.likes_count = nextCount
+      }
+    }
+    updateCommentLikesLocally(postInMovies)
+    updateCommentLikesLocally(postInGames)
 
     try {
       const res = await postsApi.toggleCommentLike(commentId)
-      targetComment.is_liked = res.data.is_liked
-      targetComment.likes_count = res.data.likes_count
+      const applyConfirmedLikes = (post?: Post) => {
+        const c = post?.comments?.find(comm => Number(comm.id) === Number(commentId))
+        if (c) {
+          c.is_liked = res.data.is_liked
+          c.likes_count = res.data.likes_count
+        }
+      }
+      applyConfirmedLikes(postInMovies)
+      applyConfirmedLikes(postInGames)
       return res.data
     } catch (err) {
-      targetComment.is_liked = prevLiked
-      targetComment.likes_count = prevCount
+      const revertCommentLikes = (post?: Post) => {
+        const c = post?.comments?.find(comm => Number(comm.id) === Number(commentId))
+        if (c) {
+          c.is_liked = prevLiked
+          c.likes_count = prevCount
+        }
+      }
+      revertCommentLikes(postInMovies)
+      revertCommentLikes(postInGames)
       throw err
     }
   }
 
   async function deletePost(postId: number) {
     await postsApi.deletePost(postId)
-    posts.value = posts.value.filter(p => p.id !== postId)
+    moviePosts.value = moviePosts.value.filter(p => p.id !== postId)
+    gamePosts.value = gamePosts.value.filter(p => p.id !== postId)
+    pendingMoviePosts.value = pendingMoviePosts.value.filter(p => p.id !== postId)
+    pendingGamePosts.value = pendingGamePosts.value.filter(p => p.id !== postId)
+  }
+
+  function addPost(newPost: Post) {
+    if (newPost.entertainment_type === 'game') {
+      const exists = gamePosts.value.some(p => p.id === newPost.id)
+      if (!exists) {
+        gamePosts.value.unshift(newPost)
+      }
+    } else {
+      const exists = moviePosts.value.some(p => p.id === newPost.id)
+      if (!exists) {
+        moviePosts.value.unshift(newPost)
+      }
+    }
   }
 
   function subscribeToEntertainment(currentUserId?: number) {
@@ -246,75 +411,114 @@ export const useEntertainmentStore = defineStore('entertainment', () => {
     channel
       .listen('.PostCreated', (data: { post: Post }) => {
         if (data.post.category !== 'entertainment') return
-        if (activeTab.value === 'movies' && data.post.entertainment_type !== 'movie') return
-        if (activeTab.value === 'games' && data.post.entertainment_type !== 'game') return
-        const exists = posts.value.some(p => p.id === data.post.id)
-        if (!exists) {
-          posts.value.unshift(data.post)
+        // Don't show banner for author's own post (already prepended locally)
+        if (currentUserId && data.post.user_id === currentUserId) return
+
+        if (data.post.entertainment_type === 'game') {
+          const existsInMain = gamePosts.value.some(p => p.id === data.post.id)
+          const existsInPending = pendingGamePosts.value.some(p => p.id === data.post.id)
+          if (!existsInMain && !existsInPending) {
+            pendingGamePosts.value.unshift(data.post)
+          }
+        } else {
+          const existsInMain = moviePosts.value.some(p => p.id === data.post.id)
+          const existsInPending = pendingMoviePosts.value.some(p => p.id === data.post.id)
+          if (!existsInMain && !existsInPending) {
+            pendingMoviePosts.value.unshift(data.post)
+          }
         }
       })
       .listen('.PostLiked', (data: { post_id: number; is_liked: boolean; likes_count: number; user_id: number }) => {
         if (currentUserId && data.user_id === currentUserId) return
-        const targetPost = posts.value.find(p => p.id === data.post_id)
-        if (targetPost) {
-          targetPost.likes_count = data.likes_count
+        const updateLikes = (list: Post[]) => {
+          const target = list.find(p => p.id === data.post_id)
+          if (target) {
+            target.likes_count = data.likes_count
+          }
         }
+        updateLikes(moviePosts.value)
+        updateLikes(gamePosts.value)
+        updateLikes(pendingMoviePosts.value)
+        updateLikes(pendingGamePosts.value)
       })
       .listen('.PostDeleted', (data: { id: number }) => {
-        posts.value = posts.value.filter(p => p.id !== data.id)
+        moviePosts.value = moviePosts.value.filter(p => p.id !== data.id)
+        gamePosts.value = gamePosts.value.filter(p => p.id !== data.id)
+        pendingMoviePosts.value = pendingMoviePosts.value.filter(p => p.id !== data.id)
+        pendingGamePosts.value = pendingGamePosts.value.filter(p => p.id !== data.id)
       })
       .listen('.CommentCreated', (data: { post_id: number; comment: PostComment; comments_count: number }) => {
-        const targetPost = posts.value.find(p => p.id === data.post_id)
-        if (targetPost) {
-          targetPost.comments_count = data.comments_count
-          if (!targetPost.comments) targetPost.comments = []
-          const existsIndex = targetPost.comments.findIndex(c => Number(c.id) === Number(data.comment.id))
-          if (existsIndex === -1) {
-            targetPost.comments.push(data.comment)
-          } else {
-            targetPost.comments[existsIndex] = data.comment
+        const updateComments = (list: Post[]) => {
+          const target = list.find(p => p.id === data.post_id)
+          if (target) {
+            target.comments_count = data.comments_count
+            if (!target.comments) target.comments = []
+            const existsIndex = target.comments.findIndex(c => Number(c.id) === Number(data.comment.id))
+            if (existsIndex === -1) {
+              target.comments.push(data.comment)
+            } else {
+              target.comments[existsIndex] = data.comment
+            }
           }
         }
+        updateComments(moviePosts.value)
+        updateComments(gamePosts.value)
       })
       .listen('.CommentUpdated', (data: { post_id: number; comment: PostComment }) => {
-        const targetPost = posts.value.find(p => p.id === data.post_id)
-        if (targetPost && targetPost.comments) {
-          const existsIndex = targetPost.comments.findIndex(c => Number(c.id) === Number(data.comment.id))
-          if (existsIndex !== -1) {
-            targetPost.comments[existsIndex] = data.comment
+        const updateComments = (list: Post[]) => {
+          const target = list.find(p => p.id === data.post_id)
+          if (target && target.comments) {
+            const existsIndex = target.comments.findIndex(c => Number(c.id) === Number(data.comment.id))
+            if (existsIndex !== -1) {
+              target.comments[existsIndex] = data.comment
+            }
           }
         }
+        updateComments(moviePosts.value)
+        updateComments(gamePosts.value)
       })
       .listen('.CommentDeleted', (data: { comment_id: number; post_id: number; comments_count: number }) => {
-        const targetPost = posts.value.find(p => p.id === data.post_id)
-        if (targetPost) {
-          targetPost.comments_count = data.comments_count
-          if (targetPost.comments) {
-            targetPost.comments = targetPost.comments.filter(c => Number(c.id) !== Number(data.comment_id))
+        const updateComments = (list: Post[]) => {
+          const target = list.find(p => p.id === data.post_id)
+          if (target) {
+            target.comments_count = data.comments_count
+            if (target.comments) {
+              target.comments = target.comments.filter(c => Number(c.id) !== Number(data.comment_id))
+            }
           }
         }
+        updateComments(moviePosts.value)
+        updateComments(gamePosts.value)
       })
       .listen('.CommentLiked', (data: { post_id: number; comment_id: number; is_liked: boolean; likes_count: number; user_id: number }) => {
         if (currentUserId && data.user_id === currentUserId) return
-        const targetPost = posts.value.find(p => p.id === data.post_id)
-        if (targetPost && targetPost.comments) {
-          const comment = targetPost.comments.find(c => Number(c.id) === Number(data.comment_id))
-          if (comment) {
-            comment.likes_count = data.likes_count
+        const updateCommentLikes = (list: Post[]) => {
+          const target = list.find(p => p.id === data.post_id)
+          if (target && target.comments) {
+            const comment = target.comments.find(c => Number(c.id) === Number(data.comment_id))
+            if (comment) {
+              comment.likes_count = data.likes_count
+            }
           }
         }
+        updateCommentLikes(moviePosts.value)
+        updateCommentLikes(gamePosts.value)
       })
   }
 
-  function addPost(newPost: Post) {
-    const exists = posts.value.some(p => p.id === newPost.id)
-    if (!exists) {
-      posts.value.unshift(newPost)
-    }
+  function unsubscribeFromEntertainment() {
+    if (!isSubscribed) return
+    try {
+      const echo = connectEcho()
+      echo.leaveChannel('posts')
+    } catch {}
+    isSubscribed = false
   }
 
   return {
     posts,
+    moviePosts,
+    gamePosts,
     isLoading,
     isLoadingMore,
     currentPage,
@@ -322,11 +526,14 @@ export const useEntertainmentStore = defineStore('entertainment', () => {
     hasLoaded,
     hasMorePages,
     activeTab,
+    pendingPosts,
+    pendingCount,
     activeFilters,
     isFiltered,
     fetchEntertainmentPosts,
     loadMorePosts,
     setActiveTab,
+    flushPendingPosts,
     addPost,
     toggleLike,
     addComment,
@@ -335,5 +542,6 @@ export const useEntertainmentStore = defineStore('entertainment', () => {
     toggleCommentLike,
     deletePost,
     subscribeToEntertainment,
+    unsubscribeFromEntertainment,
   }
 })

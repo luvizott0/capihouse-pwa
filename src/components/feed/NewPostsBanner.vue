@@ -1,18 +1,49 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useFeedStore } from '@/stores/feed'
+
+const props = withDefaults(
+  defineProps<{
+    count?: number
+    itemLabel?: string
+  }>(),
+  {
+    count: undefined,
+    itemLabel: undefined,
+  }
+)
+
+const emit = defineEmits<{
+  (e: 'click'): void
+}>()
 
 const feedStore = useFeedStore()
 
+const displayCount = computed(() => {
+  return props.count !== undefined ? props.count : feedStore.pendingPosts.length
+})
+
+const defaultLabel = computed(() => {
+  if (props.itemLabel) {
+    return props.itemLabel
+  }
+  return displayCount.value > 1 ? 'publicações' : 'publicação'
+})
+
 function handleClick() {
-  feedStore.flushPendingPosts()
-  window.scrollTo({ top: 0, behavior: 'smooth' })
+  if (props.count !== undefined) {
+    emit('click')
+  } else {
+    feedStore.flushPendingPosts()
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 }
 </script>
 
 <template>
   <Transition name="banner-slide">
     <div
-      v-if="feedStore.pendingPosts.length > 0"
+      v-if="displayCount > 0"
       class="new-posts-banner"
       role="status"
       aria-live="polite"
@@ -20,8 +51,8 @@ function handleClick() {
     >
       <span class="banner-icon">📢</span>
       <span class="banner-text">
-        {{ feedStore.pendingPosts.length }}
-        nova{{ feedStore.pendingPosts.length > 1 ? 's publicações' : ' publicação' }}
+        {{ displayCount }}
+        nova{{ displayCount > 1 ? 's' : '' }} {{ defaultLabel }}
         — clique para ver
       </span>
       <span class="banner-arrow">↑</span>

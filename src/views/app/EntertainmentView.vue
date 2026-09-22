@@ -7,6 +7,7 @@ import LetterboxdCard from '@/components/entertainment/LetterboxdCard.vue'
 import GameCard from '@/components/entertainment/GameCard.vue'
 import GameReviewModal from '@/components/entertainment/GameReviewModal.vue'
 import PostCardSkeleton from '@/components/feed/PostCardSkeleton.vue'
+import NewPostsBanner from '@/components/feed/NewPostsBanner.vue'
 import PullToRefreshIndicator from '@/components/ui/PullToRefreshIndicator.vue'
 import { usePullToRefresh } from '@/composables/usePullToRefresh'
 
@@ -14,6 +15,11 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const entertainmentStore = useEntertainmentStore()
+
+function handleFlushPending() {
+  entertainmentStore.flushPendingPosts()
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
 
 const activeTab = computed({
   get: () => entertainmentStore.activeTab,
@@ -170,9 +176,7 @@ const {
   handleTouchMove,
   handleTouchEnd,
 } = usePullToRefresh(async () => {
-  if (entertainmentStore.activeTab === 'movies') {
-    await loadPostsForCurrentRoute(true)
-  }
+  await loadPostsForCurrentRoute(true)
 })
 
 watch(
@@ -191,8 +195,18 @@ watch(
     if (tab !== oldTab) {
       syncTabFromRoute()
     }
-    if (q !== oldQ || search !== oldSearch || startDate !== oldStartDate || endDate !== oldEndDate || date !== oldDate || userId !== oldUserId || tab !== oldTab) {
+    const filtersChanged =
+      q !== oldQ ||
+      search !== oldSearch ||
+      startDate !== oldStartDate ||
+      endDate !== oldEndDate ||
+      date !== oldDate ||
+      userId !== oldUserId
+
+    if (filtersChanged) {
       loadPostsForCurrentRoute(true)
+    } else if (tab !== oldTab) {
+      loadPostsForCurrentRoute(false)
     }
   }
 )
@@ -208,9 +222,15 @@ watch(
   }
 )
 
-watch(sentinelRef, (newEl) => {
+watch(sentinelRef, (newEl, oldEl) => {
+  if (oldEl && scrollObserver) {
+    scrollObserver.unobserve(oldEl)
+  }
   if (newEl && scrollObserver) {
     scrollObserver.observe(newEl)
+    nextTick(() => {
+      checkSentinelIntersection()
+    })
   }
 })
 
@@ -225,6 +245,7 @@ onUnmounted(() => {
     scrollObserver.disconnect()
     scrollObserver = null
   }
+  entertainmentStore.unsubscribeFromEntertainment()
 })
 </script>
 
@@ -240,6 +261,13 @@ onUnmounted(() => {
       :pull-distance="pullDistance"
       :is-refreshing="isRefreshingFromPull"
       refreshing-text="Buscando novidades de entretenimento..."
+    />
+
+    <!-- Real-time new posts banner -->
+    <NewPostsBanner
+      :count="entertainmentStore.pendingCount"
+      :item-label="activeTab === 'games' ? 'avaliações de jogos' : 'avaliações de filmes'"
+      @click="handleFlushPending"
     />
 
     <!-- Header Section (padrão com cor primária) -->

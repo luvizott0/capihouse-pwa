@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import type { Post } from '@/types/models'
-import { createGameReview } from '@/api/games'
+import { createGameReview, searchGames, type GameSearchResult } from '@/api/games'
 
 const props = defineProps<{
   modelValue: boolean
@@ -13,6 +13,13 @@ const emit = defineEmits<{
 }>()
 
 const gameTitle = ref('')
+const searchQuery = ref('')
+const searchResults = ref<GameSearchResult[]>([])
+const selectedGame = ref<GameSearchResult | null>(null)
+const isSearching = ref(false)
+const showDropdown = ref(false)
+let searchTimeout: ReturnType<typeof setTimeout> | null = null
+
 const platform = ref('Xbox Series X|S')
 const gameStatus = ref<'playing' | 'completed' | 'mastered' | 'dropped' | 'wishlist'>('completed')
 const rating = ref<number | null>(5)
@@ -35,11 +42,70 @@ const availablePlatforms = [
   'Outro',
 ]
 
-function handleFileChange(event: Event) {
-  const target = event.target as HTMLInputElement
-  if (target.files && target.files[0]) {
-    boxArtFile.value = target.files[0]
+function onSearchInput() {
+  gameTitle.value = searchQuery.value
+  if (selectedGame.value && selectedGame.value.title !== searchQuery.value) {
+    selectedGame.value = null
+    boxArtUrl.value = ''
   }
+
+  if (searchTimeout) {
+    clearTimeout(searchTimeout)
+  }
+
+  const q = searchQuery.value.trim()
+  if (q.length < 2) {
+    searchResults.value = []
+    showDropdown.value = false
+    isSearching.value = false
+    return
+  }
+
+  isSearching.value = true
+  showDropdown.value = true
+
+  searchTimeout = setTimeout(async () => {
+    try {
+      const res = await searchGames(q)
+      searchResults.value = res.data.data || []
+    } catch (err) {
+      console.error('Erro ao buscar jogos:', err)
+      searchResults.value = []
+    } finally {
+      isSearching.value = false
+    }
+  }, 300)
+}
+
+function onSearchFocus() {
+  if (searchResults.value.length > 0 && !selectedGame.value) {
+    showDropdown.value = true
+  }
+}
+
+function onSearchBlur() {
+  // Pequeno timeout para permitir o clique em item do dropdown
+  setTimeout(() => {
+    showDropdown.value = false
+  }, 250)
+}
+
+function selectGame(game: GameSearchResult) {
+  selectedGame.value = game
+  gameTitle.value = game.title
+  searchQuery.value = game.title
+  boxArtUrl.value = game.cover_url || ''
+  showDropdown.value = false
+  searchResults.value = []
+}
+
+function clearSelectedGame() {
+  selectedGame.value = null
+  gameTitle.value = ''
+  searchQuery.value = ''
+  boxArtUrl.value = ''
+  searchResults.value = []
+  showDropdown.value = false
 }
 
 function setRating(val: number) {
@@ -52,6 +118,11 @@ function setRating(val: number) {
 
 function resetForm() {
   gameTitle.value = ''
+  searchQuery.value = ''
+  selectedGame.value = null
+  searchResults.value = []
+  showDropdown.value = false
+  isSearching.value = false
   platform.value = 'Xbox Series X|S'
   gameStatus.value = 'completed'
   rating.value = 5
@@ -74,7 +145,7 @@ function closeModal() {
 
 async function handleSubmit() {
   if (!gameTitle.value.trim()) {
-    errorMessage.value = 'Informe o título do jogo.'
+    errorMessage.value = 'Informe ou selecione o título do jogo.'
     return
   }
 
@@ -89,7 +160,6 @@ async function handleSubmit() {
       rating: rating.value,
       hours_played: hoursPlayed.value,
       box_art_url: boxArtUrl.value.trim() || undefined,
-      box_art: boxArtFile.value,
       content: content.value.trim() || undefined,
     })
 
@@ -121,23 +191,81 @@ async function handleSubmit() {
           {{ errorMessage }}
         </div>
 
-        <!-- Título do Jogo -->
+        <!-- Título do Jogo (Search Select) -->
         <div class="form-group">
-          <label class="form-label">Título do Jogo *</label>
-          <input
-            v-model="gameTitle"
-            type="text"
-            class="retro-input"
-            placeholder="Ex: Elden Ring, Halo Infinite, The Witcher 3..."
-            maxlength="200"
-            required
-          />
+          <label class="form-label">Jogo *</label>
+
+          <!-- Card de Jogo Selecionado -->
+          <div v-if="selectedGame" class="selected-game-card">
+            <img v-if="boxArtUrl" :src="boxArtUrl" :alt="gameTitle" class="selected-game-cover" />
+            <div v-else class="selected-game-no-cover">🎮</div>
+            <div class="selected-game-info">
+              <span class="selected-game-label">Jogo Selecionado:</span>
+              <span class="selected-game-title">{{ gameTitle }}</span>
+              <span class="selected-game-badge">✓ Capa vinculada automaticamente</span>
+            </div>
+            <button type="button" class="btn-change-game" @click="clearSelectedGame">
+              [ Alterar ]
+            </button>
+          </div>
+
+          <!-- Input de Busca com Autocomplete -->
+          <div v-else class="game-search-select-wrapper">
+            <div class="search-input-box">
+              <span class="search-icon">🔍</span>
+              <input
+                v-model="searchQuery"
+                type="text"
+                class="retro-input search-game-input"
+                placeholder="Busque o jogo (ex: Lego Marvel, The Witcher, Halo, Elden Ring)..."
+                maxlength="200"
+                @input="onSearchInput"
+                @focus="onSearchFocus"
+                @blur="onSearchBlur"
+              />
+              <span v-if="isSearching" class="search-spinner" title="Buscando...">⏳</span>
+              <button
+                v-else-if="searchQuery"
+                type="button"
+                class="btn-clear-search"
+                @click="clearSelectedGame"
+                title="Limpar busca"
+              >
+                ×
+              </button>
+            </div>
+
+            <!-- Dropdown de Resultados da API -->
+            <div v-if="showDropdown && (searchResults.length > 0 || isSearching)" class="search-results-dropdown">
+              <div v-if="isSearching && searchResults.length === 0" class="dropdown-status">
+                Buscando no catálogo...
+              </div>
+              <div
+                v-for="item in searchResults"
+                :key="item.id"
+                class="dropdown-item"
+                @mousedown="selectGame(item)"
+              >
+                <img v-if="item.cover_url" :src="item.cover_url" :alt="item.title" class="dropdown-item-cover" />
+                <div v-else class="dropdown-item-no-cover">🎮</div>
+                <div class="dropdown-item-info">
+                  <span class="dropdown-item-title">{{ item.title }}</span>
+                  <span v-if="item.source" class="dropdown-item-source">
+                    {{ item.source === 'xbox' ? 'Xbox Live / Store' : 'Steam / PC' }}
+                  </span>
+                </div>
+              </div>
+              <div v-if="!isSearching && searchResults.length === 0" class="dropdown-status">
+                Nenhum jogo encontrado.
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="form-row-2">
           <!-- Plataforma -->
           <div class="form-group">
-            <label class="form-label">Plataforma</label>
+            <label class="form-label">Plataforma onde jogou</label>
             <select v-model="platform" class="retro-select">
               <option v-for="p in availablePlatforms" :key="p" :value="p">
                 {{ p }}
@@ -191,26 +319,6 @@ async function handleSubmit() {
               class="retro-input"
               placeholder="Ex: 85"
             />
-          </div>
-        </div>
-
-        <!-- Capa do Jogo -->
-        <div class="form-group">
-          <label class="form-label">Capa do Jogo (URL ou Arquivo)</label>
-          <div class="cover-inputs">
-            <input
-              v-model="boxArtUrl"
-              type="url"
-              class="retro-input"
-              placeholder="https://exemplo.com/capa-do-jogo.jpg"
-            />
-            <div class="file-upload-wrap">
-              <label class="file-label">
-                📁 Upload de Imagem
-                <input type="file" accept="image/*" class="hidden-file-input" @change="handleFileChange" />
-              </label>
-              <span v-if="boxArtFile" class="file-chosen-name">{{ boxArtFile.name }}</span>
-            </div>
           </div>
         </div>
 
@@ -402,43 +510,225 @@ async function handleSubmit() {
   cursor: pointer;
 }
 
-.cover-inputs {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
+.game-search-select-wrapper {
+  position: relative;
+  width: 100%;
 }
 
-.file-upload-wrap {
+.search-input-box {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  position: relative;
+  width: 100%;
 }
 
-.file-label {
-  font-size: 0.78rem;
-  background: #f3f4f6;
-  border: 1px solid #d1d5db;
-  padding: 0.3rem 0.6rem;
-  border-radius: 3px;
+.search-icon {
+  position: absolute;
+  left: 0.65rem;
+  font-size: 0.85rem;
+  color: #9ca3af;
+  pointer-events: none;
+}
+
+.search-game-input {
+  width: 100%;
+  padding-left: 2.1rem;
+  padding-right: 2.1rem;
+}
+
+.search-spinner {
+  position: absolute;
+  right: 0.65rem;
+  font-size: 0.85rem;
+  animation: pulse 1s infinite alternate;
+}
+
+@keyframes pulse {
+  from { opacity: 0.4; }
+  to { opacity: 1; }
+}
+
+.btn-clear-search {
+  position: absolute;
+  right: 0.5rem;
+  background: none;
+  border: none;
+  font-size: 1.15rem;
+  color: #9ca3af;
   cursor: pointer;
-  color: #374151;
-  font-weight: 600;
+  padding: 0 0.25rem;
+  line-height: 1;
 }
 
-.file-label:hover {
+.btn-clear-search:hover {
+  color: #ef4444;
+}
+
+.search-results-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 2px solid var(--color-border, #d1d5db);
+  border-radius: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+  z-index: 100;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.45rem 0.65rem;
+  cursor: pointer;
+  border-bottom: 1px solid #f3f4f6;
+  transition: background 0.15s ease;
+}
+
+.dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.dropdown-item:hover {
+  background: #fef3c7;
+}
+
+.dropdown-item-cover {
+  width: 34px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 2px;
+  border: 1px solid #d1d5db;
+  flex-shrink: 0;
+  background: #f3f4f6;
+}
+
+.dropdown-item-no-cover {
+  width: 34px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f4f6;
+  border-radius: 2px;
+  flex-shrink: 0;
+  font-size: 1.1rem;
+}
+
+.dropdown-item-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.dropdown-item-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dropdown-item-source {
+  font-size: 0.68rem;
+  color: #6b7280;
+  font-family: var(--font-mono, monospace);
+}
+
+.dropdown-status {
+  padding: 0.75rem;
+  font-size: 0.78rem;
+  color: #6b7280;
+  text-align: center;
+  font-style: italic;
+}
+
+.selected-game-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: #fdfaf6;
+  border: 1.5px solid var(--color-primary, #a66130);
+  border-radius: 4px;
+}
+
+.selected-game-cover {
+  width: 44px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 3px;
+  border: 1px solid #d1d5db;
+  flex-shrink: 0;
+  background: #fff;
+}
+
+.selected-game-no-cover {
+  width: 44px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: #e5e7eb;
+  border-radius: 3px;
+  font-size: 1.3rem;
+  flex-shrink: 0;
 }
 
-.hidden-file-input {
-  display: none;
+.selected-game-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  flex: 1;
+  min-width: 0;
 }
 
-.file-chosen-name {
-  font-size: 0.75rem;
-  color: #4b5563;
+.selected-game-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  color: #92400e;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+
+.selected-game-title {
+  font-size: 0.88rem;
+  font-weight: bold;
+  color: #111827;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.selected-game-badge {
+  font-size: 0.72rem;
+  color: #047857;
+  font-weight: 600;
+  font-family: var(--font-mono, monospace);
+}
+
+.btn-change-game {
+  background: none;
+  border: 1px solid var(--color-border, #d1d5db);
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  border-radius: 3px;
+  cursor: pointer;
+  color: var(--color-primary, #a66130);
+  font-family: var(--font-mono, monospace);
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.btn-change-game:hover {
+  background: #fee2e2;
+  border-color: #f87171;
+  color: #b91c1c;
 }
 
 .modal-footer {

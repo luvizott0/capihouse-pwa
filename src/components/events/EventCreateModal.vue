@@ -95,12 +95,19 @@ async function handleSubmit() {
     return
   }
 
-  const combinedDateTime = `${eventDate.value}T${eventTime.value}`
+  const parts = eventDate.value.split('-').map(Number)
+  const timeParts = eventTime.value.split(':').map(Number)
+  const y = parts[0] ?? 1970
+  const m = parts[1] ?? 1
+  const d = parts[2] ?? 1
+  const h = timeParts[0] ?? 0
+  const min = timeParts[1] ?? 0
+  const localDate = new Date(y, m - 1, d, h, min, 0)
 
   const formData = new FormData()
   formData.append('name', name.value.trim())
   formData.append('description', description.value.trim())
-  formData.append('date', combinedDateTime)
+  formData.append('date', localDate.toISOString())
   if (selectedBlob.value) {
     formData.append('image', selectedBlob.value, 'event-banner.webp')
   }

@@ -509,7 +509,7 @@ async function handleAddComment() {
             </span>
             <span class="sub-dot">•</span>
             <span class="letterboxd-badge" title="Importado via Letterboxd">
-              <span class="badge-dot"></span>
+              <span class="badge-icon">🍿</span>
               Letterboxd
             </span>
           </div>
@@ -998,23 +998,21 @@ async function handleAddComment() {
 .letterboxd-badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
-  background-color: #14181c;
-  color: #00e054;
-  padding: 0.1rem 0.4rem;
-  border-radius: 3px;
-  font-size: 0.7rem;
-  font-weight: 700;
+  gap: 0.25rem;
+  background-color: #ffedd5;
+  color: #c2410c;
+  border: 1px solid #fed7aa;
+  padding: 0.1rem 0.45rem;
+  border-radius: 2px;
+  font-size: 0.72rem;
+  font-weight: 600;
   font-family: var(--font-mono, monospace);
-  letter-spacing: 0.5px;
   line-height: 1.2;
 }
 
-.badge-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background-color: #ff8000;
+.badge-icon {
+  font-size: 0.75rem;
+  line-height: 1;
 }
 
 .btn-delete-bracket {
