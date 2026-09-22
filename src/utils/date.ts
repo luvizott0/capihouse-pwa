@@ -1,8 +1,13 @@
 export function relativeTime(dateString: string): string {
   const date = new Date(dateString)
+  if (isNaN(date.getTime())) return ''
+
   const now = new Date()
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
 
+  if (diffInSeconds < -30) {
+    return formatDate(dateString)
+  }
   if (diffInSeconds < 60) return 'agora mesmo'
   if (diffInSeconds < 3600) return `há ${Math.floor(diffInSeconds / 60)} min`
   if (diffInSeconds < 86400) return `há ${Math.floor(diffInSeconds / 3600)} h`
