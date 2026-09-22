@@ -52,6 +52,8 @@ const dateFilterLabel = computed(() => {
 })
 
 async function loadPostsForCurrentRoute(force = false) {
+  syncTabFromRoute()
+
   // Se já temos posts carregados da rede nesta sessão, não é um reload forçado nem há filtros de busca ativos, reutiliza o estado do Pinia
   if (
     !force &&
@@ -78,8 +80,21 @@ async function loadMore() {
   await entertainmentStore.loadMorePosts()
 }
 
+function syncTabFromRoute() {
+  const tabFromQuery = route.query.tab as EntertainmentTab
+  if (tabFromQuery === 'games' || tabFromQuery === 'series' || tabFromQuery === 'movies') {
+    if (entertainmentStore.activeTab !== tabFromQuery) {
+      entertainmentStore.setActiveTab(tabFromQuery)
+    }
+  }
+}
+
 function clearSearch() {
-  router.push({ path: '/entertainment' })
+  const query: Record<string, string> = {}
+  if (route.query.tab) {
+    query.tab = String(route.query.tab)
+  }
+  router.push({ path: '/entertainment', query: Object.keys(query).length ? query : undefined })
 }
 
 const showGameReviewModal = ref(false)
@@ -87,12 +102,18 @@ const showGameReviewModal = ref(false)
 function handleGameCreated(newPost: any) {
   entertainmentStore.addPost(newPost)
   if (activeTab.value !== 'games') {
-    entertainmentStore.setActiveTab('games')
+    handleTabChange('games')
   }
 }
 
 function handleTabChange(tab: EntertainmentTab) {
   entertainmentStore.setActiveTab(tab)
+  router.replace({
+    query: {
+      ...route.query,
+      tab: tab !== 'movies' ? tab : undefined,
+    },
+  })
 }
 
 function handlePostDeleted(deletedId: number) {
@@ -163,10 +184,14 @@ watch(
     route.query.end_date,
     route.query.date,
     route.query.user_id,
+    route.query.tab,
   ],
-  ([name, q, search, startDate, endDate, date, userId], [, oldQ, oldSearch, oldStartDate, oldEndDate, oldDate, oldUserId]) => {
+  ([name, q, search, startDate, endDate, date, userId, tab], [, oldQ, oldSearch, oldStartDate, oldEndDate, oldDate, oldUserId, oldTab]) => {
     if (name !== 'entertainment') return
-    if (q !== oldQ || search !== oldSearch || startDate !== oldStartDate || endDate !== oldEndDate || date !== oldDate || userId !== oldUserId) {
+    if (tab !== oldTab) {
+      syncTabFromRoute()
+    }
+    if (q !== oldQ || search !== oldSearch || startDate !== oldStartDate || endDate !== oldEndDate || date !== oldDate || userId !== oldUserId || tab !== oldTab) {
       loadPostsForCurrentRoute(true)
     }
   }
@@ -226,7 +251,7 @@ onUnmounted(() => {
         class="btn-new-review"
         @click="showGameReviewModal = true"
       >
-        [ + Nova Análise ]
+        [ + Review ]
       </button>
     </header>
 
@@ -402,6 +427,8 @@ onUnmounted(() => {
   font-weight: 700;
   cursor: pointer;
   transition: all 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .btn-new-review:hover {
@@ -445,6 +472,8 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 0.5rem;
+  flex-wrap: nowrap;
   background-color: var(--color-primary, #a66130);
   border: 1px solid var(--color-primary-800, #5f4120);
   border-radius: 2px;
@@ -458,6 +487,20 @@ onUnmounted(() => {
   font-weight: 700;
   color: #ffffff;
   margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+@media (max-width: 480px) {
+  .page-title {
+    font-size: 0.9rem;
+  }
+  .btn-new-review {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+  }
 }
 
 /* Search filter banner */

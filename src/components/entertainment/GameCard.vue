@@ -383,45 +383,44 @@ const statusLabel = computed(() => {
       </div>
     </div>
 
-    <!-- Actions Footer: Like, Comments toggle, Repost -->
-    <footer class="card-footer">
-      <div class="actions-left">
-        <!-- Like Button -->
-        <button
-          type="button"
-          class="action-btn like-btn"
-          :class="{ active: isLiked }"
-          @click="handleLikeToggle"
-          title="Curtir"
-        >
-          <span class="action-icon">{{ isLiked ? '❤️' : '🤍' }}</span>
-          <span class="action-label">{{ likesCount }}</span>
-        </button>
+    <!-- Action Bar: Likes, Comments, Repost -->
+    <div class="post-actions">
+      <!-- Like Button -->
+      <button
+        type="button"
+        class="action-btn like-btn"
+        :class="{ liked: isLiked }"
+        @click="handleLikeToggle"
+      >
+        <span class="icon">{{ isLiked ? '❤️' : '🤍' }}</span>
+        <span>{{ likesCount }} {{ likesCount === 1 ? 'curtida' : 'curtidas' }}</span>
+      </button>
 
-        <!-- Comments Toggle Button -->
-        <button
-          type="button"
-          class="action-btn comment-btn"
-          :class="{ active: showComments }"
-          @click="showComments = !showComments"
-          title="Comentários"
-        >
-          <span class="action-icon">💬</span>
-          <span class="action-label">{{ post.comments_count || 0 }}</span>
-        </button>
+      <!-- Comment Toggle Button -->
+      <button
+        type="button"
+        class="action-btn comment-btn"
+        @click="showComments = !showComments"
+      >
+        <span class="icon">💬</span>
+        <span>
+          {{ post.comments_count || 0 }}
+          {{ post.comments_count === 1 ? 'comentário' : 'comentários' }}
+        </span>
+      </button>
 
-        <!-- Repost Button -->
-        <button
-          type="button"
-          class="action-btn repost-btn"
-          @click="showRepostModal = true"
-          title="Compartilhar no Feed Geral"
-        >
-          <span class="action-icon">🔁</span>
-          <span class="action-label">Repost</span>
-        </button>
-      </div>
-    </footer>
+      <!-- Repost Button (Only visible for the author) -->
+      <button
+        v-if="isAuthor"
+        type="button"
+        class="action-btn repost-btn"
+        title="Compartilhar este jogo no feed principal"
+        @click="showRepostModal = true"
+      >
+        <span class="icon">🔁</span>
+        <span>Repostar no Feed</span>
+      </button>
+    </div>
 
     <!-- Comments Section (Collapsible) -->
     <div v-if="showComments" class="comments-section">
@@ -896,46 +895,47 @@ const statusLabel = computed(() => {
   font-style: italic;
 }
 
-/* Footer Actions */
-.card-footer {
+/* Action Bar / Post Actions (identical to LetterboxdCard) */
+.post-actions {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 0.6rem 1rem;
-  border-top: 1px solid var(--color-border-subtle, #f3f4f6);
-  background: var(--color-surface-soft, #f9fafb);
-}
-
-.actions-left {
-  display: flex;
-  gap: 0.75rem;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  padding: 0.6rem 0.85rem;
+  border-top: 1px solid var(--color-border, #D8CDC5);
+  background-color: var(--color-primary-50, #f8f6f1);
+  border-radius: 2px;
 }
 
 .action-btn {
-  background: none;
-  border: 1px solid transparent;
-  padding: 0.25rem 0.55rem;
-  border-radius: 3px;
-  font-size: 0.85rem;
-  font-family: inherit;
-  cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  color: var(--color-text-muted, #4b5563);
-  transition: all 0.15s ease;
+  gap: 0.4rem;
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-primary-800, #5f4120);
+  cursor: pointer;
+  transition: color 0.15s ease;
 }
 
 .action-btn:hover {
-  background: #e5e7eb;
-  color: var(--color-text, #111827);
+  color: var(--color-primary, #a66130);
 }
 
-.action-btn.active {
+.action-btn .icon {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.like-btn.liked {
   color: #dc2626;
 }
 
-.comment-btn.active {
+.repost-btn:hover {
   color: var(--color-primary, #a66130);
 }
 

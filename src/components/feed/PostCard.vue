@@ -535,10 +535,14 @@ async function confirmDeletePost() {
     <!-- Embedded Repost Card (if post is a repost) -->
     <div v-if="post.reposted_post" class="embedded-repost-box">
       <div class="embedded-repost-header">
-        <span v-if="post.reposted_post.entertainment_type === 'game'" class="embedded-repost-tag game-tag">
+        <span
+          v-if="post.reposted_post.entertainment_type === 'game'"
+          class="embedded-repost-tag"
+          :class="post.reposted_post.external_source === 'xbox' ? 'xbox-tag' : 'game-tag'"
+        >
           {{ post.reposted_post.external_source === 'xbox' ? '🎮 Xbox Live' : '🕹️ Análise Gamer' }}
         </span>
-        <span v-else class="embedded-repost-tag">🍿 Letterboxd</span>
+        <span v-else class="embedded-repost-tag letterboxd-tag">🍿 Letterboxd</span>
         <span class="embedded-repost-author">
           Avaliação de <router-link :to="`/profile/${post.reposted_post.user?.username}`" class="embedded-author-link">@{{ post.reposted_post.user?.username }}</router-link>
         </span>
@@ -2135,13 +2139,33 @@ async function confirmDeletePost() {
 }
 
 .embedded-repost-tag {
-  font-size: 0.7rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  background-color: #14181c;
-  color: #00e054;
-  padding: 0.15rem 0.35rem;
+  padding: 0.15rem 0.45rem;
   border-radius: 2px;
   font-family: var(--font-mono, monospace);
+  line-height: 1.2;
+}
+
+.embedded-repost-tag.letterboxd-tag {
+  background-color: #ffedd5;
+  color: #c2410c;
+  border: 1px solid #fed7aa;
+}
+
+.embedded-repost-tag.xbox-tag {
+  background-color: #e8f5e9;
+  color: #107c10;
+  border: 1px solid #c8e6c9;
+}
+
+.embedded-repost-tag.game-tag {
+  background-color: #f3e8ff;
+  color: #7e22ce;
+  border: 1px solid #e9d5ff;
 }
 
 .embedded-repost-author {

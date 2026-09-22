@@ -106,10 +106,14 @@ async function handleRepost() {
           class="preview-poster"
         />
         <div class="preview-info">
-          <span v-if="post?.entertainment_type === 'game'" class="preview-badge game-badge">
+          <span
+            v-if="post?.entertainment_type === 'game'"
+            class="preview-badge"
+            :class="post?.external_source === 'xbox' ? 'xbox-badge' : 'game-badge'"
+          >
             {{ post?.external_source === 'xbox' ? '🎮 Xbox Live' : '🕹️ Análise de Jogo' }}
           </span>
-          <span v-else class="preview-badge">🍿 Letterboxd</span>
+          <span v-else class="preview-badge letterboxd-badge">🍿 Letterboxd</span>
           <h4 class="preview-title">
             {{ film.film_title || film.game_title }}
             <span v-if="film.film_year" class="preview-year">({{ film.film_year }})</span>
@@ -252,12 +256,34 @@ async function handleRepost() {
 }
 
 .preview-badge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
   font-size: 0.7rem;
   font-weight: 700;
-  color: #00c030;
+  padding: 0.15rem 0.45rem;
+  border-radius: 2px;
   font-family: var(--font-mono, monospace);
-  text-transform: uppercase;
+  width: fit-content;
+  line-height: 1.2;
+}
+
+.preview-badge.letterboxd-badge {
+  background-color: #ffedd5;
+  color: #c2410c;
+  border: 1px solid #fed7aa;
+}
+
+.preview-badge.xbox-badge {
+  background-color: #e8f5e9;
+  color: #107c10;
+  border: 1px solid #c8e6c9;
+}
+
+.preview-badge.game-badge {
+  background-color: #f3e8ff;
+  color: #7e22ce;
+  border: 1px solid #e9d5ff;
 }
 
 .preview-title {

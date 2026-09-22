@@ -232,7 +232,7 @@ async function handleSyncXbox() {
       <div class="modal-header">
         <div class="modal-title-row">
           <span class="modal-icon">🔗</span>
-          <span class="modal-title">» Contas Conectadas & Integrações</span>
+          <span class="modal-title">» Contas Conectadas</span>
         </div>
         <button type="button" class="btn-close-bracket" @click="closeModal" title="Fechar">
           [ x ]
@@ -482,10 +482,12 @@ async function handleSyncXbox() {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 0.5rem;
   padding: 0.6rem 0.85rem;
   background: var(--color-primary, #a66130);
   color: #fff;
   border-bottom: 2px solid var(--color-primary-800, #5f4120);
+  flex-wrap: nowrap;
 }
 
 .modal-title-row {
@@ -494,18 +496,26 @@ async function handleSyncXbox() {
   gap: 0.5rem;
   font-family: var(--font-mono, monospace);
   font-weight: bold;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .modal-icon {
   font-size: 1.1rem;
+  flex-shrink: 0;
 }
 
 .modal-title {
   font-size: 0.95rem;
   letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .btn-close-bracket {
+  flex-shrink: 0;
+  white-space: nowrap;
   background: none;
   border: none;
   color: #fff;

@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useEntertainmentStore } from '@/stores/entertainment'
 import SearchFilterModal, { type SearchScope, type SearchFilterState } from './SearchFilterModal.vue'
+
+const entertainmentStore = useEntertainmentStore()
 
 const emit = defineEmits<{
   (e: 'open-create-post'): void
@@ -76,6 +79,13 @@ function executeSearch() {
   if (selectedStartDate.value) query.start_date = selectedStartDate.value
   if (selectedEndDate.value) query.end_date = selectedEndDate.value
   if (selectedUserId.value !== null) query.user_id = String(selectedUserId.value)
+
+  if (targetPath === '/entertainment') {
+    const currentTab = route.query.tab || (route.path.startsWith('/entertainment') ? entertainmentStore.activeTab : undefined)
+    if (currentTab && currentTab !== 'movies') {
+      query.tab = String(currentTab)
+    }
+  }
 
   router.push({
     path: targetPath,
