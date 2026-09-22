@@ -420,6 +420,14 @@ async function handleSyncXbox() {
               Jogos recentes e quando você <strong>miletar (100%)</strong> aparecerão automaticamente na aba 🎮 Jogos!
             </p>
           </div>
+
+          <!-- Dica sobre a chave OPENXBL_API_KEY -->
+          <div class="api-help-note">
+            <span class="note-icon">💡</span>
+            <div class="note-text">
+              Para sincronizar jogos e conquistas automaticamente, adicione <code>OPENXBL_API_KEY</code> no arquivo <code>.env</code> do servidor. Obtenha sua chave gratuita em <a href="https://xbl.io" target="_blank" rel="noopener noreferrer" class="link-external">xbl.io ↗</a>.
+            </div>
+          </div>
         </div>
 
         <!-- ======================= FUTURAS INTEGRAÇÕES ======================= -->
@@ -652,6 +660,44 @@ async function handleSyncXbox() {
   background: #fef2f2;
   color: #991b1b;
   border: 1px solid #fecaca;
+}
+
+/* API Help Note */
+.api-help-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.55rem 0.75rem;
+  background: #f0fdf4;
+  border: 1px dashed #86efac;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  color: #166534;
+  line-height: 1.4;
+}
+
+.note-icon {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.note-text code {
+  background: #dcfce7;
+  padding: 0.1rem 0.3rem;
+  border-radius: 2px;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.72rem;
+  color: #14532d;
+}
+
+.link-external {
+  color: #0e5e0e;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.link-external:hover {
+  color: #052e05;
 }
 
 /* Inputs & Actions */
