@@ -23,6 +23,21 @@ const eventsStore = useEventsStore()
 const groupsStore = useGroupsStore()
 const notificationsStore = useNotificationsStore()
 
+const showPostModal = ref(false)
+const showEventModal = ref(false)
+const showGroupModal = ref(false)
+const showMobileUsersDrawer = ref(false)
+
+const headerRef = ref<HTMLElement | null>(null)
+const headerHeight = ref(145)
+let headerResizeObserver: ResizeObserver | null = null
+
+function updateHeaderHeight() {
+  if (headerRef.value) {
+    headerHeight.value = headerRef.value.offsetHeight
+  }
+}
+
 onMounted(() => {
   // Fetch initial unread count via HTTP (fast, doesn't need WS to be ready)
   notificationsStore.fetchUnreadCount()
@@ -32,19 +47,24 @@ onMounted(() => {
   if (userId) {
     notificationsStore.subscribeToNotifications(userId)
   }
+
+  // Calculate top header height and keep it in sync on resize
+  updateHeaderHeight()
+  if (headerRef.value && typeof ResizeObserver !== 'undefined') {
+    headerResizeObserver = new ResizeObserver(() => {
+      updateHeaderHeight()
+    })
+    headerResizeObserver.observe(headerRef.value)
+  }
 })
 
 onUnmounted(() => {
+  headerResizeObserver?.disconnect()
   const userId = authStore.user?.id
   if (userId) {
     notificationsStore.unsubscribeFromNotifications(userId)
   }
 })
-
-const showPostModal = ref(false)
-const showEventModal = ref(false)
-const showGroupModal = ref(false)
-const showMobileUsersDrawer = ref(false)
 
 function handleStopImpersonating() {
   authStore.stopImpersonating()
@@ -66,22 +86,22 @@ function onGroupCreated() {
 </script>
 
 <template>
-  <div class="layout-shell">
-    <!-- Impersonation Alert Banner -->
-    <div v-if="authStore.isImpersonating" class="impersonate-banner">
-      <div class="impersonate-banner-content">
-        <span class="impersonate-badge">🎭 MODO IMPERSONATE</span>
-        <span class="impersonate-text">
-          Conectado como: <strong>{{ authStore.user?.name }}</strong> (@{{ authStore.user?.username }})
-        </span>
-        <button @click="handleStopImpersonating" class="impersonate-exit-btn">
-          [ Sair da Personificação ]
-        </button>
-      </div>
-    </div>
-
+  <div class="layout-shell" :style="{ '--header-height': `${headerHeight}px` }">
     <!-- Top Header Bar -->
-    <header class="top-header">
+    <header ref="headerRef" class="top-header">
+      <!-- Impersonation Alert Banner -->
+      <div v-if="authStore.isImpersonating" class="impersonate-banner">
+        <div class="impersonate-banner-content">
+          <span class="impersonate-badge">🎭 MODO IMPERSONATE</span>
+          <span class="impersonate-text">
+            Conectado como: <strong>{{ authStore.user?.name }}</strong> (@{{ authStore.user?.username }})
+          </span>
+          <button @click="handleStopImpersonating" class="impersonate-exit-btn">
+            [ Sair da Personificação ]
+          </button>
+        </div>
+      </div>
+
       <div class="header-main-row">
         <!-- Logo & Brand -->
         <router-link to="/feed" class="brand-link">
@@ -309,6 +329,35 @@ function onGroupCreated() {
 .layout-sidebar-right {
   width: 260px;
   flex-shrink: 0;
+  position: sticky;
+  top: calc(var(--header-height, 145px) + 1.25rem);
+  align-self: flex-start;
+  max-height: calc(100vh - var(--header-height, 145px) - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border, #D8CDC5) transparent;
+}
+
+.layout-sidebar-left::-webkit-scrollbar,
+.layout-sidebar-right::-webkit-scrollbar {
+  width: 4px;
+}
+
+.layout-sidebar-left::-webkit-scrollbar-track,
+.layout-sidebar-right::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.layout-sidebar-left::-webkit-scrollbar-thumb,
+.layout-sidebar-right::-webkit-scrollbar-thumb {
+  background-color: var(--color-border, #D8CDC5);
+  border-radius: 2px;
+}
+
+.layout-sidebar-left::-webkit-scrollbar-thumb:hover,
+.layout-sidebar-right::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-primary-400, #c4884e);
 }
 
 .layout-content {

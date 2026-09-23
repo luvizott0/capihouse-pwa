@@ -219,8 +219,13 @@ a:hover {
   gap: 1rem;
 }
 .layout-sidebar-left, .layout-sidebar-right {
-  width: 250px;
+  width: 260px;
   flex-shrink: 0;
+  position: sticky;
+  top: calc(var(--header-height, 145px) + 1.25rem);
+  align-self: flex-start;
+  max-height: calc(100vh - var(--header-height, 145px) - 2rem);
+  overflow-y: auto;
 }
 .layout-content {
   flex: 1;

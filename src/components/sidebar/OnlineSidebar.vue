@@ -32,7 +32,7 @@ const displayUsers = computed(() => {
     <div class="retro-card-header">
       » Amigos da Casa
     </div>
-    <div style="padding: 0.75rem; max-height: 450px; overflow-y: auto;">
+    <div class="sidebar-users-body">
       <div v-if="usersStore.isLoading && displayUsers.length === 0" class="empty-text">Carregando membros...</div>
       <div v-else-if="displayUsers.length === 0" class="empty-text">Nenhum membro encontrado.</div>
       <router-link 
@@ -58,6 +58,10 @@ const displayUsers = computed(() => {
 </template>
 
 <style scoped>
+.sidebar-users-body {
+  padding: 0.75rem;
+}
+
 .online-user-item {
   display: flex;
   align-items: center;
