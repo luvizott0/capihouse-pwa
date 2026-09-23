@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import type { Post, PostComment } from '@/types/models'
 import { useAuthStore } from '@/stores/auth'
 import { useFeedStore } from '@/stores/feed'
@@ -140,54 +140,319 @@ function openBoxArt(url?: string | null) {
   }
 }
 
-// Comments logic
+// -------------------------------------------------------------
+// Comments Handling (identical to film / letterboxd posts)
+// -------------------------------------------------------------
 const commentContent = ref('')
 const isSubmittingComment = ref(false)
-const replyingTo = ref<PostComment | null>(null)
-const editingCommentId = ref<number | null>(null)
-const editCommentText = ref('')
-const deletingCommentId = ref<number | null>(null)
 
-const commentsList = computed(() => props.post.comments || [])
+interface ThreadedCommentItem {
+  comment: PostComment
+  depth: number
+  rootId: number
+  repliesCount?: number
+}
+
+const expandedThreadIds = ref<Set<number>>(new Set())
+
+function toggleThread(rootCommentId: number) {
+  const next = new Set(expandedThreadIds.value)
+  if (next.has(rootCommentId)) {
+    next.delete(rootCommentId)
+  } else {
+    next.add(rootCommentId)
+  }
+  expandedThreadIds.value = next
+}
+
+function isThreadExpanded(rootCommentId: number): boolean {
+  return expandedThreadIds.value.has(rootCommentId)
+}
+
+function findRootId(commentId: number): number {
+  const item = threadedComments.value.find((tc) => tc.comment.id === commentId)
+  return item ? item.rootId : commentId
+}
+
+const threadedComments = computed<ThreadedCommentItem[]>(() => {
+  const comments = props.post.comments
+  if (!comments || !comments.length) return []
+
+  const commentMap = new Map<number, PostComment>()
+  const childrenMap = new Map<number, PostComment[]>()
+  const rootComments: PostComment[] = []
+
+  for (const c of comments) {
+    commentMap.set(c.id, c)
+  }
+
+  for (const c of comments) {
+    if (c.parent_id && commentMap.has(c.parent_id)) {
+      const list = childrenMap.get(c.parent_id) || []
+      list.push(c)
+      childrenMap.set(c.parent_id, list)
+    } else {
+      rootComments.push(c)
+    }
+  }
+
+  rootComments.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+  for (const list of childrenMap.values()) {
+    list.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+  }
+
+  function countDescendants(commentId: number): number {
+    const children = childrenMap.get(commentId)
+    if (!children || !children.length) return 0
+    let count = children.length
+    for (const child of children) {
+      count += countDescendants(child.id)
+    }
+    return count
+  }
+
+  const result: ThreadedCommentItem[] = []
+  const visited = new Set<number>()
+
+  function traverse(comment: PostComment, depth: number, rootId: number) {
+    if (visited.has(comment.id)) return
+    visited.add(comment.id)
+
+    const item: ThreadedCommentItem = {
+      comment,
+      depth,
+      rootId,
+    }
+
+    if (depth === 0) {
+      item.repliesCount = countDescendants(comment.id)
+    }
+
+    result.push(item)
+
+    const children = childrenMap.get(comment.id)
+    if (children) {
+      for (const child of children) {
+        traverse(child, depth + 1, rootId)
+      }
+    }
+  }
+
+  for (const root of rootComments) {
+    traverse(root, 0, root.id)
+  }
+
+  for (const c of comments) {
+    if (!visited.has(c.id)) {
+      result.push({ comment: c, depth: 0, rootId: c.id, repliesCount: 0 })
+    }
+  }
+
+  return result
+})
+
+function canEditComment(comment: PostComment) {
+  return authStore.user?.id === comment.user_id || authStore.isAdmin
+}
+
+function canDeleteComment(comment: PostComment) {
+  return (
+    authStore.user?.id === comment.user_id ||
+    props.post.user_id === authStore.user?.id ||
+    authStore.isAdmin
+  )
+}
+
+const activeCommentMenuId = ref<number | null>(null)
+
+function toggleCommentMenu(commentId: number) {
+  if (activeCommentMenuId.value === commentId) {
+    activeCommentMenuId.value = null
+  } else {
+    activeCommentMenuId.value = commentId
+  }
+}
+
+function handleDocumentClick(e: MouseEvent) {
+  const target = e.target as HTMLElement | null
+  if (target && !target.closest('.comment-menu-wrapper')) {
+    activeCommentMenuId.value = null
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleDocumentClick)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleDocumentClick)
+})
+
+// Inline comment editing
+const editingCommentId = ref<number | null>(null)
+const editingCommentContent = ref('')
+const isUpdatingComment = ref(false)
+
+function startEditComment(comment: PostComment) {
+  activeCommentMenuId.value = null
+  editingCommentId.value = comment.id
+  editingCommentContent.value = comment.content
+}
+
+function cancelEditComment() {
+  editingCommentId.value = null
+  editingCommentContent.value = ''
+}
+
+async function saveEditComment(commentId: number) {
+  if (!editingCommentContent.value.trim()) return
+  isUpdatingComment.value = true
+  try {
+    const res = await updateComment(commentId, editingCommentContent.value.trim())
+    const updateInList = (p: Post) => {
+      if (p.comments) {
+        const idx = p.comments.findIndex((c) => c.id === commentId)
+        if (idx !== -1) p.comments[idx] = res.data
+      }
+    }
+    updateInList(props.post)
+    const postInEnt =
+      entertainmentStore.posts.find((p) => p.id === props.post.id) ||
+      entertainmentStore.gamePosts.find((p) => p.id === props.post.id)
+    if (postInEnt && postInEnt !== props.post) updateInList(postInEnt)
+    const postInUser = feedStore.userPosts.find((p) => p.id === props.post.id)
+    if (postInUser && postInUser !== props.post) updateInList(postInUser)
+
+    editingCommentId.value = null
+    editingCommentContent.value = ''
+  } catch (err) {
+    console.error('Erro ao atualizar comentário:', err)
+  } finally {
+    isUpdatingComment.value = false
+  }
+}
+
+// Comment deletion modal
+const commentToDelete = ref<PostComment | null>(null)
+const showDeleteCommentModal = ref(false)
+const isDeletingComment = ref(false)
+
+function promptDeleteComment(comment: PostComment) {
+  activeCommentMenuId.value = null
+  commentToDelete.value = comment
+  showDeleteCommentModal.value = true
+}
+
+async function confirmDeleteComment() {
+  if (!commentToDelete.value) return
+  isDeletingComment.value = true
+  try {
+    const commentId = commentToDelete.value.id
+    await deleteComment(commentId)
+    const removeInList = (p: Post) => {
+      if (p.comments) {
+        p.comments = p.comments.filter((c) => c.id !== commentId)
+        p.comments_count = Math.max(0, (p.comments_count || 0) - 1)
+      }
+    }
+    removeInList(props.post)
+    const postInEnt =
+      entertainmentStore.posts.find((p) => p.id === props.post.id) ||
+      entertainmentStore.gamePosts.find((p) => p.id === props.post.id)
+    if (postInEnt && postInEnt !== props.post) removeInList(postInEnt)
+    const postInUser = feedStore.userPosts.find((p) => p.id === props.post.id)
+    if (postInUser && postInUser !== props.post) removeInList(postInUser)
+
+    showDeleteCommentModal.value = false
+    commentToDelete.value = null
+  } catch (err) {
+    console.error('Erro ao excluir comentário:', err)
+  } finally {
+    isDeletingComment.value = false
+  }
+}
+
+// Inline comment reply
+const replyingToCommentId = ref<number | null>(null)
+const replyContent = ref('')
+const isSubmittingReply = ref(false)
 
 function startReply(comment: PostComment) {
-  replyingTo.value = comment
-  commentContent.value = `@${comment.user.username} `
+  if (replyingToCommentId.value === comment.id) {
+    cancelReply()
+    return
+  }
+  replyingToCommentId.value = comment.id
+  replyContent.value = ''
+  showComments.value = true
+
+  const rootId = findRootId(comment.id)
+  if (rootId) {
+    const next = new Set(expandedThreadIds.value)
+    next.add(rootId)
+    expandedThreadIds.value = next
+  }
+
   nextTick(() => {
-    const input = document.getElementById(`game-comment-input-${props.post.id}`)
-    input?.focus()
+    const inputEl = document.querySelector(
+      `#reply-box-${comment.id} input, #reply-box-${comment.id} textarea`
+    ) as HTMLElement | null
+    if (inputEl) {
+      inputEl.focus()
+    }
   })
 }
 
 function cancelReply() {
-  replyingTo.value = null
-  commentContent.value = ''
+  replyingToCommentId.value = null
+  replyContent.value = ''
 }
 
-async function handleAddComment() {
-  if (!commentContent.value.trim() || isSubmittingComment.value) return
-  isSubmittingComment.value = true
-
+async function submitReply(parentId: number) {
+  if (!replyContent.value.trim()) return
+  isSubmittingReply.value = true
   try {
-    const parentId = replyingTo.value ? replyingTo.value.id : undefined
-    const res = await addComment(props.post.id, commentContent.value.trim(), parentId)
-    if (!props.post.comments) props.post.comments = []
-    props.post.comments.push(res.data)
-    props.post.comments_count = (props.post.comments_count || 0) + 1
-    commentContent.value = ''
-    replyingTo.value = null
+    const res = await addComment(props.post.id, replyContent.value.trim(), parentId)
+    const appendToList = (p: Post) => {
+      if (!p.comments) p.comments = []
+      const idx = p.comments.findIndex((c) => c.id === res.data.id)
+      if (idx === -1) {
+        p.comments.push(res.data)
+        p.comments_count = (p.comments_count || 0) + 1
+      }
+    }
+    appendToList(props.post)
+    const postInEnt =
+      entertainmentStore.posts.find((p) => p.id === props.post.id) ||
+      entertainmentStore.gamePosts.find((p) => p.id === props.post.id)
+    if (postInEnt && postInEnt !== props.post) appendToList(postInEnt)
+    const postInUser = feedStore.userPosts.find((p) => p.id === props.post.id)
+    if (postInUser && postInUser !== props.post) appendToList(postInUser)
+
+    replyContent.value = ''
+    replyingToCommentId.value = null
+
+    const rootId = findRootId(parentId)
+    if (rootId) {
+      const next = new Set(expandedThreadIds.value)
+      next.add(rootId)
+      expandedThreadIds.value = next
+    }
   } catch (err) {
-    console.error('Erro ao comentar em jogo:', err)
+    console.error('Erro ao responder comentário:', err)
   } finally {
-    isSubmittingComment.value = false
+    isSubmittingReply.value = false
   }
 }
 
 async function handleToggleCommentLike(comment: PostComment) {
   const prevLiked = !!comment.is_liked
-  const prevCount = comment.likes_count || 0
-  comment.is_liked = !prevLiked
-  comment.likes_count = Math.max(0, prevCount + (comment.is_liked ? 1 : -1))
+  const prevCount = comment.likes_count ?? 0
+  const nextLiked = !prevLiked
+  const nextCount = Math.max(0, prevCount + (nextLiked ? 1 : -1))
+
+  comment.is_liked = nextLiked
+  comment.likes_count = nextCount
 
   try {
     const res = await toggleCommentLike(comment.id)
@@ -199,32 +464,32 @@ async function handleToggleCommentLike(comment: PostComment) {
   }
 }
 
-function startEditComment(comment: PostComment) {
-  editingCommentId.value = comment.id
-  editCommentText.value = comment.content
-}
-
-async function saveEditComment(comment: PostComment) {
-  if (!editCommentText.value.trim()) return
+async function handleAddComment() {
+  if (!commentContent.value.trim()) return
+  isSubmittingComment.value = true
   try {
-    const res = await updateComment(comment.id, editCommentText.value.trim())
-    comment.content = res.data.content
-    editingCommentId.value = null
-  } catch (err) {
-    console.error('Erro ao editar comentário:', err)
-  }
-}
-
-async function confirmDeleteComment(commentId: number) {
-  try {
-    await deleteComment(commentId)
-    if (props.post.comments) {
-      props.post.comments = props.post.comments.filter(c => c.id !== commentId)
-      props.post.comments_count = Math.max(0, (props.post.comments_count || 1) - 1)
+    const res = await addComment(props.post.id, commentContent.value.trim(), null)
+    const appendToList = (p: Post) => {
+      if (!p.comments) p.comments = []
+      const idx = p.comments.findIndex((c) => c.id === res.data.id)
+      if (idx === -1) {
+        p.comments.push(res.data)
+        p.comments_count = (p.comments_count || 0) + 1
+      }
     }
-    deletingCommentId.value = null
+    appendToList(props.post)
+    const postInEnt =
+      entertainmentStore.posts.find((p) => p.id === props.post.id) ||
+      entertainmentStore.gamePosts.find((p) => p.id === props.post.id)
+    if (postInEnt && postInEnt !== props.post) appendToList(postInEnt)
+    const postInUser = feedStore.userPosts.find((p) => p.id === props.post.id)
+    if (postInUser && postInUser !== props.post) appendToList(postInUser)
+
+    commentContent.value = ''
   } catch (err) {
-    console.error('Erro ao excluir comentário:', err)
+    console.error('Erro ao adicionar comentário:', err)
+  } finally {
+    isSubmittingComment.value = false
   }
 }
 
@@ -424,96 +689,243 @@ const statusLabel = computed(() => {
 
     <!-- Comments Section (Collapsible) -->
     <div v-if="showComments" class="comments-section">
-      <!-- Input New Comment -->
-      <div class="new-comment-box">
-        <div v-if="replyingTo" class="reply-notice">
-          <span>Respondendo a @{{ replyingTo.user.username }}</span>
-          <button type="button" class="cancel-reply-btn" @click="cancelReply">✕</button>
-        </div>
-        <div class="comment-input-row">
+      <!-- Add Comment Input Form (Top of comments section) -->
+      <form @submit.prevent="handleAddComment" class="comment-form-container">
+        <div class="comment-form-row">
           <MentionInput
-            :id="`game-comment-input-${post.id}`"
             v-model="commentContent"
-            placeholder="Deixe seu comentário sobre o jogo..."
-            class="retro-textarea comment-field"
-            :rows="2"
+            type="input"
+            placeholder="Escreva um comentário... (use @ para marcar)"
+            inputClass="comment-input"
+            :maxlength="500"
+            popupPosition="top"
             @submit="handleAddComment"
           />
           <button
-            type="button"
-            class="retro-action-btn primary comment-send-btn"
-            :disabled="!commentContent.trim() || isSubmittingComment"
-            @click="handleAddComment"
+            type="submit"
+            class="comment-submit-btn"
+            :disabled="isSubmittingComment || !commentContent.trim()"
           >
-            {{ isSubmittingComment ? '...' : '[ Enviar ]' }}
+            {{ isSubmittingComment ? '[ ... ]' : '[ Comentar ]' }}
           </button>
         </div>
-      </div>
+      </form>
 
       <!-- Comments List -->
-      <div v-if="commentsList.length" class="comments-stream">
-        <div
-          v-for="comment in commentsList"
-          :key="comment.id"
-          class="comment-item"
+      <div v-if="threadedComments.length" class="comments-list">
+        <template
+          v-for="item in threadedComments"
+          :key="item.comment.id"
         >
-          <div class="comment-avatar-col">
-            <UserAvatar :user="comment.user" size="sm" />
-          </div>
-          <div class="comment-content-col">
-            <div class="comment-header-line">
-              <span class="comment-user">{{ comment.user.name }}</span>
-              <span class="comment-handle">@{{ comment.user.username }}</span>
-              <span class="comment-time">{{ formatRelativeTime(comment.created_at) }}</span>
-            </div>
-
-            <!-- Edit Mode -->
-            <div v-if="editingCommentId === comment.id" class="comment-edit-box">
-              <textarea v-model="editCommentText" class="retro-textarea edit-field" rows="2"></textarea>
-              <div class="edit-btns-row">
-                <button type="button" class="btn-save" @click="saveEditComment(comment)">[ Salvar ]</button>
-                <button type="button" class="btn-cancel" @click="editingCommentId = null">Cancelar</button>
+          <!-- Comment Item (shown if root or if thread is expanded) -->
+          <div
+            v-if="item.depth === 0 || isThreadExpanded(item.rootId)"
+            :id="'comment-' + item.comment.id"
+            class="comment-item"
+            :class="{
+              'is-reply': item.depth > 0,
+              'is-deep-reply': item.depth > 1,
+            }"
+          >
+            <router-link :to="`/profile/${item.comment.user?.username}`" class="comment-avatar-link">
+              <UserAvatar :user="item.comment.user" size="sm" />
+            </router-link>
+            <div class="comment-content-box">
+              <!-- Parent comment quotation header if this comment is a reply -->
+              <div v-if="item.comment.parent" class="comment-reply-context">
+                <span class="reply-symbol">↳</span>
+                <span class="reply-to-text">Em resposta a</span>
+                <router-link
+                  v-if="item.comment.parent.user?.username"
+                  :to="`/profile/${item.comment.parent.user.username}`"
+                  class="reply-user-link"
+                >
+                  @{{ item.comment.parent.user.username }}
+                </router-link>
+                <span class="reply-quote-preview">
+                  "{{ item.comment.parent.content.length > 50 ? item.comment.parent.content.substring(0, 50) + '...' : item.comment.parent.content }}"
+                </span>
               </div>
-            </div>
-            <!-- Read Mode -->
-            <div v-else class="comment-body-text">
-              <FormattedContent :content="comment.content" />
-            </div>
 
-            <!-- Comment Actions -->
-            <div class="comment-actions-line">
-              <button
-                type="button"
-                class="comment-action-link"
-                :class="{ active: comment.is_liked }"
-                @click="handleToggleCommentLike(comment)"
-              >
-                {{ comment.is_liked ? '❤️' : '🤍' }} {{ comment.likes_count || '' }}
-              </button>
-              <button type="button" class="comment-action-link" @click="startReply(comment)">
-                Responder
-              </button>
-              <button
-                v-if="authStore.user?.id === comment.user.id"
-                type="button"
-                class="comment-action-link"
-                @click="startEditComment(comment)"
-              >
-                Editar
-              </button>
-              <button
-                v-if="authStore.user?.id === comment.user.id || authStore.isAdmin"
-                type="button"
-                class="comment-action-link delete"
-                @click="confirmDeleteComment(comment.id)"
-              >
-                Excluir
-              </button>
+              <div class="comment-user-line">
+                <router-link :to="`/profile/${item.comment.user?.username}`" class="comment-user-name">
+                  {{ item.comment.user?.name }}
+                </router-link>
+                <div class="comment-header-right">
+                  <span class="comment-date">
+                    {{ formatRelativeTime(item.comment.created_at) }}
+                    <span v-if="item.comment.updated_at && item.comment.updated_at !== item.comment.created_at" class="comment-edited-tag">(editado)</span>
+                  </span>
+                  <div
+                    v-if="editingCommentId !== item.comment.id && (canEditComment(item.comment) || canDeleteComment(item.comment))"
+                    class="comment-menu-wrapper"
+                  >
+                    <button
+                      type="button"
+                      class="comment-menu-trigger"
+                      title="Mais opções"
+                      aria-label="Mais opções"
+                      @click.stop="toggleCommentMenu(item.comment.id)"
+                    >
+                      ⋮
+                    </button>
+                    <div
+                      v-if="activeCommentMenuId === item.comment.id"
+                      class="comment-dropdown-menu"
+                      @click.stop
+                    >
+                      <button
+                        v-if="canEditComment(item.comment)"
+                        type="button"
+                        class="comment-menu-item edit-item"
+                        @click="startEditComment(item.comment)"
+                      >
+                        <span class="item-icon">✎</span> Editar
+                      </button>
+                      <button
+                        v-if="canDeleteComment(item.comment)"
+                        type="button"
+                        class="comment-menu-item delete-item"
+                        @click="promptDeleteComment(item.comment)"
+                      >
+                        <span class="item-icon">×</span> Excluir
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Inline Edit Mode -->
+              <div v-if="editingCommentId === item.comment.id" class="comment-inline-edit">
+                <MentionInput
+                  v-model="editingCommentContent"
+                  type="input"
+                  :maxlength="500"
+                  :disabled="isUpdatingComment"
+                  inputClass="comment-edit-input"
+                  popupPosition="top"
+                  @submit="saveEditComment(item.comment.id)"
+                  @cancel="cancelEditComment"
+                />
+                <div class="comment-inline-edit-actions">
+                  <button
+                    type="button"
+                    class="comment-save-btn"
+                    :disabled="isUpdatingComment || !editingCommentContent.trim()"
+                    @click="saveEditComment(item.comment.id)"
+                  >
+                    {{ isUpdatingComment ? '[ Salvando... ]' : '[ Salvar ]' }}
+                  </button>
+                  <button
+                    type="button"
+                    class="comment-cancel-btn"
+                    :disabled="isUpdatingComment"
+                    @click="cancelEditComment"
+                  >
+                    [ Cancelar ]
+                  </button>
+                </div>
+              </div>
+
+              <!-- Standard Comment Text & Footer -->
+              <template v-else>
+                <p class="comment-text">
+                  <FormattedContent :content="item.comment.content" />
+                </p>
+
+                <!-- Comment Footer: Like & Reply -->
+                <div class="comment-footer">
+                  <button
+                    type="button"
+                    class="comment-like-btn"
+                    :class="{ liked: item.comment.is_liked }"
+                    :title="item.comment.is_liked ? 'Descurtir comentário' : 'Curtir comentário'"
+                    @click="handleToggleCommentLike(item.comment)"
+                  >
+                    <span class="like-heart-icon">{{ item.comment.is_liked ? '❤️' : '🤍' }}</span>
+                    <span class="comment-like-count">{{ item.comment.likes_count || 0 }}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    class="comment-reply-btn"
+                    :class="{ active: replyingToCommentId === item.comment.id }"
+                    title="Responder a este comentário"
+                    @click="startReply(item.comment)"
+                  >
+                    <span class="reply-arrow-icon">↩</span> Responder
+                  </button>
+                </div>
+
+                <!-- Inline Reply Form under the comment -->
+                <div
+                  v-if="replyingToCommentId === item.comment.id"
+                  :id="'reply-box-' + item.comment.id"
+                  class="comment-inline-reply"
+                >
+                  <div class="inline-reply-header">
+                    <span class="inline-reply-label">
+                      ↳ Respondendo a <strong>@{{ item.comment.user?.username || item.comment.user?.name }}</strong>:
+                    </span>
+                    <button
+                      type="button"
+                      class="inline-reply-cancel-btn"
+                      title="Cancelar resposta"
+                      @click="cancelReply"
+                    >
+                      [ × Cancelar ]
+                    </button>
+                  </div>
+                  <div class="inline-reply-row">
+                    <MentionInput
+                      v-model="replyContent"
+                      type="input"
+                      :placeholder="`Responder a @${item.comment.user?.username || item.comment.user?.name}...`"
+                      inputClass="inline-reply-input"
+                      :maxlength="500"
+                      popupPosition="top"
+                      @submit="submitReply(item.comment.id)"
+                      @cancel="cancelReply"
+                    />
+                    <button
+                      type="button"
+                      class="inline-reply-submit-btn"
+                      :disabled="isSubmittingReply || !replyContent.trim()"
+                      @click="submitReply(item.comment.id)"
+                    >
+                      {{ isSubmittingReply ? '[ ... ]' : '[ Responder ]' }}
+                    </button>
+                  </div>
+                </div>
+              </template>
             </div>
           </div>
-        </div>
+
+          <!-- Thread replies toggle button right below root comment -->
+          <div
+            v-if="item.depth === 0 && item.repliesCount && item.repliesCount > 0"
+            class="thread-toggle-wrapper"
+          >
+            <button
+              type="button"
+              class="toggle-replies-btn"
+              @click="toggleThread(item.comment.id)"
+            >
+              <span class="toggle-icon">{{ isThreadExpanded(item.comment.id) ? '▾' : '▸' }}</span>
+              <span>
+                {{
+                  isThreadExpanded(item.comment.id)
+                    ? 'Ocultar respostas'
+                    : item.repliesCount === 1
+                      ? 'Ver 1 resposta'
+                      : `Ver ${item.repliesCount} respostas`
+                }}
+              </span>
+            </button>
+          </div>
+        </template>
       </div>
-      <div v-else class="empty-comments">
+      <div v-else class="no-comments">
         Nenhum comentário ainda. Seja o primeiro a comentar!
       </div>
     </div>
@@ -526,8 +938,21 @@ const statusLabel = computed(() => {
       confirm-text="[ Sim, Excluir ]"
       cancel-text="Cancelar"
       :is-danger="true"
+      :is-loading="isDeleting"
       @confirm="confirmDelete"
       @cancel="showDeleteModal = false"
+    />
+
+    <!-- Delete Comment Confirm Modal -->
+    <RetroConfirmModal
+      v-model="showDeleteCommentModal"
+      title="Excluir Comentário"
+      message="Tem certeza que deseja excluir este comentário? Esta ação não pode ser desfeita."
+      confirm-text="Excluir"
+      cancel-text="Cancelar"
+      :is-danger="true"
+      :is-loading="isDeletingComment"
+      @confirm="confirmDeleteComment"
     />
 
     <RepostModal
@@ -939,126 +1364,550 @@ const statusLabel = computed(() => {
   color: var(--color-primary, #a66130);
 }
 
-/* Comments Section */
+/* =============================================================
+   Comments Section Styling (consistent with LetterboxdCard)
+   ============================================================= */
 .comments-section {
-  padding: 0.85rem 1rem;
-  border-top: 1px solid var(--color-border, #e5e7eb);
-  background: #fdfdfd;
+  background-color: var(--color-primary-50, #fdf8f3);
+  border-top: 1px solid var(--color-border, #d8cdc5);
+  padding: 0.85rem;
+  border-radius: 0 0 2px 2px;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
 }
 
-.reply-notice {
+.comment-form-container {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 0.75rem;
-  color: var(--color-primary, #a66130);
-  margin-bottom: 0.3rem;
-  background: #fff7ed;
-  padding: 0.2rem 0.5rem;
-  border-radius: 2px;
+  flex-direction: column;
+  gap: 0.4rem;
+  width: 100%;
 }
 
-.cancel-reply-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: #9a3412;
-}
-
-.comment-input-row {
+.comment-form-row {
   display: flex;
+  align-items: stretch;
   gap: 0.5rem;
-  align-items: flex-end;
+  width: 100%;
 }
 
-.comment-field {
-  flex: 1;
+.comment-form-row :deep(.mention-input-wrapper) {
+  flex: 1 1 0;
+  min-width: 0;
+  width: auto;
 }
 
-.comment-send-btn {
+.comment-input {
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.85rem;
+  font-family: var(--font-body, 'Outfit', sans-serif);
+  border: 1px solid var(--color-border, #d8cdc5);
+  background: #ffffff;
+  border-radius: 2px;
+  outline: none;
+  box-sizing: border-box;
+}
+.comment-input:focus {
+  border-color: var(--color-primary, #a66130);
+}
+
+.comment-submit-btn {
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.75rem;
+  font-weight: bold;
+  background-color: var(--color-primary, #a66130);
+  color: #ffffff;
+  border: none;
+  border-radius: 2px;
+  padding: 0 0.85rem;
+  cursor: pointer;
   white-space: nowrap;
-  padding: 0.5rem 0.8rem;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.comment-submit-btn:hover:not(:disabled) {
+  background-color: var(--color-primary-800, #5f4120);
+}
+.comment-submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-.comments-stream {
+.comments-list {
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
-  margin-top: 0.4rem;
 }
 
 .comment-item {
   display: flex;
+  align-items: flex-start;
   gap: 0.5rem;
-  font-size: 0.85rem;
 }
 
-.comment-avatar-col {
+.comment-item.is-reply {
+  margin-left: 2rem;
+}
+
+.comment-item.is-deep-reply {
+  margin-left: 3.25rem;
+}
+
+.comment-avatar-link {
   flex-shrink: 0;
+  display: flex;
+  text-decoration: none;
 }
 
-.comment-content-col {
+.comment-content-box {
   flex: 1;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background-color: #ffffff;
+  border: 1px solid var(--color-border, #d8cdc5);
   padding: 0.5rem 0.75rem;
-  border-radius: 4px;
+  border-radius: 2px;
+  min-width: 0;
 }
 
-.comment-header-line {
+.comment-reply-context {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  font-size: 0.75rem;
-  margin-bottom: 0.2rem;
+  gap: 0.35rem;
+  margin-bottom: 0.35rem;
+  font-size: 0.72rem;
+  color: #718096;
+  border-bottom: 1px dashed var(--color-border, #d8cdc5);
+  padding-bottom: 0.25rem;
 }
 
-.comment-user {
+.reply-symbol {
+  font-weight: bold;
+  color: var(--color-primary, #a66130);
+}
+
+.reply-to-text {
+  font-family: var(--font-body, 'Outfit', sans-serif);
+}
+
+.reply-user-link {
+  font-family: var(--font-heading, 'Space Mono', monospace);
   font-weight: 700;
-  color: var(--color-text, #111827);
+  color: var(--color-primary-800, #5f4120);
+  text-decoration: none;
+}
+.reply-user-link:hover {
+  text-decoration: underline;
 }
 
-.comment-handle,
-.comment-time {
-  color: var(--color-text-muted, #6b7280);
+.reply-quote-preview {
+  font-style: italic;
+  color: #847062;
+  max-width: 250px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.comment-body-text {
-  color: var(--color-text, #1f2937);
-  line-height: 1.35;
-}
-
-.comment-actions-line {
+.comment-user-line {
   display: flex;
-  gap: 0.6rem;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.2rem;
+  gap: 0.5rem;
+}
+
+.comment-user-name {
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: var(--color-primary-800, #5f4120);
+  text-decoration: none;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.comment-user-name:hover {
+  text-decoration: underline;
+}
+
+.comment-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.comment-date {
+  font-size: 0.7rem;
+  color: #847062;
+  white-space: nowrap;
+}
+
+.comment-edited-tag {
+  font-size: 0.65rem;
+  color: #847062;
+  font-style: italic;
+  margin-left: 0.15rem;
+}
+
+.comment-menu-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.comment-menu-trigger {
+  background: none;
+  border: 1px solid transparent;
+  font-size: 1rem;
+  font-weight: bold;
+  line-height: 1;
+  color: #847062;
+  cursor: pointer;
+  padding: 0;
+  border-radius: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  transition: all 0.15s ease;
+}
+.comment-menu-trigger:hover {
+  color: var(--color-primary-800, #5f4120);
+  background-color: var(--color-primary-50, #f8f6f1);
+  border-color: var(--color-border, #d8cdc5);
+}
+
+.comment-dropdown-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 2px);
+  background: #ffffff;
+  border: 1px solid var(--color-border, #d8cdc5);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.14);
+  border-radius: 2px;
+  z-index: 30;
+  min-width: 90px;
+  display: flex;
+  flex-direction: column;
+  padding: 0.2rem 0;
+}
+
+.comment-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.55rem;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.72rem;
+  font-weight: bold;
+  background: none;
+  border: none;
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.1s ease;
+}
+.comment-menu-item .item-icon {
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.comment-menu-item.edit-item {
+  color: var(--color-primary-800, #7d5628);
+}
+.comment-menu-item.edit-item:hover {
+  background-color: var(--color-primary-50, #fdf8f3);
+}
+
+.comment-menu-item.delete-item {
+  color: #ef4444;
+}
+.comment-menu-item.delete-item:hover {
+  background-color: #fee2e2;
+}
+
+.comment-inline-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
   margin-top: 0.35rem;
+}
+
+.comment-edit-input {
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.85rem;
+  font-family: var(--font-body, 'Outfit', sans-serif);
+  border: 1px solid var(--color-primary, #a66130);
+  background: #ffffff;
+  border-radius: 2px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.comment-inline-edit-actions {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
+
+.comment-save-btn {
+  font-family: var(--font-heading, monospace);
+  font-size: 0.75rem;
+  font-weight: bold;
+  background-color: var(--color-primary, #a66130);
+  color: #ffffff;
+  border: none;
+  border-radius: 2px;
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+}
+.comment-save-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.comment-cancel-btn {
+  font-family: var(--font-heading, monospace);
+  font-size: 0.75rem;
+  font-weight: bold;
+  background: none;
+  border: 1px solid var(--color-border, #d8cdc5);
+  color: #847062;
+  border-radius: 2px;
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+}
+.comment-cancel-btn:hover {
+  background-color: var(--color-primary-50, #f8f6f1);
+}
+
+.comment-text {
+  font-family: var(--font-body, 'Outfit', sans-serif);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: #333333;
+  word-break: break-word;
+}
+
+.comment-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.45rem;
+  padding-top: 0.35rem;
+  border-top: 1px dotted var(--color-border, #e5ddd5);
+}
+
+.comment-like-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  padding: 0.15rem 0.35rem;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.72rem;
+  color: #847062;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+.comment-like-btn:hover {
+  border-color: var(--color-border, #d8cdc5);
+  background: var(--color-primary-50, #fdf8f3);
+}
+.comment-like-btn.liked {
+  color: #dc2626;
+  font-weight: 700;
+}
+.comment-like-btn.liked:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+
+.like-heart-icon {
+  font-size: 0.75rem;
+}
+
+.comment-like-count {
+  font-weight: bold;
+}
+
+.comment-reply-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  padding: 0.15rem 0.35rem;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-primary-700, #7d5628);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+.comment-reply-btn:hover {
+  border-color: var(--color-border, #d8cdc5);
+  background: var(--color-primary-50, #fdf8f3);
+  color: var(--color-primary, #a66130);
+}
+.comment-reply-btn.active {
+  background: var(--color-primary-100, #f6eee4);
+  border-color: var(--color-primary-300, #d5bba2);
+  color: var(--color-primary, #a66130);
+}
+
+.reply-arrow-icon {
   font-size: 0.72rem;
 }
 
-.comment-action-link {
+.comment-inline-reply {
+  margin-top: 0.45rem;
+  padding: 0.45rem 0.6rem;
+  background: var(--color-primary-50, #fdf8f3);
+  border: 1px solid var(--color-primary-200, #d5bba2);
+  border-radius: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.inline-reply-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.inline-reply-label {
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.72rem;
+  color: var(--color-primary-900, #463018);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.inline-reply-label strong {
+  color: var(--color-primary-800, #5f4120);
+}
+
+.inline-reply-cancel-btn {
   background: none;
   border: none;
-  padding: 0;
-  color: var(--color-text-muted, #6b7280);
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #dc2626;
   cursor: pointer;
+  padding: 0.1rem 0.3rem;
+  border-radius: 2px;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+.inline-reply-cancel-btn:hover {
+  background-color: #fee2e2;
 }
 
-.comment-action-link:hover {
+.inline-reply-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.4rem;
+  width: 100%;
+}
+
+.inline-reply-row :deep(.mention-input-wrapper) {
+  flex: 1 1 0;
+  min-width: 0;
+  width: auto;
+}
+
+.inline-reply-input {
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.82rem;
+  font-family: var(--font-body, 'Outfit', sans-serif);
+  border: 1px solid var(--color-border, #d8cdc5);
+  background: #ffffff;
+  border-radius: 2px;
+  outline: none;
+  box-sizing: border-box;
+}
+.inline-reply-input:focus {
+  border-color: var(--color-primary, #a66130);
+}
+
+.inline-reply-submit-btn {
+  font-family: var(--font-heading, monospace);
+  font-size: 0.75rem;
+  font-weight: bold;
+  background-color: var(--color-primary, #a66130);
+  color: #ffffff;
+  border: none;
+  border-radius: 2px;
+  padding: 0 0.65rem;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+}
+.inline-reply-submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.thread-toggle-wrapper {
+  margin-left: 2rem;
+  margin-top: 0.2rem;
+}
+
+.toggle-replies-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: none;
+  border: none;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-primary, #a66130);
+  cursor: pointer;
+  padding: 0.15rem 0.35rem;
+  border-radius: 2px;
+  transition: all 0.15s ease;
+}
+.toggle-replies-btn:hover {
+  background-color: var(--color-primary-100, #fdf8f3);
   text-decoration: underline;
-  color: var(--color-text, #111827);
 }
 
-.comment-action-link.delete {
-  color: #ef4444;
-}
-
-.empty-comments {
+.toggle-icon {
   font-size: 0.8rem;
-  color: var(--color-text-muted, #9ca3af);
+  line-height: 1;
+}
+
+.no-comments {
+  font-size: 0.8rem;
+  color: #847062;
   text-align: center;
-  padding: 0.5rem 0;
+  padding: 0.75rem 0.5rem;
 }
 </style>
