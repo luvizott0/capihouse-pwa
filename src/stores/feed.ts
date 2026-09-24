@@ -475,11 +475,23 @@ export const useFeedStore = defineStore('feed', () => {
     if (postInEvent) applyDelete(postInEvent)
   }
 
+  function removePostLocally(postId: number) {
+    const id = Number(postId)
+    posts.value = posts.value.filter(p => Number(p.id) !== id)
+    userPosts.value = userPosts.value.filter(p => Number(p.id) !== id)
+    eventPosts.value = eventPosts.value.filter(p => Number(p.id) !== id)
+    pendingPosts.value = pendingPosts.value.filter(p => Number(p.id) !== id)
+  }
+
   async function deletePost(postId: number) {
-    await postsApi.deletePost(postId)
-    posts.value = posts.value.filter(p => p.id !== postId)
-    userPosts.value = userPosts.value.filter(p => p.id !== postId)
-    eventPosts.value = eventPosts.value.filter(p => p.id !== postId)
+    removePostLocally(postId)
+    try {
+      await postsApi.deletePost(postId)
+    } catch (err: unknown) {
+      if ((err as { response?: { status?: number } })?.response?.status !== 404) {
+        throw err
+      }
+    }
   }
 
   async function updatePost(postId: number, data: FormData | postsApi.UpdatePostData) {
@@ -721,6 +733,7 @@ export const useFeedStore = defineStore('feed', () => {
     updateComment,
     deleteComment,
     deletePost,
+    removePostLocally,
     flushPendingPosts,
     subscribeToFeed,
     unsubscribeFromFeed,

@@ -118,12 +118,19 @@ async function handleLikeToggle() {
 
 async function confirmDelete() {
   isDeleting.value = true
+  const postId = props.post.id
+  // Remove immediately from memory for instantaneous UI reactivity
+  entertainmentStore.removePostLocally(postId)
+  feedStore.removePostLocally(postId)
+  showDeleteModal.value = false
+  emit('deleted', postId)
+
   try {
-    await deletePost(props.post.id)
-    showDeleteModal.value = false
-    emit('deleted', props.post.id)
-  } catch (err) {
-    console.error('Erro ao excluir post de jogo:', err)
+    await entertainmentStore.deletePost(postId)
+  } catch (err: unknown) {
+    if ((err as { response?: { status?: number } })?.response?.status !== 404) {
+      console.error('Erro ao excluir post de jogo:', err)
+    }
   } finally {
     isDeleting.value = false
   }

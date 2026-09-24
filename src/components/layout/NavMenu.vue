@@ -87,76 +87,78 @@ function handleNavClick(targetPath: string, e: MouseEvent) {
       </div>
     </nav>
 
-    <!-- Mobile Bottom App Navigation Bar -->
-    <nav class="mobile-bottom-nav">
-      <div class="mobile-nav-grid" :class="{ 'has-admin': authStore.isAdmin }">
-        <!-- Feed Tab -->
-        <router-link
-          to="/feed"
-          class="mobile-tab"
-          active-class="active"
-          @click="(e) => handleNavClick('/feed', e)"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" class="tab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
-          </svg>
-          <span class="tab-label">Feed</span>
-        </router-link>
+    <!-- Mobile Bottom App Navigation Bar (Teleported to body to detach from sticky header) -->
+    <Teleport to="body">
+      <nav class="mobile-bottom-nav" role="navigation" aria-label="Navegação mobile">
+        <div class="mobile-nav-grid" :class="{ 'has-admin': authStore.isAdmin }">
+          <!-- Feed Tab -->
+          <router-link
+            to="/feed"
+            class="mobile-tab"
+            active-class="active"
+            @click="(e) => handleNavClick('/feed', e)"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="tab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+            </svg>
+            <span class="tab-label">Feed</span>
+          </router-link>
 
-        <!-- Entertainment Tab -->
-        <router-link
-          to="/entertainment"
-          class="mobile-tab"
-          active-class="active"
-          @click="(e) => handleNavClick('/entertainment', e)"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" class="tab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
-          </svg>
-          <span class="tab-label">Mídias</span>
-        </router-link>
+          <!-- Entertainment Tab -->
+          <router-link
+            to="/entertainment"
+            class="mobile-tab"
+            active-class="active"
+            @click="(e) => handleNavClick('/entertainment', e)"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="tab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
+            </svg>
+            <span class="tab-label">Mídias</span>
+          </router-link>
 
-        <!-- Events Tab -->
-        <router-link
-          to="/events"
-          class="mobile-tab"
-          active-class="active"
-          @click="(e) => handleNavClick('/events', e)"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" class="tab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-          <span class="tab-label">Eventos</span>
-        </router-link>
+          <!-- Events Tab -->
+          <router-link
+            to="/events"
+            class="mobile-tab"
+            active-class="active"
+            @click="(e) => handleNavClick('/events', e)"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="tab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <span class="tab-label">Eventos</span>
+          </router-link>
 
-        <!-- Profile Tab -->
-        <router-link
-          to="/profile"
-          class="mobile-tab"
-          active-class="active"
-          @click="(e) => handleNavClick('/profile', e)"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" class="tab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-          </svg>
-          <span class="tab-label">Perfil</span>
-        </router-link>
+          <!-- Profile Tab -->
+          <router-link
+            to="/profile"
+            class="mobile-tab"
+            active-class="active"
+            @click="(e) => handleNavClick('/profile', e)"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="tab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            <span class="tab-label">Perfil</span>
+          </router-link>
 
-        <!-- Admin Tab (Only if admin) -->
-        <router-link
-          v-if="authStore.isAdmin"
-          to="/admin/users"
-          class="mobile-tab"
-          active-class="active"
-          @click="(e) => handleNavClick('/admin/users', e)"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" class="tab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-          </svg>
-          <span class="tab-label">Admin</span>
-        </router-link>
-      </div>
-    </nav>
+          <!-- Admin Tab (Only if admin) -->
+          <router-link
+            v-if="authStore.isAdmin"
+            to="/admin/users"
+            class="mobile-tab"
+            active-class="active"
+            @click="(e) => handleNavClick('/admin/users', e)"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="tab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+            <span class="tab-label">Admin</span>
+          </router-link>
+        </div>
+      </nav>
+    </Teleport>
   </div>
 </template>
 
@@ -237,11 +239,15 @@ function handleNavClick(targetPath: string, e: MouseEvent) {
     bottom: 0;
     left: 0;
     right: 0;
+    width: 100%;
     background-color: #ffffff;
     border-top: 2px solid var(--color-primary-200, #e8c9a5);
     box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
     z-index: 1000;
     padding-bottom: env(safe-area-inset-bottom, 0px);
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    contain: layout style;
   }
 
   .mobile-nav-grid {

@@ -379,22 +379,33 @@ export const useEntertainmentStore = defineStore('entertainment', () => {
     }
   }
 
+  function removePostLocally(postId: number) {
+    const id = Number(postId)
+    moviePosts.value = moviePosts.value.filter(p => Number(p.id) !== id)
+    gamePosts.value = gamePosts.value.filter(p => Number(p.id) !== id)
+    pendingMoviePosts.value = pendingMoviePosts.value.filter(p => Number(p.id) !== id)
+    pendingGamePosts.value = pendingGamePosts.value.filter(p => Number(p.id) !== id)
+  }
+
   async function deletePost(postId: number) {
-    await postsApi.deletePost(postId)
-    moviePosts.value = moviePosts.value.filter(p => p.id !== postId)
-    gamePosts.value = gamePosts.value.filter(p => p.id !== postId)
-    pendingMoviePosts.value = pendingMoviePosts.value.filter(p => p.id !== postId)
-    pendingGamePosts.value = pendingGamePosts.value.filter(p => p.id !== postId)
+    removePostLocally(postId)
+    try {
+      await postsApi.deletePost(postId)
+    } catch (err: unknown) {
+      if ((err as { response?: { status?: number } })?.response?.status !== 404) {
+        throw err
+      }
+    }
   }
 
   function addPost(newPost: Post) {
     if (newPost.entertainment_type === 'game') {
-      const exists = gamePosts.value.some(p => p.id === newPost.id)
+      const exists = gamePosts.value.some(p => Number(p.id) === Number(newPost.id))
       if (!exists) {
         gamePosts.value.unshift(newPost)
       }
     } else {
-      const exists = moviePosts.value.some(p => p.id === newPost.id)
+      const exists = moviePosts.value.some(p => Number(p.id) === Number(newPost.id))
       if (!exists) {
         moviePosts.value.unshift(newPost)
       }
@@ -415,14 +426,14 @@ export const useEntertainmentStore = defineStore('entertainment', () => {
         if (currentUserId && data.post.user_id === currentUserId) return
 
         if (data.post.entertainment_type === 'game') {
-          const existsInMain = gamePosts.value.some(p => p.id === data.post.id)
-          const existsInPending = pendingGamePosts.value.some(p => p.id === data.post.id)
+          const existsInMain = gamePosts.value.some(p => Number(p.id) === Number(data.post.id))
+          const existsInPending = pendingGamePosts.value.some(p => Number(p.id) === Number(data.post.id))
           if (!existsInMain && !existsInPending) {
             pendingGamePosts.value.unshift(data.post)
           }
         } else {
-          const existsInMain = moviePosts.value.some(p => p.id === data.post.id)
-          const existsInPending = pendingMoviePosts.value.some(p => p.id === data.post.id)
+          const existsInMain = moviePosts.value.some(p => Number(p.id) === Number(data.post.id))
+          const existsInPending = pendingMoviePosts.value.some(p => Number(p.id) === Number(data.post.id))
           if (!existsInMain && !existsInPending) {
             pendingMoviePosts.value.unshift(data.post)
           }
@@ -431,7 +442,7 @@ export const useEntertainmentStore = defineStore('entertainment', () => {
       .listen('.PostLiked', (data: { post_id: number; is_liked: boolean; likes_count: number; user_id: number }) => {
         if (currentUserId && data.user_id === currentUserId) return
         const updateLikes = (list: Post[]) => {
-          const target = list.find(p => p.id === data.post_id)
+          const target = list.find(p => Number(p.id) === Number(data.post_id))
           if (target) {
             target.likes_count = data.likes_count
           }
@@ -442,10 +453,7 @@ export const useEntertainmentStore = defineStore('entertainment', () => {
         updateLikes(pendingGamePosts.value)
       })
       .listen('.PostDeleted', (data: { id: number }) => {
-        moviePosts.value = moviePosts.value.filter(p => p.id !== data.id)
-        gamePosts.value = gamePosts.value.filter(p => p.id !== data.id)
-        pendingMoviePosts.value = pendingMoviePosts.value.filter(p => p.id !== data.id)
-        pendingGamePosts.value = pendingGamePosts.value.filter(p => p.id !== data.id)
+        removePostLocally(data.id)
       })
       .listen('.CommentCreated', (data: { post_id: number; comment: PostComment; comments_count: number }) => {
         const updateComments = (list: Post[]) => {
@@ -510,7 +518,12 @@ export const useEntertainmentStore = defineStore('entertainment', () => {
     if (!isSubscribed) return
     try {
       const echo = connectEcho()
-      echo.leaveChannel('posts')
+      const channel = echo.channel('posts')
+      channel.stopListening('.PostCreated')
+      channel.stopListening('.PostLiked')
+      channel.stopListening('.PostDeleted')
+      channel.stopListening('.CommentCreated')
+      channel.stopListening('.CommentLiked')
     } catch {}
     isSubscribed = false
   }
@@ -541,6 +554,7 @@ export const useEntertainmentStore = defineStore('entertainment', () => {
     deleteComment,
     toggleCommentLike,
     deletePost,
+    removePostLocally,
     subscribeToEntertainment,
     unsubscribeFromEntertainment,
   }

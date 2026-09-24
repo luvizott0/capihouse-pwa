@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUsersStore } from '@/stores/users'
 import { useAuthStore } from '@/stores/auth'
@@ -21,12 +21,31 @@ const authStore = useAuthStore()
 
 const searchQuery = ref('')
 
+watch(
+  () => props.modelValue,
+  (isOpen) => {
+    if (typeof document === 'undefined') return
+    if (isOpen) {
+      document.body.style.overflow = 'hidden'
+      document.body.style.touchAction = 'none'
+    } else {
+      document.body.style.overflow = ''
+      document.body.style.touchAction = ''
+    }
+  },
+  { immediate: true }
+)
+
 onMounted(() => {
   usersStore.startPolling()
 })
 
 onUnmounted(() => {
   usersStore.stopPolling()
+  if (typeof document !== 'undefined') {
+    document.body.style.overflow = ''
+    document.body.style.touchAction = ''
+  }
 })
 
 function close() {
@@ -77,6 +96,7 @@ const offlineCount = computed(() => otherUsers.value.filter(u => !u.is_online).l
         v-if="modelValue"
         class="sidebar-backdrop"
         @click="close"
+        @touchmove.prevent
       ></div>
     </Transition>
 
@@ -221,6 +241,8 @@ const offlineCount = computed(() => otherUsers.value.filter(u => !u.is_online).l
   background-color: rgba(0, 0, 0, 0.55);
   z-index: 9998;
   backdrop-filter: blur(2px);
+  touch-action: none;
+  overscroll-behavior: contain;
 }
 
 /* ── Drawer Frame ── */
@@ -232,6 +254,7 @@ const offlineCount = computed(() => otherUsers.value.filter(u => !u.is_online).l
   width: 88%;
   max-width: 340px;
   height: 100vh;
+  height: 100dvh;
   background-color: #ffffff;
   border-left: 2px solid var(--color-primary-800, #5f4120);
   box-shadow: -8px 0 24px rgba(0, 0, 0, 0.35);
@@ -239,6 +262,8 @@ const offlineCount = computed(() => otherUsers.value.filter(u => !u.is_online).l
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
 }
 
 /* ── Header ── */
@@ -290,6 +315,9 @@ const offlineCount = computed(() => otherUsers.value.filter(u => !u.is_online).l
 .drawer-body {
   flex: 1;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
   padding: 1rem;
   display: flex;
   flex-direction: column;

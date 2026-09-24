@@ -9,6 +9,7 @@ export interface NotificationCategoryCounts {
   mentions: number
   groups: number
   events: number
+  polls?: number
 }
 
 export function getNotifications(page = 1, category?: string) {

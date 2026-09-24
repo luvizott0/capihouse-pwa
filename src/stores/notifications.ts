@@ -21,6 +21,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
     mentions: 0,
     groups: 0,
     events: 0,
+    polls: 0,
   })
 
   async function fetchUnreadCount() {

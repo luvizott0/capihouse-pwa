@@ -23,6 +23,7 @@ const categories: CategoryItem[] = [
   { id: 'likes', label: 'Curtidas', icon: '❤️', countKey: 'likes' },
   { id: 'comments', label: 'Comentários', icon: '💬', countKey: 'comments' },
   { id: 'mentions', label: 'Marcações', icon: '🏷️', countKey: 'mentions' },
+  { id: 'polls', label: 'Votações', icon: '📊', countKey: 'polls' },
   { id: 'groups', label: 'Grupos e Convites', icon: '👥', countKey: 'groups' },
   { id: 'events', label: 'Eventos', icon: '📅', countKey: 'events' },
 ]

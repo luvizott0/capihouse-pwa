@@ -7,7 +7,7 @@ describe('smoothScrollToTop', () => {
     window.pageYOffset = 500
     document.documentElement.scrollTop = 500
     document.body.scrollTop = 500
-    window.scrollTo = vi.fn((x: number, y: number) => {
+    window.scrollTo = vi.fn<any>((x: number, y: number) => {
       window.pageYOffset = y
       document.documentElement.scrollTop = y
       document.body.scrollTop = y

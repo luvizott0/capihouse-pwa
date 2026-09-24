@@ -123,7 +123,7 @@ function handleTabChange(tab: EntertainmentTab) {
 }
 
 function handlePostDeleted(deletedId: number) {
-  entertainmentStore.deletePost(deletedId)
+  entertainmentStore.removePostLocally(deletedId)
 }
 
 function checkSentinelIntersection() {

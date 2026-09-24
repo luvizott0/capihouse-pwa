@@ -9,6 +9,7 @@ vi.mock('@/services/echo', () => ({
   connectEcho: vi.fn<any>(() => ({
     channel: vi.fn<any>(() => ({
       listen: vi.fn<any>().mockReturnThis(),
+      stopListening: vi.fn<any>().mockReturnThis(),
     })),
   })),
 }))
@@ -178,15 +179,16 @@ describe('Entertainment Store', () => {
     // Setup Echo listener
     let postCreatedCallback: ((data: any) => void) | null = null
     const mockChannel = {
-      listen: vi.fn((event: string, cb: any) => {
+      listen: vi.fn<any>((event: string, cb: any) => {
         if (event === '.PostCreated') postCreatedCallback = cb
         return mockChannel
       }),
+      stopListening: vi.fn<any>().mockReturnThis(),
     }
     const { connectEcho } = await import('@/services/echo')
     vi.mocked(connectEcho).mockReturnValue({
-      channel: vi.fn(() => mockChannel),
-      leaveChannel: vi.fn(),
+      channel: vi.fn<any>(() => mockChannel),
+      leaveChannel: vi.fn<any>(),
     } as any)
 
     store.subscribeToEntertainment(999) // Current user ID is 999
