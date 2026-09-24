@@ -4,6 +4,8 @@ import type { Post } from '@/types/models'
 import RetroModal from '@/components/ui/RetroModal.vue'
 import RetroButton from '@/components/ui/RetroButton.vue'
 import EmojiPicker from '@/components/ui/EmojiPicker.vue'
+import UserAvatar from '@/components/ui/UserAvatar.vue'
+import { resolveMediaUrl } from '@/utils/media'
 import { createPost } from '@/api/posts'
 
 const props = defineProps<{
@@ -24,7 +26,20 @@ const hashtags = ref<string[]>([])
 const isSubmitting = ref(false)
 const errorMessage = ref('')
 
-const film = computed(() => props.post?.metadata)
+const isEntertainment = computed(() => {
+  return props.post?.category === 'entertainment' || !!props.post?.entertainment_type || !!props.post?.metadata?.film_title || !!props.post?.metadata?.game_title
+})
+
+const film = computed(() => isEntertainment.value ? props.post?.metadata : null)
+
+const placeholderText = computed(() => {
+  if (isEntertainment.value) {
+    return props.post?.entertainment_type === 'game'
+      ? 'O que achou deste jogo? Escreva algo para seus amigos no feed...'
+      : 'O que achou deste filme? Escreva algo para seus amigos no feed...'
+  }
+  return 'O que achou desta publicação? Adicione seu comentário...'
+})
 
 function clearFeeling() {
   feelingText.value = ''
@@ -98,7 +113,7 @@ async function handleRepost() {
       </div>
 
       <!-- Preview of Film/Game to be reposted -->
-      <div v-if="film" class="film-preview-card">
+      <div v-if="isEntertainment && film" class="film-preview-card">
         <img
           v-if="film.poster_url || film.box_art_url"
           :src="film.poster_url || film.box_art_url || ''"
@@ -132,6 +147,35 @@ async function handleRepost() {
         </div>
       </div>
 
+      <!-- Preview of Regular Feed Post -->
+      <div v-else-if="post" class="feed-preview-card">
+        <div class="feed-preview-header">
+          <UserAvatar :user="post.user" size="sm" />
+          <div class="feed-preview-author">
+            <span class="feed-preview-name">{{ post.user?.name || 'Usuário' }}</span>
+            <span class="feed-preview-username">@{{ post.user?.username }}</span>
+          </div>
+          <span class="preview-badge feed-badge">💬 Publicação</span>
+        </div>
+        <p v-if="post.content" class="feed-preview-snippet">
+          "{{ post.content.length > 160 ? post.content.slice(0, 160) + '...' : post.content }}"
+        </p>
+        <div v-if="post.media && post.media.length && post.media[0]" class="feed-preview-media">
+          <img
+            v-if="post.media[0]?.type !== 'video'"
+            :src="resolveMediaUrl(post.media[0]?.url || post.media[0]?.path)"
+            alt="Mídia da postagem"
+            class="feed-preview-thumb"
+          />
+          <div v-else class="feed-preview-video-box">
+            🎬 Vídeo anexo
+          </div>
+          <span v-if="post.media.length > 1" class="preview-media-count">
+            +{{ post.media.length - 1 }} arquivo(s)
+          </span>
+        </div>
+      </div>
+
       <!-- User Commentary -->
       <div class="form-group">
         <label class="form-label">Adicionar seu comentário (opcional):</label>
@@ -139,7 +183,7 @@ async function handleRepost() {
           v-model="content"
           class="retro-textarea"
           rows="3"
-          placeholder="O que achou deste filme? Escreva algo para seus amigos no feed..."
+          :placeholder="placeholderText"
           maxlength="2000"
         ></textarea>
       </div>
@@ -284,6 +328,88 @@ async function handleRepost() {
   background-color: #f3e8ff;
   color: #7e22ce;
   border: 1px solid #e9d5ff;
+}
+
+.preview-badge.feed-badge {
+  background-color: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+}
+
+.feed-preview-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.75rem;
+  background-color: var(--color-primary-50, #f8f6f1);
+  border: 1px solid var(--color-border, #D8CDC5);
+  border-radius: 4px;
+}
+
+.feed-preview-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.feed-preview-author {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.feed-preview-name {
+  font-family: var(--font-heading, monospace);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-primary-900, #3d2a14);
+  line-height: 1.2;
+}
+
+.feed-preview-username {
+  font-size: 0.75rem;
+  color: #718096;
+  font-family: var(--font-mono, monospace);
+}
+
+.feed-preview-snippet {
+  font-size: 0.85rem;
+  color: var(--color-primary-800, #4a3b2c);
+  font-style: italic;
+  margin: 0;
+  line-height: 1.4;
+  white-space: pre-line;
+}
+
+.feed-preview-media {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.feed-preview-thumb {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  border: 1px solid var(--color-border, #D8CDC5);
+  border-radius: 3px;
+}
+
+.feed-preview-video-box {
+  padding: 0.35rem 0.6rem;
+  background-color: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  color: #475569;
+}
+
+.preview-media-count {
+  font-size: 0.75rem;
+  color: #718096;
+  font-family: var(--font-mono, monospace);
 }
 
 .preview-title {

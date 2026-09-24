@@ -101,3 +101,12 @@ export function updateComment(commentId: number, content: string) {
 export function deleteComment(commentId: number) {
   return apiClient.delete(`/comments/${commentId}`)
 }
+
+export function pinPost(postId: number) {
+  return apiClient.post<{ pinned: boolean; pinned_post_id: number | null; message: string }>(`/posts/${postId}/pin`)
+}
+
+export function unpinPost(postId: number) {
+  return apiClient.post<{ pinned: boolean; pinned_post_id: number | null; message: string }>(`/posts/${postId}/unpin`)
+}
+

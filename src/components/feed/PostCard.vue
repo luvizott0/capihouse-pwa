@@ -14,6 +14,8 @@ import MentionInput from '@/components/ui/MentionInput.vue'
 import PollCard from './PollCard.vue'
 import { formatRelativeTime } from '@/utils/date'
 import { resolveMediaUrl } from '@/utils/media'
+import RepostModal from '@/components/entertainment/RepostModal.vue'
+import { pinPost } from '@/api/posts'
 
 const props = withDefaults(
   defineProps<{
@@ -27,6 +29,8 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   (e: 'deleted', postId: number): void
+  (e: 'reposted', newPost: any): void
+  (e: 'pinned', payload: { postId: number; pinned: boolean }): void
 }>()
 
 const feedStore = useFeedStore()
@@ -38,7 +42,57 @@ const commentContent = ref('')
 const isSubmittingComment = ref(false)
 const showEditModal = ref(false)
 const showRecapModal = ref(false)
+const showRepostModal = ref(false)
+const isPinning = ref(false)
+
 const isAuthor = computed(() => Boolean((authStore.user?.id && authStore.user.id === props.post.user_id) || authStore.isAdmin))
+
+const isPostOwner = computed(() => Boolean(authStore.user?.id && authStore.user.id === props.post.user_id))
+
+const isPinned = computed(() => authStore.user?.pinned_post_id === props.post.id)
+
+async function handleTogglePin() {
+  if (isPinning.value) return
+  isPinning.value = true
+  showPostMenu.value = false
+  try {
+    const res = await pinPost(props.post.id)
+    authStore.updatePinnedPost(res.data.pinned_post_id, res.data.pinned ? props.post : null)
+    emit('pinned', { postId: props.post.id, pinned: res.data.pinned })
+  } catch (err: any) {
+    console.error('Erro ao fixar publicação:', err)
+  } finally {
+    isPinning.value = false
+  }
+}
+
+function handleRepostCreated(newPost: any) {
+  showRepostModal.value = false
+  emit('reposted', newPost)
+  if (feedStore.posts && Array.isArray(feedStore.posts)) {
+    feedStore.posts.unshift(newPost)
+  }
+}
+
+const isEntertainmentRepost = computed(() => {
+  const rp = props.post.reposted_post
+  if (!rp) return false
+  return rp.category === 'entertainment' || !!rp.entertainment_type || !!rp.metadata?.film_title || !!rp.metadata?.game_title
+})
+
+function openRepostedMediaModal(mediaList: any[], clickedIndex: number) {
+  const author = props.post.reposted_post?.user?.username
+    ? `@${props.post.reposted_post.user.username}`
+    : ''
+  const imageItems = mediaList
+    .filter(m => m.type !== 'video')
+    .map(m => ({
+      url: resolveMediaUrl(m.url || m.path),
+      title: author,
+    }))
+  if (!imageItems.length) return
+  imageViewer.openGallery(imageItems, Math.max(0, clickedIndex))
+}
 
 const isRecapPost = computed(() => {
   return (
@@ -469,8 +523,11 @@ async function confirmDeletePost() {
             <span v-if="isBirthdayPost" class="birthday-badge" title="Parabéns da Capivara Rogéria">
               🎂 Aniversário
             </span>
-            <span v-if="post.repost_of_id" class="repost-badge" title="Repost de Entretenimento">
+            <span v-if="post.repost_of_id" class="repost-badge" title="Repost">
               🔁 Repost
+            </span>
+            <span v-if="isPinned" class="pinned-badge" title="Publicação fixada no perfil">
+              📌 Fixado
             </span>
           </div>
           <div class="post-sub-line">
@@ -509,6 +566,15 @@ async function confirmDeletePost() {
           @click.stop
         >
           <button
+            v-if="isPostOwner"
+            type="button"
+            class="post-menu-item pin-item"
+            :disabled="isPinning"
+            @click="handleTogglePin"
+          >
+            <span class="item-icon">📌</span> {{ isPinned ? 'Desafixar do perfil' : 'Fixar no perfil' }}
+          </button>
+          <button
             type="button"
             class="post-menu-item edit-item"
             @click="handleEditPost"
@@ -534,55 +600,94 @@ async function confirmDeletePost() {
 
     <!-- Embedded Repost Card (if post is a repost) -->
     <div v-if="post.reposted_post" class="embedded-repost-box">
-      <div class="embedded-repost-header">
-        <span
-          v-if="post.reposted_post.entertainment_type === 'game'"
-          class="embedded-repost-tag"
-          :class="post.reposted_post.external_source === 'xbox' ? 'xbox-tag' : 'game-tag'"
-        >
-          {{ post.reposted_post.external_source === 'xbox' ? '🎮 Xbox Live' : '🕹️ Análise' }}
-        </span>
-        <span v-else class="embedded-repost-tag letterboxd-tag">🍿 Letterboxd</span>
-        <span class="embedded-repost-author">
-          Avaliação de <router-link :to="`/profile/${post.reposted_post.user?.username}`" class="embedded-author-link">@{{ post.reposted_post.user?.username }}</router-link>
-        </span>
-      </div>
-      <div class="embedded-repost-body">
-        <img
-          v-if="post.reposted_post.metadata?.poster_url || post.reposted_post.metadata?.box_art_url"
-          :src="post.reposted_post.metadata?.poster_url || post.reposted_post.metadata?.box_art_url || ''"
-          :alt="post.reposted_post.metadata?.film_title || post.reposted_post.metadata?.game_title || 'Pôster/Capa'"
-          class="embedded-poster"
-          @click="openPoster(post.reposted_post.metadata?.poster_url || post.reposted_post.metadata?.box_art_url)"
-          title="Clique para ampliar"
-        />
-        <div class="embedded-details">
-          <div class="embedded-title-row">
-            <span class="embedded-film-title">{{ post.reposted_post.metadata?.film_title || post.reposted_post.metadata?.game_title }}</span>
-            <span v-if="post.reposted_post.metadata?.film_year" class="embedded-film-year">({{ post.reposted_post.metadata.film_year }})</span>
-            <span v-else-if="post.reposted_post.metadata?.platform" class="embedded-film-year">[{{ post.reposted_post.metadata.platform }}]</span>
-          </div>
-          <div v-if="post.reposted_post.metadata?.rating" class="embedded-rating">
-            <span class="embedded-stars">{{ renderRatingStars(post.reposted_post.metadata.rating) }}</span>
-            <span class="embedded-score">{{ post.reposted_post.metadata.rating }} / 5</span>
-          </div>
-          <div v-else-if="post.reposted_post.metadata?.gamerscore != null" class="embedded-rating">
-            <span class="embedded-score">🎮 {{ post.reposted_post.metadata.gamerscore }} G</span>
-          </div>
-          <p v-if="post.reposted_post.content" class="embedded-review">
-            "{{ post.reposted_post.content }}"
-          </p>
-          <a
-            v-if="post.reposted_post.metadata?.letterboxd_url"
-            :href="post.reposted_post.metadata.letterboxd_url"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="embedded-external-link"
+      <!-- Entertainment Repost (Film or Game) -->
+      <template v-if="isEntertainmentRepost">
+        <div class="embedded-repost-header">
+          <span
+            v-if="post.reposted_post.entertainment_type === 'game'"
+            class="embedded-repost-tag"
+            :class="post.reposted_post.external_source === 'xbox' ? 'xbox-tag' : 'game-tag'"
           >
-            [ Ver no Letterboxd ↗ ]
-          </a>
+            {{ post.reposted_post.external_source === 'xbox' ? '🎮 Xbox Live' : '🕹️ Análise' }}
+          </span>
+          <span v-else class="embedded-repost-tag letterboxd-tag">🍿 Letterboxd</span>
+          <span class="embedded-repost-author">
+            Avaliação de <router-link :to="`/profile/${post.reposted_post.user?.username}`" class="embedded-author-link">@{{ post.reposted_post.user?.username }}</router-link>
+          </span>
         </div>
-      </div>
+        <div class="embedded-repost-body">
+          <img
+            v-if="post.reposted_post.metadata?.poster_url || post.reposted_post.metadata?.box_art_url"
+            :src="post.reposted_post.metadata?.poster_url || post.reposted_post.metadata?.box_art_url || ''"
+            :alt="post.reposted_post.metadata?.film_title || post.reposted_post.metadata?.game_title || 'Pôster/Capa'"
+            class="embedded-poster"
+            @click="openPoster(post.reposted_post.metadata?.poster_url || post.reposted_post.metadata?.box_art_url)"
+            title="Clique para ampliar"
+          />
+          <div class="embedded-details">
+            <div class="embedded-title-row">
+              <span class="embedded-film-title">{{ post.reposted_post.metadata?.film_title || post.reposted_post.metadata?.game_title }}</span>
+              <span v-if="post.reposted_post.metadata?.film_year" class="embedded-film-year">({{ post.reposted_post.metadata.film_year }})</span>
+              <span v-else-if="post.reposted_post.metadata?.platform" class="embedded-film-year">[{{ post.reposted_post.metadata.platform }}]</span>
+            </div>
+            <div v-if="post.reposted_post.metadata?.rating" class="embedded-rating">
+              <span class="embedded-stars">{{ renderRatingStars(post.reposted_post.metadata.rating) }}</span>
+              <span class="embedded-score">{{ post.reposted_post.metadata.rating }} / 5</span>
+            </div>
+            <div v-else-if="post.reposted_post.metadata?.gamerscore != null" class="embedded-rating">
+              <span class="embedded-score">🎮 {{ post.reposted_post.metadata.gamerscore }} G</span>
+            </div>
+            <p v-if="post.reposted_post.content" class="embedded-review">
+              "{{ post.reposted_post.content }}"
+            </p>
+            <a
+              v-if="post.reposted_post.metadata?.letterboxd_url"
+              :href="post.reposted_post.metadata.letterboxd_url"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="embedded-external-link"
+            >
+              [ Ver no Letterboxd ↗ ]
+            </a>
+          </div>
+        </div>
+      </template>
+
+      <!-- Feed Post Repost -->
+      <template v-else>
+        <div class="embedded-repost-header">
+          <span class="embedded-repost-tag feed-tag">💬 Publicação</span>
+          <span class="embedded-repost-author">
+            Publicação de <router-link :to="`/profile/${post.reposted_post.user?.username}`" class="embedded-author-link">@{{ post.reposted_post.user?.username }}</router-link>
+          </span>
+        </div>
+        <div class="embedded-feed-body">
+          <div v-if="post.reposted_post.content" class="embedded-feed-text">
+            <FormattedContent :content="post.reposted_post.content" />
+          </div>
+          <div v-if="post.reposted_post.media && post.reposted_post.media.length" class="embedded-feed-media-preview">
+            <div
+              v-for="(item, idx) in post.reposted_post.media.slice(0, 3)"
+              :key="item.id || idx"
+              class="embedded-media-item"
+            >
+              <img
+                v-if="item.type !== 'video'"
+                :src="resolveMediaUrl(item.url || item.path)"
+                alt="Mídia repostada"
+                class="embedded-media-thumb"
+                @click="openRepostedMediaModal(post.reposted_post.media, idx)"
+              />
+              <div v-else class="embedded-video-badge">
+                ▶ Vídeo
+              </div>
+            </div>
+            <span v-if="post.reposted_post.media.length > 3" class="embedded-media-more">
+              +{{ post.reposted_post.media.length - 3 }}
+            </span>
+          </div>
+        </div>
+      </template>
     </div>
 
     <!-- Post Poll -->
@@ -707,6 +812,17 @@ async function confirmDeletePost() {
       >
         <span class="icon">💬</span>
         <span>{{ post.comments_count || 0 }} {{ post.comments_count === 1 ? 'comentário' : 'comentários' }}</span>
+      </button>
+
+      <button
+        v-if="authStore.isAuthenticated"
+        type="button"
+        class="action-btn repost-btn"
+        title="Compartilhar esta publicação no feed"
+        @click="showRepostModal = true"
+      >
+        <span class="icon">🔁</span>
+        <span>Repostar</span>
       </button>
     </div>
 
@@ -954,6 +1070,13 @@ async function confirmDeletePost() {
     <PostEditModal
       v-model="showEditModal"
       :post="post"
+    />
+
+    <!-- Repost Modal -->
+    <RepostModal
+      v-model="showRepostModal"
+      :post="post"
+      @reposted="handleRepostCreated"
     />
 
     <!-- Recap Card Modal -->
@@ -2260,5 +2383,84 @@ async function confirmDeletePost() {
 }
 .embedded-external-link:hover {
   text-decoration: underline;
+}
+
+.embedded-repost-tag.feed-tag {
+  background-color: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+}
+
+.embedded-feed-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.embedded-feed-text {
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: var(--color-primary-900, #3d2a14);
+}
+
+.embedded-feed-media-preview {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.embedded-media-item {
+  position: relative;
+}
+
+.embedded-media-thumb {
+  width: 65px;
+  height: 65px;
+  object-fit: cover;
+  border: 1px solid var(--color-border, #D8CDC5);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.embedded-media-thumb:hover {
+  opacity: 0.85;
+}
+
+.embedded-video-badge {
+  padding: 0.25rem 0.5rem;
+  background-color: #1e293b;
+  color: #f8fafc;
+  font-size: 0.75rem;
+  border-radius: 3px;
+  font-family: var(--font-mono, monospace);
+}
+
+.embedded-media-more {
+  font-size: 0.8rem;
+  font-family: var(--font-mono, monospace);
+  color: #718096;
+}
+
+.pinned-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  background-color: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+  padding: 0.1rem 0.4rem;
+  border-radius: 2px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-family: var(--font-mono, monospace);
+  line-height: 1.2;
+}
+
+.post-menu-item.pin-item {
+  color: var(--color-primary-800, #4a3b2c);
+}
+.post-menu-item.pin-item:hover {
+  background-color: var(--retro-bg-hover, #f1ece4);
 }
 </style>

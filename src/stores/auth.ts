@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { User } from '@/types/models'
+import type { User, Post } from '@/types/models'
 import type { LoginRequest, RegisterRequest } from '@/types/api'
 import * as authApi from '@/api/auth'
 import { connectEcho, disconnectEcho } from '@/services/echo'
@@ -64,6 +64,18 @@ export const useAuthStore = defineStore('auth', () => {
     const unwrapped = (updatedUser as any)?.data ? (updatedUser as any).data : updatedUser
     user.value = unwrapped
     localStorage.setItem('capihouse_user', JSON.stringify(unwrapped))
+  }
+
+  function updatePinnedPost(postId: number | null, post?: Post | null) {
+    if (user.value) {
+      user.value.pinned_post_id = postId
+      if (post !== undefined) {
+        user.value.pinned_post = post
+      } else if (postId === null) {
+        user.value.pinned_post = null
+      }
+      localStorage.setItem('capihouse_user', JSON.stringify(user.value))
+    }
   }
 
   function clearAuth() {
@@ -173,6 +185,7 @@ export const useAuthStore = defineStore('auth', () => {
     initFromStorage,
     setAuth,
     updateUser,
+    updatePinnedPost,
     clearAuth,
     impersonate,
     stopImpersonating,

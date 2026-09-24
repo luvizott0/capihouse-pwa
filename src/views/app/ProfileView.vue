@@ -16,11 +16,12 @@ import PostCardSkeleton from '@/components/feed/PostCardSkeleton.vue'
 import LetterboxdCard from '@/components/entertainment/LetterboxdCard.vue'
 import GameCard from '@/components/entertainment/GameCard.vue'
 import ConnectedAccountsModal from '@/components/profile/ConnectedAccountsModal.vue'
-import { formatBirthDate, formatRelativeTime } from '@/utils/date'
+import { formatBirthDate } from '@/utils/date'
 import { usePwaUpdate } from '@/composables/usePwaUpdate'
 import { useWebPush } from '@/composables/useWebPush'
 import PullToRefreshIndicator from '@/components/ui/PullToRefreshIndicator.vue'
 import { usePullToRefresh } from '@/composables/usePullToRefresh'
+import { pinPost } from '@/api/posts'
 
 const route = useRoute()
 const router = useRouter()
@@ -116,6 +117,7 @@ async function loadProfile() {
     wasVisitingOther.value = false
     // Restore own theme when viewing own profile
     themeStore.loadThemeFromUser(authStore.user)
+    await authStore.fetchMe()
   }
   if (user.value) {
     settingsName.value = user.value.name
@@ -124,6 +126,53 @@ async function loadProfile() {
     birthInput.value = user.value.birth ? user.value.birth.substring(0, 10) : ''
     // Fetch posts for this user profile (authored posts and tagged posts)
     await feedStore.fetchUserPosts(user.value.id, 1, profilePostTab.value)
+  }
+}
+
+async function handleUnpinPost() {
+  if (!user.value?.pinned_post_id) return
+  try {
+    await pinPost(user.value.pinned_post_id)
+    authStore.updatePinnedPost(null, null)
+    if (profileStore.profile) {
+      profileStore.profile.pinned_post_id = null
+      profileStore.profile.pinned_post = null
+    }
+  } catch (err) {
+    console.error('Erro ao desafixar post:', err)
+  }
+}
+
+function onPinnedPostDeleted(postId: number) {
+  if (user.value?.pinned_post_id === postId) {
+    authStore.updatePinnedPost(null, null)
+    if (profileStore.profile) {
+      profileStore.profile.pinned_post_id = null
+      profileStore.profile.pinned_post = null
+    }
+  }
+  feedStore.deletePost(postId)
+}
+
+async function onPinnedStateChanged(payload: { postId: number; pinned: boolean }) {
+  if (!payload.pinned) {
+    if (user.value?.pinned_post_id === payload.postId) {
+      authStore.updatePinnedPost(null, null)
+      if (profileStore.profile) {
+        profileStore.profile.pinned_post_id = null
+        profileStore.profile.pinned_post = null
+      }
+    }
+  } else {
+    const target = userPosts.value.find((p: any) => p.id === payload.postId)
+    if (target) {
+      authStore.updatePinnedPost(payload.postId, target)
+      if (profileStore.profile && !isOwner.value) {
+        profileStore.profile.pinned_post_id = payload.postId
+        profileStore.profile.pinned_post = target
+      }
+    }
+    await authStore.fetchMe()
   }
 }
 
@@ -551,6 +600,46 @@ const {
       </div>
     </div>
 
+    <!-- Pinned Post Highlight Section (Below interests, above activities) -->
+    <div v-if="user?.pinned_post" class="pinned-post-section">
+      <div class="pinned-post-banner">
+        <div class="pinned-banner-left">
+          <span class="pinned-pin-icon">📌</span>
+          <span class="pinned-banner-title">Publicação Fixada</span>
+        </div>
+        <button
+          v-if="isOwner"
+          type="button"
+          class="pinned-unpin-btn"
+          title="Desafixar do perfil"
+          @click="handleUnpinPost"
+        >
+          [ Desafixar ]
+        </button>
+      </div>
+
+      <div class="pinned-card-wrapper">
+        <GameCard
+          v-if="user.pinned_post.entertainment_type === 'game'"
+          :post="user.pinned_post"
+          @deleted="onPinnedPostDeleted"
+          @pinned="onPinnedStateChanged"
+        />
+        <LetterboxdCard
+          v-else-if="user.pinned_post.entertainment_type === 'movie' || user.pinned_post.entertainment_type === 'series' || user.pinned_post.category === 'entertainment'"
+          :post="user.pinned_post"
+          @deleted="onPinnedPostDeleted"
+          @pinned="onPinnedStateChanged"
+        />
+        <PostCard
+          v-else
+          :post="user.pinned_post"
+          @deleted="onPinnedPostDeleted"
+          @pinned="onPinnedStateChanged"
+        />
+      </div>
+    </div>
+
     <!-- User's Posts Feed / Entertainment Section -->
     <div class="user-posts-section">
       <div class="user-posts-header">
@@ -587,16 +676,24 @@ const {
                 v-if="post.entertainment_type === 'game'"
                 :post="post"
                 @deleted="feedStore.deletePost(post.id)"
+                @pinned="onPinnedStateChanged"
               />
               <LetterboxdCard
                 v-else
                 :post="post"
                 @deleted="feedStore.deletePost(post.id)"
+                @pinned="onPinnedStateChanged"
               />
             </template>
           </template>
           <template v-else>
-            <PostCard v-for="post in userPosts" :key="post.id" :post="post" />
+            <PostCard
+              v-for="post in userPosts"
+              :key="post.id"
+              :post="post"
+              @deleted="feedStore.deletePost(post.id)"
+              @pinned="onPinnedStateChanged"
+            />
           </template>
         </div>
         <div v-if="feedStore.hasMoreUserPosts" class="load-more-container">
@@ -2028,5 +2125,74 @@ const {
 .retro-load-more-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.pinned-post-section {
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.pinned-post-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(90deg, #fef3c7 0%, #fde68a 100%);
+  border: 1px solid #f59e0b;
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  padding: 0.45rem 0.85rem;
+}
+
+.pinned-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.pinned-pin-icon {
+  font-size: 1rem;
+}
+
+.pinned-banner-title {
+  font-family: var(--font-heading, monospace);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #92400e;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.pinned-unpin-btn {
+  background: none;
+  border: none;
+  color: #b45309;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0.15rem 0.4rem;
+  border-radius: 2px;
+  transition: all 0.15s ease;
+}
+
+.pinned-unpin-btn:hover {
+  background-color: rgba(180, 83, 9, 0.15);
+  color: #78350f;
+  text-decoration: underline;
+}
+
+.pinned-card-wrapper {
+  border: 1px solid #f59e0b;
+  border-radius: 0 0 4px 4px;
+  overflow: hidden;
+  background-color: var(--retro-bg-card, #ffffff);
+}
+
+.pinned-card-wrapper :deep(.post-card),
+.pinned-card-wrapper :deep(.film-card),
+.pinned-card-wrapper :deep(.game-card) {
+  margin-bottom: 0;
+  border: none;
+  box-shadow: none;
 }
 </style>

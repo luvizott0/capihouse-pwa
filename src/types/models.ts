@@ -31,6 +31,8 @@ export interface User {
   is_admin: boolean
   is_online: boolean
   theme?: UserTheme | null
+  pinned_post_id?: number | null
+  pinned_post?: Post | null
   avatar: Media | null
   banner: Media | null
   interests: Interest[]

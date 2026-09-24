@@ -12,6 +12,7 @@ import {
   updateComment,
   deleteComment,
   toggleCommentLike,
+  pinPost,
 } from '@/api/posts'
 import UserAvatar from '@/components/ui/UserAvatar.vue'
 import RetroConfirmModal from '@/components/ui/RetroConfirmModal.vue'
@@ -33,6 +34,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   (e: 'deleted', postId: number): void
   (e: 'reposted', newPost: any): void
+  (e: 'pinned', payload: { postId: number; pinned: boolean }): void
 }>()
 
 const authStore = useAuthStore()
@@ -64,6 +66,30 @@ watch(
 const isAuthor = computed(() => {
   return (authStore.user?.id && authStore.user.id === props.post.user_id) || authStore.isAdmin
 })
+
+const isPostOwner = computed(() => {
+  return !!authStore.user?.id && authStore.user.id === props.post.user_id
+})
+
+const isPinned = computed(() => {
+  return authStore.user?.pinned_post_id === props.post.id
+})
+
+const isPinning = ref(false)
+
+async function handleTogglePin() {
+  if (isPinning.value) return
+  isPinning.value = true
+  try {
+    const res = await pinPost(props.post.id)
+    authStore.updatePinnedPost(res.data.pinned_post_id, res.data.pinned ? props.post : null)
+    emit('pinned', { postId: props.post.id, pinned: res.data.pinned })
+  } catch (err: any) {
+    console.error('Erro ao fixar publicação:', err)
+  } finally {
+    isPinning.value = false
+  }
+}
 
 const game = computed(() => props.post.metadata)
 
@@ -557,6 +583,19 @@ const statusLabel = computed(() => {
       </div>
 
       <div class="header-right">
+        <!-- Pin button if post owner -->
+        <button
+          v-if="isPostOwner"
+          type="button"
+          class="btn-pin-bracket"
+          :class="{ pinned: isPinned }"
+          :title="isPinned ? 'Desafixar do perfil' : 'Fixar no perfil'"
+          :disabled="isPinning"
+          @click="handleTogglePin"
+        >
+          {{ isPinned ? '[ 📌 desafixar ]' : '[ 📌 fixar ]' }}
+        </button>
+
         <button
           v-if="isAuthor"
           type="button"
@@ -681,9 +720,9 @@ const statusLabel = computed(() => {
         </span>
       </button>
 
-      <!-- Repost Button (Only visible for the author) -->
+      <!-- Repost Button (Visible for all authenticated users) -->
       <button
-        v-if="isAuthor"
+        v-if="authStore.isAuthenticated"
         type="button"
         class="action-btn repost-btn"
         title="Compartilhar este jogo no feed principal"
@@ -1064,6 +1103,29 @@ const statusLabel = computed(() => {
 
 .xbox-dot {
   background: #107c10;
+}
+
+.btn-pin-bracket {
+  background: none;
+  border: none;
+  color: var(--color-primary-700, #5c4028);
+  font-family: var(--font-mono, monospace);
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.85rem;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-pin-bracket:hover {
+  background: var(--retro-bg-hover, #f1ece4);
+  color: var(--color-primary-900, #3d2a14);
+  border-radius: 2px;
+}
+
+.btn-pin-bracket.pinned {
+  color: #b45309;
 }
 
 .btn-delete-bracket {
