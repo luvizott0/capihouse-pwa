@@ -54,4 +54,26 @@ describe('FormattedContent', () => {
     expect(mentionLinks[0]?.text()).toBe('@user1')
     expect(mentionLinks[1]?.text()).toBe('@user2')
   })
+
+  it('renders @todos as a special badge without creating a router-link', () => {
+    const wrapper = mount(FormattedContent, {
+      props: { content: 'Atenção @todos, reunião hoje com @amigo!' },
+      global: {
+        stubs: {
+          RouterLink: {
+            template: '<a :href="to" class="mention-link"><slot /></a>',
+            props: ['to'],
+          },
+        },
+      },
+    })
+
+    const everyonePill = wrapper.find('.mention-everyone-pill')
+    expect(everyonePill.exists()).toBe(true)
+    expect(everyonePill.text()).toContain('@todos')
+
+    const mentionLinks = wrapper.findAll('.mention-link')
+    expect(mentionLinks.length).toBe(1)
+    expect(mentionLinks[0]?.text()).toBe('@amigo')
+  })
 })

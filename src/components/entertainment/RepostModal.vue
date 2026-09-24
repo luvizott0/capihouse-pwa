@@ -5,6 +5,7 @@ import RetroModal from '@/components/ui/RetroModal.vue'
 import RetroButton from '@/components/ui/RetroButton.vue'
 import EmojiPicker from '@/components/ui/EmojiPicker.vue'
 import UserAvatar from '@/components/ui/UserAvatar.vue'
+import MentionInput from '@/components/ui/MentionInput.vue'
 import { resolveMediaUrl } from '@/utils/media'
 import { createPost } from '@/api/posts'
 
@@ -35,10 +36,10 @@ const film = computed(() => isEntertainment.value ? props.post?.metadata : null)
 const placeholderText = computed(() => {
   if (isEntertainment.value) {
     return props.post?.entertainment_type === 'game'
-      ? 'O que achou deste jogo? Escreva algo para seus amigos no feed...'
-      : 'O que achou deste filme? Escreva algo para seus amigos no feed...'
+      ? 'O que achou deste jogo? Use @ para marcar amigos ou @todos...'
+      : 'O que achou deste filme? Use @ para marcar amigos ou @todos...'
   }
-  return 'O que achou desta publicação? Adicione seu comentário...'
+  return 'O que achou desta publicação? Use @ para marcar amigos ou @todos...'
 })
 
 function clearFeeling() {
@@ -176,16 +177,15 @@ async function handleRepost() {
         </div>
       </div>
 
-      <!-- User Commentary -->
+      <!-- User Commentary with Mentions Support -->
       <div class="form-group">
         <label class="form-label">Adicionar seu comentário (opcional):</label>
-        <textarea
+        <MentionInput
           v-model="content"
-          class="retro-textarea"
-          rows="3"
+          :rows="3"
           :placeholder="placeholderText"
-          maxlength="2000"
-        ></textarea>
+          :maxlength="2000"
+        />
       </div>
 
       <!-- Feelings Section with EmojiPicker (identical to feed form) -->

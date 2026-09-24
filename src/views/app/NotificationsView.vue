@@ -169,6 +169,7 @@ async function handleItemClick(item: AppNotification) {
               <span v-if="item.type === 'group_invite'" class="type-icon">👥</span>
               <span v-else-if="item.type === 'post_like' || item.type === 'comment_like'" class="type-icon">❤️</span>
               <span v-else-if="item.type === 'post_comment' || item.type === 'comment_reply'" class="type-icon">💬</span>
+              <span v-if="item.data?.is_all" class="type-icon" title="Menção para todos">📢</span>
               <span v-else-if="item.type === 'post_mention' || item.type === 'comment_mention'" class="type-icon">🏷️</span>
               <span v-else-if="item.type === 'event_rsvp'" class="type-icon">📅</span>
               <span v-else-if="item.type === 'birthday_post'" class="type-icon">🎂</span>

@@ -69,29 +69,48 @@ function handleClickOutside(e: MouseEvent) {
   }
 }
 
+// Special pseudo-user for global @todos mention
+const TODOS_USER: User = {
+  id: -999,
+  name: 'Todos os usuários',
+  username: 'todos',
+  status: 'approved',
+  role: 'user',
+  email: '',
+  created_at: '',
+  updated_at: '',
+} as unknown as User
+
 // Search users when searchQuery changes
 let searchDebounceTimer: any = null
 
 async function searchUsers(q: string) {
-  if (!q.trim()) {
-    // If just typed "@", show top users from cache or fetch
-    searchResults.value = cachedUsers.value.slice(0, 8)
+  const lower = q.trim().toLowerCase()
+
+  if (!lower) {
+    // If just typed "@", suggest @todos at top followed by cached users
+    searchResults.value = [TODOS_USER, ...cachedUsers.value.filter(u => u.username !== 'todos').slice(0, 7)]
+    selectedIndex.value = 0
     return
   }
+
+  const matchesTodos = 'todos'.includes(lower) || 'todos os usuários'.includes(lower)
 
   clearTimeout(searchDebounceTimer)
   searchDebounceTimer = setTimeout(async () => {
     isLoadingUsers.value = true
     try {
       const res = await usersApi.getUsers(q)
-      searchResults.value = res.data.slice(0, 8)
+      const list = res.data.filter(u => u.username !== 'todos').slice(0, matchesTodos ? 7 : 8)
+      searchResults.value = matchesTodos ? [TODOS_USER, ...list] : list
       selectedIndex.value = 0
     } catch {
       // Fallback to local filter
-      const lower = q.toLowerCase()
-      searchResults.value = cachedUsers.value
-        .filter(u => u.name.toLowerCase().includes(lower) || u.username.toLowerCase().includes(lower))
-        .slice(0, 8)
+      const filtered = cachedUsers.value
+        .filter(u => u.username !== 'todos' && (u.name.toLowerCase().includes(lower) || u.username.toLowerCase().includes(lower)))
+        .slice(0, matchesTodos ? 7 : 8)
+      searchResults.value = matchesTodos ? [TODOS_USER, ...filtered] : filtered
+      selectedIndex.value = 0
     } finally {
       isLoadingUsers.value = false
     }
@@ -265,13 +284,19 @@ defineExpose({
           v-for="(user, idx) in searchResults"
           :key="user.id"
           class="mention-item"
-          :class="{ active: idx === selectedIndex }"
+          :class="{ active: idx === selectedIndex, 'is-everyone-item': user.id === -999 }"
           @mousedown.prevent="selectUser(user)"
           @mouseenter="selectedIndex = idx"
         >
-          <UserAvatar :user="user" size="sm" />
+          <div v-if="user.id === -999" class="mention-everyone-icon" title="Todos os usuários">
+            📢
+          </div>
+          <UserAvatar v-else :user="user" size="sm" />
           <div class="mention-user-info">
-            <span class="mention-name">{{ user.name }}</span>
+            <span class="mention-name">
+              {{ user.name }}
+              <span v-if="user.id === -999" class="mention-everyone-tag">Notifica todos</span>
+            </span>
             <span class="mention-handle">@{{ user.username }}</span>
           </div>
         </div>
@@ -404,5 +429,38 @@ defineExpose({
   font-family: var(--font-heading);
   font-size: 0.7rem;
   color: var(--color-primary, #a66130);
+}
+
+.is-everyone-item {
+  background-color: var(--color-primary-50, #fcf8f4);
+  border-bottom: 1px dashed var(--color-primary-200, #e8c9a5) !important;
+}
+
+.mention-everyone-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background-color: var(--color-primary-100, #f8efe6);
+  border: 1px solid var(--color-primary-400, #c49a6c);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.mention-everyone-tag {
+  display: inline-block;
+  font-size: 0.62rem;
+  background-color: var(--color-primary, #a66130);
+  color: #ffffff;
+  padding: 0.05rem 0.35rem;
+  border-radius: 2px;
+  margin-left: 0.35rem;
+  font-family: var(--font-heading, monospace);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  vertical-align: middle;
 }
 </style>

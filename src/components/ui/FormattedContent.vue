@@ -48,8 +48,15 @@ const tokens = computed<Token[]>(() => {
 <template>
   <span class="formatted-content">
     <template v-for="(token, index) in tokens" :key="index">
+      <span
+        v-if="token.type === 'mention' && token.username?.toLowerCase() === 'todos'"
+        class="mention-everyone-pill"
+        title="Menção global para todos os usuários"
+      >
+        <span class="everyone-icon">📢</span>{{ token.value }}
+      </span>
       <router-link
-        v-if="token.type === 'mention' && token.username"
+        v-else-if="token.type === 'mention' && token.username"
         :to="`/profile/${token.username}`"
         class="mention-link"
         @click.stop
@@ -84,5 +91,25 @@ const tokens = computed<Token[]>(() => {
   background-color: var(--color-primary, #a66130);
   color: #ffffff;
   border-bottom-color: var(--color-primary-800);
+}
+
+.mention-everyone-pill {
+  color: #ffffff;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-weight: 700;
+  font-size: 0.88em;
+  background-color: var(--color-primary, #a66130);
+  border: 1px solid var(--color-primary-800, #5f4120);
+  padding: 0.05rem 0.4rem;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  vertical-align: baseline;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.everyone-icon {
+  font-size: 0.85em;
 }
 </style>
