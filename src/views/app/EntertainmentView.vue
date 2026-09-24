@@ -273,14 +273,40 @@ onUnmounted(() => {
     <!-- Header Section (padrão com cor primária) -->
     <header class="entertainment-header">
       <h1 class="page-title">» Atividades e Análises</h1>
-      <button
-        v-if="activeTab === 'games'"
-        type="button"
-        class="btn-new-review"
-        @click="showGameReviewModal = true"
-      >
-        [ + Review ]
-      </button>
+      <div class="entertainment-header-actions">
+        <button
+          v-if="activeTab === 'games'"
+          type="button"
+          class="btn-new-review"
+          @click="showGameReviewModal = true"
+        >
+          [ + Review ]
+        </button>
+        <button
+          type="button"
+          class="refresh-btn"
+          :class="{ 'is-refreshing': entertainmentStore.isLoading }"
+          :disabled="entertainmentStore.isLoading"
+          @click="loadPostsForCurrentRoute(true)"
+          title="Recarregar publicações"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="refresh-icon"
+            :class="{ 'spin': entertainmentStore.isLoading }"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+            />
+          </svg>
+        </button>
+      </div>
     </header>
 
     <!-- Search Results Banner -->
@@ -521,6 +547,59 @@ onUnmounted(() => {
   min-width: 0;
 }
 
+.entertainment-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 2px;
+  padding: 0.3rem 0.6rem;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.25);
+  border-color: #ffffff;
+  color: #ffffff;
+}
+
+.refresh-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.refresh-icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin {
+  animation: spin 0.8s linear infinite;
+}
+
 @media (max-width: 480px) {
   .page-title {
     font-size: 0.9rem;
@@ -528,6 +607,9 @@ onUnmounted(() => {
   .btn-new-review {
     font-size: 0.75rem;
     padding: 0.2rem 0.5rem;
+  }
+  .refresh-btn {
+    padding: 0.25rem 0.45rem;
   }
 }
 
