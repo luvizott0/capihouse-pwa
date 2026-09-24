@@ -635,7 +635,7 @@ const {
           title="Desafixar do perfil"
           @click="handleUnpinPost"
         >
-          [ Desafixar ]
+          [ x ]
         </button>
       </div>
 
