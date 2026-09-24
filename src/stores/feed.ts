@@ -166,6 +166,9 @@ export const useFeedStore = defineStore('feed', () => {
     if (page > 1) {
       isLoadingMoreUserPosts.value = true
     } else {
+      if (activeProfileUserId.value !== userId || activeProfileCategory.value !== category) {
+        userPosts.value = []
+      }
       isLoadingUserPosts.value = true
       activeProfileUserId.value = userId
       activeProfileCategory.value = category

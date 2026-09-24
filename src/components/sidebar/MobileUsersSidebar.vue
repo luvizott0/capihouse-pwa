@@ -52,9 +52,15 @@ function close() {
   emit('update:modelValue', false)
 }
 
+const isNavigating = ref(false)
+
 function goToProfile(username: string) {
-  close()
+  isNavigating.value = true
+  emit('update:modelValue', false)
   router.push(`/profile/${username}`)
+  setTimeout(() => {
+    isNavigating.value = false
+  }, 300)
 }
 
 // Filter out current logged-in user from general list so they stay in their dedicated preview section
@@ -91,7 +97,7 @@ const offlineCount = computed(() => otherUsers.value.filter(u => !u.is_online).l
 <template>
   <Teleport to="body">
     <!-- Backdrop Overlay -->
-    <Transition name="fade">
+    <Transition :name="isNavigating ? undefined : 'fade'">
       <div
         v-if="modelValue"
         class="sidebar-backdrop"
@@ -101,7 +107,7 @@ const offlineCount = computed(() => otherUsers.value.filter(u => !u.is_online).l
     </Transition>
 
     <!-- Slide-over Drawer -->
-    <Transition name="slide">
+    <Transition :name="isNavigating ? undefined : 'slide'">
       <aside
         v-if="modelValue"
         class="mobile-sidebar-drawer"

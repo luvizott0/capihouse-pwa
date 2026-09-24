@@ -13,8 +13,16 @@ export const useProfileStore = defineStore('profile', () => {
   const isLoading = ref(false)
   const authStore = useAuthStore()
   const themeStore = useThemeStore()
+  function resetProfile() {
+    profile.value = null
+    interests.value = []
+    isLoading.value = false
+  }
 
   async function fetchProfile(username?: string) {
+    if (username && profile.value?.username !== username) {
+      profile.value = null
+    }
     isLoading.value = true
     try {
       const res = await profileApi.getProfile(username)
@@ -110,6 +118,7 @@ export const useProfileStore = defineStore('profile', () => {
     interests,
     isEditing,
     isLoading,
+    resetProfile,
     fetchProfile,
     updateProfile,
     uploadAvatar,

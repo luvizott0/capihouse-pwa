@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import type { Post, PostComment } from '@/types/models'
 import { useFeedStore } from '@/stores/feed'
 import { useAuthStore } from '@/stores/auth'
@@ -33,6 +34,7 @@ const emit = defineEmits<{
   (e: 'pinned', payload: { postId: number; pinned: boolean }): void
 }>()
 
+const router = useRouter()
 const feedStore = useFeedStore()
 const authStore = useAuthStore()
 const imageViewer = useImageViewerStore()
@@ -92,6 +94,16 @@ function openRepostedMediaModal(mediaList: any[], clickedIndex: number) {
     }))
   if (!imageItems.length) return
   imageViewer.openGallery(imageItems, Math.max(0, clickedIndex))
+}
+
+function handleRepostBoxClick(e: MouseEvent | KeyboardEvent) {
+  const target = e.target as HTMLElement | null
+  if (target?.closest('a, button, .embedded-poster, .embedded-media-thumb')) {
+    return
+  }
+  if (props.post.reposted_post?.id) {
+    router.push({ name: 'post-detail', params: { id: props.post.reposted_post.id } })
+  }
 }
 
 const isRecapPost = computed(() => {
@@ -599,21 +611,32 @@ async function confirmDeletePost() {
     </div>
 
     <!-- Embedded Repost Card (if post is a repost) -->
-    <div v-if="post.reposted_post" class="embedded-repost-box">
+    <div
+      v-if="post.reposted_post"
+      class="embedded-repost-box"
+      role="link"
+      tabindex="0"
+      title="Clique para ver os detalhes da publicação original"
+      @click="handleRepostBoxClick"
+      @keydown.enter="handleRepostBoxClick"
+    >
       <!-- Entertainment Repost (Film or Game) -->
       <template v-if="isEntertainmentRepost">
         <div class="embedded-repost-header">
-          <span
-            v-if="post.reposted_post.entertainment_type === 'game'"
-            class="embedded-repost-tag"
-            :class="post.reposted_post.external_source === 'xbox' ? 'xbox-tag' : 'game-tag'"
-          >
-            {{ post.reposted_post.external_source === 'xbox' ? '🎮 Xbox Live' : '🕹️ Análise' }}
-          </span>
-          <span v-else class="embedded-repost-tag letterboxd-tag">🍿 Letterboxd</span>
-          <span class="embedded-repost-author">
-            Avaliação de <router-link :to="`/profile/${post.reposted_post.user?.username}`" class="embedded-author-link">@{{ post.reposted_post.user?.username }}</router-link>
-          </span>
+          <div class="embedded-repost-header-left">
+            <span
+              v-if="post.reposted_post.entertainment_type === 'game'"
+              class="embedded-repost-tag"
+              :class="post.reposted_post.external_source === 'xbox' ? 'xbox-tag' : 'game-tag'"
+            >
+              {{ post.reposted_post.external_source === 'xbox' ? '🎮 Xbox Live' : '🕹️ Análise' }}
+            </span>
+            <span v-else class="embedded-repost-tag letterboxd-tag">🍿 Letterboxd</span>
+            <span class="embedded-repost-author">
+              Avaliação de <router-link :to="`/profile/${post.reposted_post.user?.username}`" class="embedded-author-link">@{{ post.reposted_post.user?.username }}</router-link>
+            </span>
+          </div>
+          <span class="embedded-repost-action-hint">Ver original ↗</span>
         </div>
         <div class="embedded-repost-body">
           <img
@@ -656,10 +679,13 @@ async function confirmDeletePost() {
       <!-- Feed Post Repost -->
       <template v-else>
         <div class="embedded-repost-header">
-          <span class="embedded-repost-tag feed-tag">💬 Publicação</span>
-          <span class="embedded-repost-author">
-            Publicação de <router-link :to="`/profile/${post.reposted_post.user?.username}`" class="embedded-author-link">@{{ post.reposted_post.user?.username }}</router-link>
-          </span>
+          <div class="embedded-repost-header-left">
+            <span class="embedded-repost-tag feed-tag">💬 Publicação</span>
+            <span class="embedded-repost-author">
+              Publicação de <router-link :to="`/profile/${post.reposted_post.user?.username}`" class="embedded-author-link">@{{ post.reposted_post.user?.username }}</router-link>
+            </span>
+          </div>
+          <span class="embedded-repost-action-hint">Ver original ↗</span>
         </div>
         <div class="embedded-feed-body">
           <div v-if="post.reposted_post.content" class="embedded-feed-text">
@@ -2252,13 +2278,44 @@ async function confirmDeletePost() {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.embedded-repost-box:hover {
+  border-color: var(--color-primary, #a66130);
+  background-color: var(--color-primary-100, #fdf8f3);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .embedded-repost-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.5rem;
   font-size: 0.8rem;
+}
+
+.embedded-repost-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.embedded-repost-action-hint {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.72rem;
+  color: var(--color-primary, #a66130);
+  font-weight: 700;
+  white-space: nowrap;
+  opacity: 0.85;
+  transition: opacity 0.15s ease;
+}
+
+.embedded-repost-box:hover .embedded-repost-action-hint {
+  opacity: 1;
+  text-decoration: underline;
 }
 
 .embedded-repost-tag {

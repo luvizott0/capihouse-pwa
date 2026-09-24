@@ -35,7 +35,22 @@ const isOwner = computed(() => {
   return !route.params.username || route.params.username === authStore.user?.username
 })
 
-const user = computed(() => isOwner.value ? authStore.user : profileStore.profile)
+const isProfileLoaded = computed(() => {
+  if (isOwner.value) {
+    return !!authStore.user
+  }
+  return !!profileStore.profile && profileStore.profile.username === route.params.username
+})
+
+const user = computed(() => {
+  if (isOwner.value) {
+    return authStore.user
+  }
+  if (profileStore.profile && profileStore.profile.username === route.params.username) {
+    return profileStore.profile
+  }
+  return null
+})
 
 // Modals state
 const showBannerCropper = ref(false)
@@ -106,16 +121,23 @@ const birthInput = ref('')
 const newInterestInput = ref('')
 
 const wasVisitingOther = ref(false)
+const isLoadingProfile = ref(false)
 
 async function loadProfile() {
-  if (!isOwner.value && route.params.username) {
+  const currentUsername = route.params.username as string | undefined
+  if (!isOwner.value && currentUsername) {
     wasVisitingOther.value = true
-    await profileStore.fetchProfile(route.params.username as string)
-    // Apply the visited user's theme while on their profile page
-    themeStore.loadThemeFromUser(profileStore.profile)
+    isLoadingProfile.value = true
+    try {
+      await profileStore.fetchProfile(currentUsername)
+      if (profileStore.profile && route.params.username === currentUsername) {
+        themeStore.loadThemeFromUser(profileStore.profile)
+      }
+    } finally {
+      isLoadingProfile.value = false
+    }
   } else {
     wasVisitingOther.value = false
-    // Restore own theme when viewing own profile
     themeStore.loadThemeFromUser(authStore.user)
     await authStore.fetchMe()
   }
@@ -602,11 +624,10 @@ const {
 
     <!-- Pinned Post Highlight Section (Below interests, above activities) -->
     <div v-if="user?.pinned_post" class="pinned-post-section">
-      <div class="pinned-post-banner">
-        <div class="pinned-banner-left">
-          <span class="pinned-pin-icon">📌</span>
-          <span class="pinned-banner-title">Publicação Fixada</span>
-        </div>
+      <div class="pinned-post-header">
+        <h2 class="pinned-post-title">
+          » 📌 Publicação Fixada
+        </h2>
         <button
           v-if="isOwner"
           type="button"
@@ -618,7 +639,7 @@ const {
         </button>
       </div>
 
-      <div class="pinned-card-wrapper">
+      <div class="pinned-card-container">
         <GameCard
           v-if="user.pinned_post.entertainment_type === 'game'"
           :post="user.pinned_post"
@@ -1107,11 +1128,26 @@ const {
     />
   </div>
 
-  <div v-else-if="profileStore.isLoading" class="loading-state">
-    Carregando perfil...
+  <div v-else-if="isLoadingProfile || profileStore.isLoading || !isProfileLoaded" class="profile-page-container profile-skeleton-container">
+    <div class="retro-box profile-header-box skeleton-header-card">
+      <div class="skeleton-banner"></div>
+      <div class="profile-bar">
+        <div class="avatar-wrapper">
+          <div class="skeleton-avatar"></div>
+        </div>
+        <div class="profile-info-col">
+          <div class="skeleton-line skeleton-title"></div>
+          <div class="skeleton-line skeleton-handle"></div>
+        </div>
+      </div>
+    </div>
+    <div class="skeleton-stream">
+      <PostCardSkeleton v-for="i in 2" :key="i" />
+    </div>
   </div>
   <div v-else class="retro-box not-found-box">
-    Usuário não encontrado.
+    <p>» Usuário não encontrado.</p>
+    <router-link to="/feed" class="not-found-back">[ Voltar ao Feed ]</router-link>
   </div>
 </template>
 
@@ -2128,71 +2164,126 @@ const {
 }
 
 .pinned-post-section {
-  margin-top: 1.5rem;
-  margin-bottom: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
 }
 
-.pinned-post-banner {
+.pinned-post-header {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  background: linear-gradient(90deg, #fef3c7 0%, #fde68a 100%);
-  border: 1px solid #f59e0b;
-  border-bottom: none;
-  border-radius: 4px 4px 0 0;
-  padding: 0.45rem 0.85rem;
+  align-items: center;
+  background-color: var(--color-primary, #a66130);
+  border: 1px solid var(--color-primary-800, #5f4120);
+  border-radius: 2px;
+  padding: 0.6rem 0.85rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
-.pinned-banner-left {
+.pinned-post-title {
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
   display: flex;
   align-items: center;
-  gap: 0.45rem;
-}
-
-.pinned-pin-icon {
-  font-size: 1rem;
-}
-
-.pinned-banner-title {
-  font-family: var(--font-heading, monospace);
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: #92400e;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  gap: 0.35rem;
 }
 
 .pinned-unpin-btn {
   background: none;
   border: none;
-  color: #b45309;
+  color: #ffffff;
   font-family: var(--font-mono, monospace);
   font-size: 0.78rem;
   font-weight: 700;
   cursor: pointer;
   padding: 0.15rem 0.4rem;
   border-radius: 2px;
+  opacity: 0.9;
   transition: all 0.15s ease;
 }
 
 .pinned-unpin-btn:hover {
-  background-color: rgba(180, 83, 9, 0.15);
-  color: #78350f;
+  background-color: rgba(255, 255, 255, 0.15);
+  opacity: 1;
   text-decoration: underline;
 }
 
-.pinned-card-wrapper {
-  border: 1px solid #f59e0b;
-  border-radius: 0 0 4px 4px;
-  overflow: hidden;
-  background-color: var(--retro-bg-card, #ffffff);
+.pinned-card-container {
+  display: flex;
+  flex-direction: column;
 }
 
-.pinned-card-wrapper :deep(.post-card),
-.pinned-card-wrapper :deep(.film-card),
-.pinned-card-wrapper :deep(.game-card) {
-  margin-bottom: 0;
-  border: none;
-  box-shadow: none;
+/* ── Profile Loading Skeleton ── */
+.profile-skeleton-container {
+  opacity: 0.85;
+}
+
+.skeleton-banner {
+  width: 100%;
+  aspect-ratio: 3 / 1;
+  max-height: 220px;
+  background: linear-gradient(90deg, #e8dfd5 0%, #f3eee8 50%, #e8dfd5 100%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s infinite;
+}
+
+.skeleton-avatar {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  border: 4px solid #ffffff;
+  background: #e8dfd5;
+}
+
+.skeleton-line {
+  background: #e8dfd5;
+  border-radius: 2px;
+}
+
+.skeleton-title {
+  width: 160px;
+  height: 20px;
+  margin-bottom: 8px;
+}
+
+.skeleton-handle {
+  width: 100px;
+  height: 14px;
+}
+
+.skeleton-stream {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.not-found-box {
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  color: var(--color-muted, #847062);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.not-found-back {
+  font-family: var(--font-heading, monospace);
+  color: var(--color-primary, #a66130);
+  font-size: 0.9rem;
+  text-decoration: none;
+  font-weight: 700;
+}
+.not-found-back:hover {
+  text-decoration: underline;
 }
 </style>
