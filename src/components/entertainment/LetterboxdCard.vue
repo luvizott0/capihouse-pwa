@@ -76,10 +76,21 @@ const isPinned = computed(() => {
 })
 
 const isPinning = ref(false)
+const showPostMenu = ref(false)
+
+function togglePostMenu() {
+  showPostMenu.value = !showPostMenu.value
+}
+
+function handleDeletePost() {
+  showPostMenu.value = false
+  showDeleteModal.value = true
+}
 
 async function handleTogglePin() {
   if (isPinning.value) return
   isPinning.value = true
+  showPostMenu.value = false
   try {
     const res = await pinPost(props.post.id)
     authStore.updatePinnedPost(res.data.pinned_post_id, res.data.pinned ? props.post : null)
@@ -314,6 +325,9 @@ function handleDocumentClick(e: MouseEvent) {
   if (target && !target.closest('.comment-menu-wrapper')) {
     activeCommentMenuId.value = null
   }
+  if (target && !target.closest('.post-menu-wrapper')) {
+    showPostMenu.value = false
+  }
 }
 
 onMounted(() => {
@@ -524,17 +538,22 @@ async function handleAddComment() {
 
 <template>
   <article class="letterboxd-card retro-box">
-    <!-- Header: User info (3 lines) + Delete button on opposite side -->
+    <!-- Header: User info + Options menu -->
     <header class="card-header">
       <div class="user-meta">
         <router-link :to="`/profile/${post.user.username}`" class="user-avatar-link">
           <UserAvatar :user="post.user" size="md" />
         </router-link>
         <div class="user-text">
-          <router-link :to="`/profile/${post.user.username}`" class="user-name">
-            {{ post.user.name }}
-          </router-link>
-          <span class="user-handle">@{{ post.user.username }}</span>
+          <div class="user-name-line">
+            <router-link :to="`/profile/${post.user.username}`" class="user-name">
+              {{ post.user.name }}
+            </router-link>
+            <span class="user-handle">@{{ post.user.username }}</span>
+            <span v-if="isPinned" class="pinned-badge" title="Publicação fixada no perfil">
+              📌 Fixado
+            </span>
+          </div>
           <div class="user-sub-line">
             <span class="post-time" :title="post.created_at">
               {{ formatRelativeTime(post.created_at) }}
@@ -548,30 +567,39 @@ async function handleAddComment() {
         </div>
       </div>
 
-      <div class="header-right">
-        <!-- Pin button if post owner -->
+      <!-- Action options for author/admin (3-dots menu) -->
+      <div v-if="isAuthor" class="post-menu-wrapper">
         <button
-          v-if="isPostOwner"
           type="button"
-          class="btn-pin-bracket"
-          :class="{ pinned: isPinned }"
-          :title="isPinned ? 'Desafixar do perfil' : 'Fixar no perfil'"
-          :disabled="isPinning"
-          @click="handleTogglePin"
+          class="post-menu-trigger"
+          title="Mais opções"
+          aria-label="Mais opções"
+          @click.stop="togglePostMenu"
         >
-          {{ isPinned ? '[ 📌 desafixar ]' : '[ 📌 fixar ]' }}
+          ⋮
         </button>
-
-        <!-- Delete button if author/admin: Red with brackets side by side -->
-        <button
-          v-if="isAuthor"
-          type="button"
-          class="btn-delete-bracket"
-          title="Excluir post"
-          @click="showDeleteModal = true"
+        <div
+          v-if="showPostMenu"
+          class="post-dropdown-menu"
+          @click.stop
         >
-          [ x ]
-        </button>
+          <button
+            v-if="isPostOwner"
+            type="button"
+            class="post-menu-item pin-item"
+            :disabled="isPinning"
+            @click="handleTogglePin"
+          >
+            <span class="item-icon">📌</span> {{ isPinned ? 'Desafixar do perfil' : 'Fixar no perfil' }}
+          </button>
+          <button
+            type="button"
+            class="post-menu-item delete-item"
+            @click="handleDeletePost"
+          >
+            <span class="item-icon">×</span> Excluir
+          </button>
+        </div>
       </div>
     </header>
 
@@ -1035,70 +1063,109 @@ async function handleAddComment() {
   color: #a0aec0;
 }
 
-.header-right {
+.user-name-line {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
 }
 
-.letterboxd-badge {
+.pinned-badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  background-color: #ffedd5;
-  color: #c2410c;
-  border: 1px solid #fed7aa;
-  padding: 0.1rem 0.45rem;
+  gap: 0.2rem;
+  background-color: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+  padding: 0.1rem 0.4rem;
   border-radius: 2px;
   font-size: 0.72rem;
-  font-weight: 600;
+  font-weight: 700;
   font-family: var(--font-mono, monospace);
   line-height: 1.2;
 }
 
-.badge-icon {
+.post-menu-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: 0.5rem;
+}
+
+.post-menu-trigger {
+  background: none;
+  border: 1px solid transparent;
+  color: var(--color-muted, #8c7e72);
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 1.15rem;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  transition: all 0.15s ease;
+}
+
+.post-menu-trigger:hover {
+  color: var(--color-primary-800, #5f4120);
+  background-color: var(--color-primary-50, #f8f6f1);
+  border-color: var(--color-border, #d8cdc5);
+}
+
+.post-dropdown-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  background: var(--color-bg, #ffffff);
+  border: 1px solid var(--color-border, #d8cdc5);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.14);
+  border-radius: 2px;
+  z-index: 30;
+  min-width: 100px;
+  display: flex;
+  flex-direction: column;
+  padding: 0.25rem 0;
+}
+
+.post-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.65rem;
+  font-family: var(--font-heading, 'Space Mono', monospace);
   font-size: 0.75rem;
+  font-weight: bold;
+  background: none;
+  border: none;
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.1s ease;
+}
+
+.post-menu-item .item-icon {
+  font-size: 0.85rem;
   line-height: 1;
 }
 
-.btn-pin-bracket {
-  background: none;
-  border: none;
-  color: var(--color-primary-700, #5c4028);
-  font-family: var(--font-mono, monospace);
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0.2rem 0.4rem;
-  border-radius: 2px;
-  transition: all 0.15s ease;
-  white-space: nowrap;
+.post-menu-item.pin-item {
+  color: var(--color-primary-800, #4a3b2c);
 }
-.btn-pin-bracket:hover {
-  color: var(--color-primary-900, #3d2a14);
+.post-menu-item.pin-item:hover {
   background-color: var(--retro-bg-hover, #f1ece4);
 }
-.btn-pin-bracket.pinned {
-  color: #b45309;
-  font-weight: 700;
-}
 
-.btn-delete-bracket {
-  background: none;
-  border: none;
-  color: #e53e3e;
-  font-family: var(--font-mono, monospace);
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0.2rem 0.4rem;
-  border-radius: 2px;
-  transition: all 0.15s ease;
-  white-space: nowrap;
+.post-menu-item.delete-item {
+  color: var(--color-danger, #ef4444);
 }
-.btn-delete-bracket:hover {
-  color: #c53030;
-  background-color: #fff5f5;
-  text-decoration: underline;
+.post-menu-item.delete-item:hover {
+  background-color: #fee2e2;
 }
 
 /* Main Film Container */
