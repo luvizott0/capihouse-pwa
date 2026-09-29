@@ -4,6 +4,7 @@ import type { User } from '@/types/models'
 import { connectLetterboxd, disconnectLetterboxd, syncLetterboxd } from '@/api/letterboxd'
 import { connectXbox, disconnectXbox, syncXbox } from '@/api/xbox'
 import { getSpotifyAuthUrl, disconnectSpotify } from '@/api/spotify'
+import { connectLastfm, disconnectLastfm } from '@/api/lastfm'
 import { formatRelativeTime } from '@/utils/date'
 import { useAuthStore } from '@/stores/auth'
 
@@ -24,6 +25,13 @@ const isConnectingSpotify = ref(false)
 const isDisconnectingSpotify = ref(false)
 const spotifyMessage = ref('')
 const spotifyError = ref('')
+
+// Last.fm State
+const lastfmInput = ref('')
+const isConnectingLastfm = ref(false)
+const isDisconnectingLastfm = ref(false)
+const lastfmMessage = ref('')
+const lastfmError = ref('')
 
 // Letterboxd State
 const letterboxdInput = ref('')
@@ -63,6 +71,9 @@ watch(() => props.modelValue, (isOpen) => {
     xboxError.value = ''
     spotifyMessage.value = ''
     spotifyError.value = ''
+    lastfmInput.value = ''
+    lastfmMessage.value = ''
+    lastfmError.value = ''
   }
 })
 
@@ -267,6 +278,45 @@ async function handleDisconnectSpotify() {
     isDisconnectingSpotify.value = false
   }
 }
+
+// Last.fm Handlers
+async function handleConnectLastfm() {
+  if (!lastfmInput.value.trim()) return
+  isConnectingLastfm.value = true
+  lastfmError.value = ''
+  lastfmMessage.value = ''
+  try {
+    const res = await connectLastfm(lastfmInput.value.trim())
+    emit('userUpdated', res.data.user)
+    if (authStore.user) {
+      authStore.user = res.data.user
+    }
+    lastfmMessage.value = res.data.message
+    lastfmInput.value = ''
+  } catch (err: any) {
+    lastfmError.value = err.response?.data?.message || 'Erro ao conectar conta do Last.fm.'
+  } finally {
+    isConnectingLastfm.value = false
+  }
+}
+
+async function handleDisconnectLastfm() {
+  isDisconnectingLastfm.value = true
+  lastfmError.value = ''
+  lastfmMessage.value = ''
+  try {
+    const res = await disconnectLastfm()
+    emit('userUpdated', res.data.user)
+    if (authStore.user) {
+      authStore.user = res.data.user
+    }
+    lastfmMessage.value = res.data.message
+  } catch (err: any) {
+    lastfmError.value = err.response?.data?.message || 'Erro ao desconectar conta do Last.fm.'
+  } finally {
+    isDisconnectingLastfm.value = false
+  }
+}
 </script>
 
 <template>
@@ -465,8 +515,9 @@ async function handleDisconnectSpotify() {
           </div>
         </div>
 
-        <!-- ======================= SPOTIFY ======================= -->
-        <div class="account-card spotify-theme">
+        <!-- ======================= SPOTIFY (OCULTO TEMPORARIAMENTE) ======================= -->
+        <!-- Ocultado no app por enquanto, utilizando Last.fm para scrobble sem limites -->
+        <div v-if="false" class="account-card spotify-theme">
           <div class="account-card-header">
             <div class="brand-row">
               <span class="brand-badge-icon spotify-icon">
@@ -530,6 +581,92 @@ async function handleDisconnectSpotify() {
             </div>
             <p class="account-hint">
               Sua música atual aparecerá automaticamente para os outros membros da casa enquanto você estiver ouvindo.
+            </p>
+          </div>
+        </div>
+
+        <!-- ======================= LAST.FM ======================= -->
+        <div class="account-card lastfm-theme">
+          <div class="account-card-header">
+            <div class="brand-row">
+              <span class="brand-badge-icon lastfm-icon">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="#D51007">
+                  <path d="M12.001 0C5.372 0 0 5.372 0 12c0 6.627 5.372 12 12.001 12 6.627 0 11.999-5.373 11.999-12 0-6.628-5.372-12-11.999-12zm2.146 15.688c-1.077 0-1.748-.567-2.34-1.57-.497-.84-1.259-2.614-2.147-2.614-.803 0-1.16.54-1.16 1.458 0 1.258.647 1.838 1.542 1.838.742 0 1.348-.37 1.764-.98l1.32.84c-.66 1.054-1.734 1.63-3.134 1.63-2.11 0-3.32-1.353-3.32-3.344 0-1.92 1.25-3.313 3.12-3.313 1.558 0 2.502.943 3.23 2.298.634 1.185 1.05 1.564 1.644 1.564.558 0 .97-.37.97-.99 0-.756-.474-1.31-1.393-1.684l.58-1.517c1.472.56 2.378 1.57 2.378 2.983 0 1.76-1.155 2.895-2.484 2.895z"/>
+                </svg>
+              </span>
+              <div class="brand-info">
+                <div class="brand-name-status">
+                  <h4 class="brand-name">Last.fm</h4>
+                  <span v-if="user.has_lastfm_connected" class="status-badge connected lastfm-connected">
+                    ● Conectado
+                  </span>
+                  <span v-else class="status-badge disconnected">
+                    ○ Não vinculado
+                  </span>
+                </div>
+                <div v-if="user.has_lastfm_connected" class="account-username">
+                  Usuário: <strong>@{{ user.lastfm_username }}</strong>
+                  <a
+                    :href="`https://www.last.fm/user/${user.lastfm_username}`"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="account-link"
+                  >
+                    Ver perfil ↗
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Banners de feedback -->
+          <div v-if="lastfmMessage" class="feedback-banner success">
+            {{ lastfmMessage }}
+          </div>
+          <div v-if="lastfmError" class="feedback-banner error">
+            {{ lastfmError }}
+          </div>
+
+          <!-- Ação quando não conectado -->
+          <div v-if="!user.has_lastfm_connected" class="connect-action-area">
+            <form class="connect-form" @submit.prevent="handleConnectLastfm">
+              <div class="form-row">
+                <input
+                  v-model="lastfmInput"
+                  type="text"
+                  class="retro-input"
+                  placeholder="Nome de usuário do Last.fm"
+                  autocomplete="off"
+                  :disabled="isConnectingLastfm"
+                />
+                <button
+                  type="submit"
+                  class="retro-action-btn lastfm-action-btn"
+                  :disabled="isConnectingLastfm || !lastfmInput.trim()"
+                >
+                  {{ isConnectingLastfm ? 'Conectando...' : 'Conectar' }}
+                </button>
+              </div>
+              <p class="account-hint">
+                Ideal para sincronizar o que você escuta no <strong>Spotify</strong>, <strong>Deezer</strong>, <strong>Apple Music</strong> ou <strong>YouTube Music</strong> sem limitação de vagas de desenvolvedor!
+              </p>
+            </form>
+          </div>
+
+          <!-- Ações quando conectado -->
+          <div v-else class="connected-action-area">
+            <div class="buttons-row">
+              <button
+                type="button"
+                class="retro-action-btn danger"
+                :disabled="isDisconnectingLastfm"
+                @click="handleDisconnectLastfm"
+              >
+                {{ isDisconnectingLastfm ? 'Desconectando...' : 'Desconectar Last.fm' }}
+              </button>
+            </div>
+            <p class="account-hint">
+              Suas reproduções atuais e recentes do Last.fm aparecerão automaticamente no card musical do seu perfil.
             </p>
           </div>
         </div>
@@ -1028,5 +1165,29 @@ async function handleDisconnectSpotify() {
 
 .spotify-action-btn:hover:not(:disabled) {
   background-color: #1aa34a;
+}
+
+/* Last.fm Card Styles */
+.account-card.lastfm-theme {
+  border-left: 4px solid #d51007;
+}
+
+.lastfm-connected {
+  color: #991b1b !important;
+  background-color: #fee2e2 !important;
+}
+
+.lastfm-action-btn {
+  background-color: #d51007;
+  color: #ffffff;
+  border-color: #b91c1c;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.lastfm-action-btn:hover:not(:disabled) {
+  background-color: #b91c1c;
 }
 </style>

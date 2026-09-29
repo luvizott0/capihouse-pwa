@@ -37,12 +37,35 @@ const isPlaying = computed(() => {
   return !!nowPlaying.value?.is_playing && !!nowPlaying.value?.title
 })
 
+const hasMusicService = computed(() => {
+  return !!props.user?.has_spotify_connected || !!props.user?.has_lastfm_connected
+})
+
+const isLastFm = computed(() => {
+  return nowPlaying.value?.source === 'lastfm' || (!props.user?.has_spotify_connected && !!props.user?.has_lastfm_connected)
+})
+
+const headerTitle = computed(() => {
+  return isPlaying.value ? '» Ouvindo Agora no Spotify' : '» Última Tocada no Spotify'
+})
+
+const listenUrl = computed(() => {
+  return nowPlaying.value?.spotify_url || nowPlaying.value?.url || null
+})
+
+const listenLabel = computed(() => {
+  if (listenUrl.value?.includes('last.fm')) {
+    return 'Ver no Last.fm ↗'
+  }
+  return 'Ouvir no Spotify ↗'
+})
+
 const shouldShowCard = computed(() => {
-  return !!props.user?.has_spotify_connected && !!nowPlaying.value?.title
+  return hasMusicService.value && !!nowPlaying.value?.title
 })
 
 async function fetchStatus() {
-  if (!props.user?.has_spotify_connected || !props.user.username) {
+  if (!hasMusicService.value || !props.user.username) {
     nowPlaying.value = null
     return
   }
@@ -99,15 +122,15 @@ function stopPolling() {
 }
 
 function handleVisibilityChange() {
-  if (!document.hidden && props.user?.has_spotify_connected) {
+  if (!document.hidden && hasMusicService.value) {
     fetchStatus()
   }
 }
 
 watch(
-  () => [props.user.username, props.user.has_spotify_connected],
-  ([newUsername, hasSpotify]) => {
-    if (hasSpotify && newUsername) {
+  () => [props.user.username, props.user.has_spotify_connected, props.user.has_lastfm_connected],
+  ([newUsername]) => {
+    if (hasMusicService.value && newUsername) {
       startPolling()
       startTicker()
     } else {
@@ -121,7 +144,7 @@ watch(
 
 onMounted(() => {
   document.addEventListener('visibilitychange', handleVisibilityChange)
-  if (props.user.has_spotify_connected) {
+  if (hasMusicService.value) {
     startPolling()
     startTicker()
   }
@@ -146,7 +169,7 @@ onUnmounted(() => {
             </svg>
           </span>
           <span class="header-title">
-            {{ isPlaying ? '» Ouvindo Agora no Spotify' : '» Última Tocada no Spotify' }}
+            {{ headerTitle }}
           </span>
         </div>
 
@@ -205,8 +228,8 @@ onUnmounted(() => {
               </p>
             </div>
 
-            <!-- Barra de Progresso em Tempo Real (se tocando) -->
-            <div v-if="isPlaying" class="progress-section">
+            <!-- Barra de Progresso em Tempo Real (se tocando e tem duração) -->
+            <div v-if="isPlaying && nowPlaying.duration_ms" class="progress-section">
               <div class="progress-track-bar">
                 <div
                   class="progress-fill-bar"
@@ -220,23 +243,23 @@ onUnmounted(() => {
             </div>
 
             <!-- Info de última reprodução (se pausado/recente) -->
-            <div v-else class="recent-time-info">
-              <span class="track-duration-tag">⏱️ {{ formatTime(nowPlaying.duration_ms) }}</span>
+            <div v-else-if="!isPlaying" class="recent-time-info">
+              <span v-if="nowPlaying.duration_ms" class="track-duration-tag">⏱️ {{ formatTime(nowPlaying.duration_ms) }}</span>
               <span v-if="nowPlaying.played_at" class="track-played-at">
                 • Ouvida {{ formatRelativeTime(nowPlaying.played_at) }}
               </span>
             </div>
 
-            <!-- Ações: Link Spotify + Repostar no feed -->
+            <!-- Ações: Link Spotify / Last.fm + Repostar no feed -->
             <div class="track-actions">
               <a
-                v-if="nowPlaying.spotify_url"
-                :href="nowPlaying.spotify_url"
+                v-if="listenUrl"
+                :href="listenUrl"
                 target="_blank"
                 rel="noopener noreferrer"
                 class="spotify-listen-btn"
               >
-                <span>Ouvir no Spotify ↗</span>
+                <span>{{ listenLabel }}</span>
               </a>
               <button
                 type="button"
@@ -260,9 +283,9 @@ onUnmounted(() => {
 }
 
 .now-playing-box {
-  border-color: #1db954;
-  box-shadow: 2px 2px 0px rgba(29, 185, 84, 0.4);
+  border: 2px solid var(--color-border, #D8CDC5);
   background: var(--bg-card, #ffffff);
+  border-radius: 2px;
   overflow: hidden;
 }
 

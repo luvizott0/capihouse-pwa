@@ -16,12 +16,15 @@ export interface SpotifyTrack {
   spotify_url?: string | null
   preview_url?: string | null
   duration_ms?: number | null
+  source?: 'spotify' | 'lastfm'
 }
 
 export interface SpotifyNowPlaying {
   is_playing: boolean
   is_recent?: boolean
   has_spotify?: boolean
+  has_lastfm?: boolean
+  source?: 'spotify' | 'lastfm'
   played_at?: string | null
   track_id?: string | null
   title?: string
@@ -29,6 +32,7 @@ export interface SpotifyNowPlaying {
   album?: string
   album_art?: string | null
   spotify_url?: string | null
+  url?: string | null
   progress_ms?: number
   duration_ms?: number
   preview_url?: string | null
@@ -40,6 +44,7 @@ export interface SpotifyOnlineTrack {
   title: string
   artist: string
   spotify_url?: string | null
+  source?: 'spotify' | 'lastfm'
 }
 
 export interface User {
@@ -59,6 +64,8 @@ export interface User {
   spotify_display_name?: string | null
   spotify_avatar_url?: string | null
   spotify_profile_url?: string | null
+  lastfm_username?: string | null
+  has_lastfm_connected?: boolean
   favorite_music?: SpotifyTrack | null
   spotify_current_track?: SpotifyOnlineTrack | null
   letterboxd_username?: string | null

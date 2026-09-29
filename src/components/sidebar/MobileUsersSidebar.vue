@@ -29,7 +29,8 @@ const selfSpotifyTrack = computed(() => {
 })
 
 async function checkSelfSpotify() {
-  if (authStore.user?.has_spotify_connected && authStore.user.username) {
+  const hasMusic = authStore.user?.has_spotify_connected || authStore.user?.has_lastfm_connected
+  if (hasMusic && authStore.user?.username) {
     try {
       const res = await getUserSpotifyStatus(authStore.user.username)
       if (res.data.is_playing && res.data.title) {
@@ -38,13 +39,15 @@ async function checkSelfSpotify() {
             is_playing: true,
             title: res.data.title || '',
             artist: res.data.artist || '',
-            spotify_url: res.data.spotify_url || null,
+            spotify_url: res.data.spotify_url || res.data.url || null,
+            source: res.data.source || 'spotify',
           }
         } else {
           authStore.user.spotify_current_track.is_playing = true
           authStore.user.spotify_current_track.title = res.data.title || ''
           authStore.user.spotify_current_track.artist = res.data.artist || ''
-          authStore.user.spotify_current_track.spotify_url = res.data.spotify_url || null
+          authStore.user.spotify_current_track.spotify_url = res.data.spotify_url || res.data.url || null
+          authStore.user.spotify_current_track.source = res.data.source || 'spotify'
         }
       } else if (authStore.user.spotify_current_track) {
         authStore.user.spotify_current_track.is_playing = false
