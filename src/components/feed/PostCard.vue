@@ -630,9 +630,11 @@ async function confirmDeletePost() {
         <div class="music-card-title-row">
           <span class="music-card-track" :title="post.metadata.track_title || undefined">{{ post.metadata.track_title }}</span>
         </div>
-        <span class="music-card-artist" :title="post.metadata.track_artist || undefined">{{ post.metadata.track_artist }}</span>
-        <span v-if="post.metadata.track_album" class="music-card-album" :title="post.metadata.track_album || undefined">
-          Álbum: <em>{{ post.metadata.track_album }}</em>
+        <span class="music-card-artist" :title="post.metadata.track_artist || post.metadata.artist || undefined">
+          {{ post.metadata.track_artist || post.metadata.artist }}
+        </span>
+        <span v-if="post.metadata.track_album || post.metadata.album" class="music-card-album" :title="post.metadata.track_album || post.metadata.album || undefined">
+          Álbum: <em>{{ post.metadata.track_album || post.metadata.album }}</em>
         </span>
         <div class="music-card-footer">
           <a
@@ -700,12 +702,12 @@ async function confirmDeletePost() {
           <div class="embedded-details">
             <div class="embedded-title-row">
               <span class="embedded-film-title">{{ post.reposted_post.metadata?.track_title || post.reposted_post.metadata?.film_title || post.reposted_post.metadata?.game_title }}</span>
-              <span v-if="post.reposted_post.metadata?.track_artist" class="embedded-film-year">• {{ post.reposted_post.metadata.track_artist }}</span>
+              <span v-if="post.reposted_post.metadata?.track_artist || post.reposted_post.metadata?.artist" class="embedded-film-year">• {{ post.reposted_post.metadata.track_artist || post.reposted_post.metadata.artist }}</span>
               <span v-else-if="post.reposted_post.metadata?.film_year" class="embedded-film-year">({{ post.reposted_post.metadata.film_year }})</span>
               <span v-else-if="post.reposted_post.metadata?.platform" class="embedded-film-year">[{{ post.reposted_post.metadata.platform }}]</span>
             </div>
-            <p v-if="post.reposted_post.metadata?.track_album" class="embedded-track-album">
-              Álbum: <em>{{ post.reposted_post.metadata.track_album }}</em>
+            <p v-if="post.reposted_post.metadata?.track_album || post.reposted_post.metadata?.album" class="embedded-track-album">
+              Álbum: <em>{{ post.reposted_post.metadata.track_album || post.reposted_post.metadata.album }}</em>
             </p>
             <div v-if="post.reposted_post.metadata?.rating" class="embedded-rating">
               <span class="embedded-stars">{{ renderRatingStars(post.reposted_post.metadata.rating) }}</span>
@@ -2584,27 +2586,25 @@ async function confirmDeletePost() {
   background-color: var(--retro-bg-hover, #f1ece4);
 }
 
-/* Post Music Card (Spotify) */
+/* Post Music Card (Spotify / Last.fm) */
 .post-music-card {
   display: flex;
   gap: 0.85rem;
   align-items: center;
   margin: 0.6rem 0.75rem 0.75rem;
   padding: 0.75rem 0.85rem;
-  background-color: #fbfbfb;
-  border: 1px solid #1db954;
-  border-left: 4px solid #1db954;
+  background-color: var(--color-primary-50, #f8f6f1);
+  border: 1px solid var(--color-border, #d8cdc5);
   border-radius: 4px;
-  box-shadow: 2px 2px 0px rgba(29, 185, 84, 0.2);
 }
 
 .music-card-stage {
   flex-shrink: 0;
   width: 58px;
   height: 58px;
-  border-radius: 3px;
+  border-radius: 2px;
   overflow: hidden;
-  border: 1px solid rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--color-border, #d8cdc5);
   background-color: #222;
 }
 

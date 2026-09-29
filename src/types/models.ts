@@ -208,11 +208,13 @@ export interface EntertainmentMetadata {
   xbox_title_id?: string | null
   hours_played?: number | null
 
-  // Music (Spotify)
+  // Music (Spotify / Last.fm)
   track_id?: string | null
   track_title?: string | null
   track_artist?: string | null
+  artist?: string | null
   track_album?: string | null
+  album?: string | null
   album_art?: string | null
   spotify_url?: string | null
   preview_url?: string | null

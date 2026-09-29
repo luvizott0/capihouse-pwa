@@ -597,7 +597,7 @@ async function handleDisconnectLastfm() {
               <div class="brand-info">
                 <div class="brand-name-status">
                   <h4 class="brand-name">Last.fm</h4>
-                  <span v-if="user.has_lastfm_connected" class="status-badge connected lastfm-connected">
+                  <span v-if="user.has_lastfm_connected" class="status-badge connected">
                     ● Conectado
                   </span>
                   <span v-else class="status-badge disconnected">
@@ -1170,11 +1170,6 @@ async function handleDisconnectLastfm() {
 /* Last.fm Card Styles */
 .account-card.lastfm-theme {
   border-left: 4px solid #d51007;
-}
-
-.lastfm-connected {
-  color: #991b1b !important;
-  background-color: #fee2e2 !important;
 }
 
 .lastfm-action-btn {
