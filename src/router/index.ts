@@ -108,11 +108,28 @@ const router = createRouter({
           meta: { requiresAdmin: true }
         }
       ]
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      redirect: (to) => {
+        const normalized = to.path.replace(/\/+/g, '/')
+        if (normalized !== to.path) {
+          return { path: normalized, query: to.query, hash: to.hash }
+        }
+        const auth = useAuthStore()
+        return auth.isAuthenticated ? '/feed' : '/login'
+      }
     }
   ]
 })
 
 router.beforeEach(async (to, from, next) => {
+  // Normaliza caminhos com barras duplas (ex: //profile -> /profile)
+  if (to.path.startsWith('//') || to.path.includes('//')) {
+    const normalized = to.path.replace(/\/+/g, '/')
+    return next({ path: normalized, query: to.query, hash: to.hash, replace: true })
+  }
+
   const auth = useAuthStore()
 
   // If we have a token stored but no user object, fetch the profile

@@ -5,7 +5,10 @@ import type { User, SpotifyTrack, SpotifyNowPlaying } from '@/types/models'
  * Obtém a URL para autorização com o Spotify via OAuth 2.0.
  */
 export async function getSpotifyAuthUrl() {
-  return apiClient.get<{ url: string }>('/spotify/auth-url')
+  const origin = typeof window !== 'undefined' ? window.location.origin : undefined
+  return apiClient.get<{ url: string }>('/spotify/auth-url', {
+    params: origin ? { frontend_url: origin } : {}
+  })
 }
 
 /**

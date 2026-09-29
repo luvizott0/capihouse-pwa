@@ -181,9 +181,19 @@ const isLoadingProfile = ref(false)
 async function loadProfile() {
   if (route.query.spotify === 'connected') {
     await authStore.fetchMe()
+    showNotice('» Spotify Conectado', 'Sua conta do Spotify foi conectada com sucesso!')
     const newQuery = { ...route.query }
     delete newQuery.spotify
-    router.replace({ query: newQuery })
+    router.replace({ path: route.path.replace(/\/+/g, '/'), query: newQuery })
+  } else if (route.query.spotify_error) {
+    const errType = route.query.spotify_error as string
+    const errMsg = errType === 'access_denied'
+      ? 'A autorização foi cancelada no Spotify.'
+      : 'Não foi possível conectar com sua conta do Spotify. Tente novamente.'
+    showNotice('» Conexão Spotify', errMsg)
+    const newQuery = { ...route.query }
+    delete newQuery.spotify_error
+    router.replace({ path: route.path.replace(/\/+/g, '/'), query: newQuery })
   }
 
   const currentUsername = route.params.username as string | undefined
@@ -1686,7 +1696,7 @@ const {
   align-items: center;
   gap: 0.5rem;
   margin-top: 0.2rem;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .pinned-music-spotify-link {
@@ -1696,6 +1706,8 @@ const {
   text-decoration: none;
   display: inline-flex;
   align-items: center;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .pinned-music-spotify-link:hover {
@@ -1715,6 +1727,8 @@ const {
   display: inline-flex;
   align-items: center;
   gap: 0.2rem;
+  white-space: nowrap;
+  flex-shrink: 0;
   transition: all 0.15s ease;
   font-family: var(--font-heading, monospace);
 }

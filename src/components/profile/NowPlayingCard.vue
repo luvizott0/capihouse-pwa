@@ -244,7 +244,7 @@ onUnmounted(() => {
                 title="Compartilhar esta música no feed"
                 @click="emit('repost', nowPlaying)"
               >
-                <span>🔁 Repostar no Feed</span>
+                <span>🔁 Repostar</span>
               </button>
             </div>
           </div>
@@ -537,8 +537,8 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  margin-top: 0.2rem;
-  flex-wrap: wrap;
+  margin-top: 0.25rem;
+  flex-wrap: nowrap;
 }
 
 .spotify-listen-btn {
@@ -549,6 +549,8 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 0.2rem;
+  white-space: nowrap;
+  flex-shrink: 0;
   transition: color 0.15s;
 }
 
@@ -569,6 +571,8 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
+  white-space: nowrap;
+  flex-shrink: 0;
   transition: all 0.15s ease;
   font-family: var(--font-heading, monospace);
 }
