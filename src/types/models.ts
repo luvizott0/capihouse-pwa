@@ -7,6 +7,38 @@ export interface UserTheme {
   color_primary?: string
 }
 
+export interface SpotifyTrack {
+  id?: string | null
+  title: string
+  artist: string
+  album?: string | null
+  album_art?: string | null
+  spotify_url?: string | null
+  preview_url?: string | null
+  duration_ms?: number | null
+}
+
+export interface SpotifyNowPlaying {
+  is_playing: boolean
+  track_id?: string | null
+  title?: string
+  artist?: string
+  album?: string
+  album_art?: string | null
+  spotify_url?: string | null
+  progress_ms?: number
+  duration_ms?: number
+  preview_url?: string | null
+  fetched_at?: number
+}
+
+export interface SpotifyOnlineTrack {
+  is_playing: boolean
+  title: string
+  artist: string
+  spotify_url?: string | null
+}
+
 export interface User {
   id: number
   name: string
@@ -20,6 +52,12 @@ export interface User {
   birth: string | null
   instagram: string | null
   spotify: string | null
+  has_spotify_connected?: boolean
+  spotify_display_name?: string | null
+  spotify_avatar_url?: string | null
+  spotify_profile_url?: string | null
+  favorite_music?: SpotifyTrack | null
+  spotify_current_track?: SpotifyOnlineTrack | null
   letterboxd_username?: string | null
   letterboxd_last_synced_at?: string | null
   letterboxd_is_syncing?: boolean

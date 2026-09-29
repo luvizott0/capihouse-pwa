@@ -16,12 +16,16 @@ import PostCardSkeleton from '@/components/feed/PostCardSkeleton.vue'
 import LetterboxdCard from '@/components/entertainment/LetterboxdCard.vue'
 import GameCard from '@/components/entertainment/GameCard.vue'
 import ConnectedAccountsModal from '@/components/profile/ConnectedAccountsModal.vue'
+import NowPlayingCard from '@/components/profile/NowPlayingCard.vue'
+import MusicSearchModal from '@/components/profile/MusicSearchModal.vue'
 import { formatBirthDate } from '@/utils/date'
 import { usePwaUpdate } from '@/composables/usePwaUpdate'
 import { useWebPush } from '@/composables/useWebPush'
 import PullToRefreshIndicator from '@/components/ui/PullToRefreshIndicator.vue'
 import { usePullToRefresh } from '@/composables/usePullToRefresh'
 import { pinPost } from '@/api/posts'
+import { updateFavoriteMusic, removeFavoriteMusic } from '@/api/spotify'
+import type { SpotifyTrack } from '@/types/models'
 
 const route = useRoute()
 const router = useRouter()
@@ -120,10 +124,52 @@ const birthInput = ref('')
 // New interest input
 const newInterestInput = ref('')
 
+// Favorite Music modal & handlers
+const isMusicSearchModalOpen = ref(false)
+
+function openMusicSearchModal() {
+  isMusicSearchModalOpen.value = true
+}
+
+async function handleSelectFavoriteMusic(track: SpotifyTrack) {
+  try {
+    const res = await updateFavoriteMusic(track)
+    if (res.data.user) {
+      authStore.user = res.data.user
+      if (profileStore.profile && profileStore.profile.id === res.data.user.id) {
+        profileStore.profile = res.data.user
+      }
+    }
+  } catch (err) {
+    console.error('Erro ao atualizar música favorita:', err)
+  }
+}
+
+async function handleRemoveFavoriteMusic() {
+  try {
+    const res = await removeFavoriteMusic()
+    if (res.data.user) {
+      authStore.user = res.data.user
+      if (profileStore.profile && profileStore.profile.id === res.data.user.id) {
+        profileStore.profile = res.data.user
+      }
+    }
+  } catch (err) {
+    console.error('Erro ao remover música favorita:', err)
+  }
+}
+
 const wasVisitingOther = ref(false)
 const isLoadingProfile = ref(false)
 
 async function loadProfile() {
+  if (route.query.spotify === 'connected') {
+    await authStore.fetchMe()
+    const newQuery = { ...route.query }
+    delete newQuery.spotify
+    router.replace({ query: newQuery })
+  }
+
   const currentUsername = route.params.username as string | undefined
   if (!isOwner.value && currentUsername) {
     wasVisitingOther.value = true
@@ -527,61 +573,127 @@ const {
 
     <!-- Personal Info (Sobre mim + Interesses) -->
     <div class="profile-sections-grid">
-      <!-- Sobre Mim -->
-      <div class="retro-box section-box">
-        <div class="box-header">
-          » Sobre mim
-        </div>
-        <div class="box-body">
-          <!-- Bio -->
-          <div class="info-block">
-            <div class="block-title-row">
-              <span class="block-label">BIO</span>
-              <button v-if="isOwner && !isEditingBio" type="button" class="edit-icon-btn" @click="startEditBio" title="Editar bio">
-                ✏️
-              </button>
-            </div>
+      <!-- Coluna Esquerda: Ouvindo Agora + Sobre Mim -->
+      <div class="profile-left-col">
+        <!-- Card Ouvindo Agora (aparece se tiver Spotify conectado e estiver tocando) -->
+        <NowPlayingCard v-if="user" :user="user" />
 
-            <!-- Bio edit mode -->
-            <div v-if="isEditingBio" class="inline-editor">
-              <textarea
-                v-model="bioInput"
-                class="retro-textarea"
-                rows="3"
-                maxlength="255"
-                placeholder="Diga algo sobre você..."
-              ></textarea>
-              <div class="editor-buttons">
-                <button type="button" class="btn-save" @click="saveBio">[ Salvar ]</button>
-                <button type="button" class="btn-cancel" @click="isEditingBio = false">Cancelar</button>
-              </div>
-            </div>
-            <!-- Bio read mode -->
-            <div v-else class="bio-text">
-              "{{ user.bio || 'Diga algo sobre você...' }}"
-            </div>
+        <!-- Sobre Mim -->
+        <div class="retro-box section-box">
+          <div class="box-header">
+            » Sobre mim
           </div>
+          <div class="box-body">
+            <!-- Bio -->
+            <div class="info-block">
+              <div class="block-title-row">
+                <span class="block-label">BIO</span>
+                <button v-if="isOwner && !isEditingBio" type="button" class="edit-icon-btn" @click="startEditBio" title="Editar bio">
+                  ✏️
+                </button>
+              </div>
 
-          <!-- Birthday -->
-          <div class="info-block">
-            <div class="block-title-row">
-              <span class="block-label">🎂 ANIVERSÁRIO</span>
-              <button v-if="isOwner && !isEditingBirth" type="button" class="edit-icon-btn" @click="startEditBirth" title="Editar aniversário">
-                ✏️
-              </button>
-            </div>
-
-            <!-- Birth edit mode -->
-            <div v-if="isEditingBirth" class="inline-editor">
-              <input v-model="birthInput" type="date" class="retro-field" />
-              <div class="editor-buttons">
-                <button type="button" class="btn-save" @click="saveBirth">[ Salvar ]</button>
-                <button type="button" class="btn-cancel" @click="isEditingBirth = false">Cancelar</button>
+              <!-- Bio edit mode -->
+              <div v-if="isEditingBio" class="inline-editor">
+                <textarea
+                  v-model="bioInput"
+                  class="retro-textarea"
+                  rows="3"
+                  maxlength="255"
+                  placeholder="Diga algo sobre você..."
+                ></textarea>
+                <div class="editor-buttons">
+                  <button type="button" class="btn-save" @click="saveBio">[ Salvar ]</button>
+                  <button type="button" class="btn-cancel" @click="isEditingBio = false">Cancelar</button>
+                </div>
+              </div>
+              <!-- Bio read mode -->
+              <div v-else class="bio-text">
+                "{{ user.bio || 'Diga algo sobre você...' }}"
               </div>
             </div>
-            <!-- Birth read mode -->
-            <div v-else class="info-text">
-              {{ user.birth ? formatBirthDate(user.birth) : 'Aniversário não informado' }}
+
+            <!-- Birthday -->
+            <div class="info-block">
+              <div class="block-title-row">
+                <span class="block-label">🎂 ANIVERSÁRIO</span>
+                <button v-if="isOwner && !isEditingBirth" type="button" class="edit-icon-btn" @click="startEditBirth" title="Editar aniversário">
+                  ✏️
+                </button>
+              </div>
+
+              <!-- Birth edit mode -->
+              <div v-if="isEditingBirth" class="inline-editor">
+                <input v-model="birthInput" type="date" class="retro-field" />
+                <div class="editor-buttons">
+                  <button type="button" class="btn-save" @click="saveBirth">[ Salvar ]</button>
+                  <button type="button" class="btn-cancel" @click="isEditingBirth = false">Cancelar</button>
+                </div>
+              </div>
+              <!-- Birth read mode -->
+              <div v-else class="info-text">
+                {{ user.birth ? formatBirthDate(user.birth) : 'Aniversário não informado' }}
+              </div>
+            </div>
+
+            <!-- Minha Música -->
+            <div class="info-block">
+              <div class="block-title-row">
+                <span class="block-label">🎵 MINHA MÚSICA</span>
+                <div v-if="isOwner" class="music-action-buttons">
+                  <button
+                    type="button"
+                    class="edit-icon-btn"
+                    @click="openMusicSearchModal"
+                    title="Escolher música do perfil"
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    v-if="user.favorite_music"
+                    type="button"
+                    class="edit-icon-btn delete-icon-btn"
+                    @click="handleRemoveFavoriteMusic"
+                    title="Remover música do perfil"
+                  >
+                    🗑️
+                  </button>
+                </div>
+              </div>
+
+              <!-- Música fixada -->
+              <div v-if="user.favorite_music" class="pinned-music-card">
+                <img
+                  v-if="user.favorite_music.album_art"
+                  :src="user.favorite_music.album_art"
+                  :alt="user.favorite_music.title"
+                  class="pinned-music-art"
+                />
+                <div v-else class="pinned-music-placeholder">🎵</div>
+                <div class="pinned-music-info">
+                  <span class="pinned-music-title" :title="user.favorite_music.title">{{ user.favorite_music.title }}</span>
+                  <span class="pinned-music-artist" :title="user.favorite_music.artist">{{ user.favorite_music.artist }}</span>
+                  <a
+                    v-if="user.favorite_music.spotify_url"
+                    :href="user.favorite_music.spotify_url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="pinned-music-spotify-link"
+                  >
+                    Ouvir no Spotify ↗
+                  </a>
+                </div>
+              </div>
+
+              <!-- Sem música fixada -->
+              <div v-else class="info-text no-music-text">
+                <span v-if="isOwner">
+                  <button type="button" class="btn-choose-music" @click="openMusicSearchModal">
+                    + Escolher música para o seu perfil
+                  </button>
+                </span>
+                <span v-else class="empty-hint">Nenhuma música escolhida ainda.</span>
+              </div>
             </div>
           </div>
         </div>
@@ -1126,6 +1238,12 @@ const {
       :user="user"
       @userUpdated="handleConnectedUserUpdated"
     />
+
+    <!-- Music Search Modal -->
+    <MusicSearchModal
+      v-model="isMusicSearchModalOpen"
+      @selectTrack="handleSelectFavoriteMusic"
+    />
   </div>
 
   <div v-else-if="isLoadingProfile || profileStore.isLoading || !isProfileLoaded" class="profile-page-container profile-skeleton-container">
@@ -1451,6 +1569,119 @@ const {
 .info-text {
   font-size: 0.9rem;
   color: var(--color-primary-800);
+}
+
+.profile-left-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.music-action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.delete-icon-btn:hover {
+  background-color: #fee2e2 !important;
+  border-color: #fca5a5 !important;
+}
+
+.pinned-music-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.65rem;
+  background-color: var(--color-surface-soft, #f9fafb);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 4px;
+}
+
+.pinned-music-art {
+  width: 44px;
+  height: 44px;
+  border-radius: 3px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.pinned-music-placeholder {
+  width: 44px;
+  height: 44px;
+  border-radius: 3px;
+  background: #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.pinned-music-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 0.1rem;
+}
+
+.pinned-music-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text, #111827);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pinned-music-artist {
+  font-size: 0.75rem;
+  color: var(--color-primary-600, #1db954);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pinned-music-spotify-link {
+  font-size: 0.7rem;
+  color: #15803d;
+  font-weight: 600;
+  text-decoration: none;
+  margin-top: 0.1rem;
+  display: inline-flex;
+  align-items: center;
+}
+
+.pinned-music-spotify-link:hover {
+  text-decoration: underline;
+  color: #16a34a;
+}
+
+.btn-choose-music {
+  background: none;
+  border: 1px dashed var(--color-border, #cbd5e1);
+  color: var(--color-primary, #385d38);
+  padding: 0.4rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.btn-choose-music:hover {
+  background-color: rgba(29, 185, 84, 0.08);
+  border-color: #1db954;
+  color: #15803d;
+}
+
+.empty-hint {
+  font-size: 0.8rem;
+  color: var(--color-muted, #847062);
+  font-style: italic;
 }
 
 .inline-editor {

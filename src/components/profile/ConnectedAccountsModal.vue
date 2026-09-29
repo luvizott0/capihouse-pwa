@@ -3,6 +3,7 @@ import { ref, watch, onUnmounted } from 'vue'
 import type { User } from '@/types/models'
 import { connectLetterboxd, disconnectLetterboxd, syncLetterboxd } from '@/api/letterboxd'
 import { connectXbox, disconnectXbox, syncXbox } from '@/api/xbox'
+import { getSpotifyAuthUrl, disconnectSpotify } from '@/api/spotify'
 import { formatRelativeTime } from '@/utils/date'
 import { useAuthStore } from '@/stores/auth'
 
@@ -17,6 +18,12 @@ const emit = defineEmits<{
 }>()
 
 const authStore = useAuthStore()
+
+// Spotify State
+const isConnectingSpotify = ref(false)
+const isDisconnectingSpotify = ref(false)
+const spotifyMessage = ref('')
+const spotifyError = ref('')
 
 // Letterboxd State
 const letterboxdInput = ref('')
@@ -54,6 +61,8 @@ watch(() => props.modelValue, (isOpen) => {
     letterboxdError.value = ''
     xboxMessage.value = ''
     xboxError.value = ''
+    spotifyMessage.value = ''
+    spotifyError.value = ''
   }
 })
 
@@ -222,6 +231,40 @@ async function handleSyncXbox() {
   } catch (err: any) {
     xboxError.value = err.response?.data?.message || 'Erro ao iniciar sincronização do Xbox.'
     isSyncingXbox.value = false
+  }
+}
+
+// Spotify Handlers
+async function handleConnectSpotify() {
+  isConnectingSpotify.value = true
+  spotifyError.value = ''
+  spotifyMessage.value = ''
+  try {
+    const res = await getSpotifyAuthUrl()
+    if (res.data.url) {
+      window.location.href = res.data.url
+    }
+  } catch (err: any) {
+    spotifyError.value = err.response?.data?.message || 'Erro ao conectar conta do Spotify.'
+    isConnectingSpotify.value = false
+  }
+}
+
+async function handleDisconnectSpotify() {
+  isDisconnectingSpotify.value = true
+  spotifyError.value = ''
+  spotifyMessage.value = ''
+  try {
+    const res = await disconnectSpotify()
+    emit('userUpdated', res.data.user)
+    if (authStore.user) {
+      authStore.user = res.data.user
+    }
+    spotifyMessage.value = res.data.message
+  } catch (err: any) {
+    spotifyError.value = err.response?.data?.message || 'Erro ao desconectar conta do Spotify.'
+  } finally {
+    isDisconnectingSpotify.value = false
   }
 }
 </script>
@@ -418,6 +461,75 @@ async function handleSyncXbox() {
             </div>
             <p class="account-hint">
               Jogos recentes e quando você <strong>miletar (100%)</strong> aparecerão automaticamente na aba 🎮 Jogos!
+            </p>
+          </div>
+        </div>
+
+        <!-- ======================= SPOTIFY ======================= -->
+        <div class="account-card spotify-theme">
+          <div class="account-card-header">
+            <div class="brand-row">
+              <span class="brand-badge-icon spotify-icon">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="#1DB954">
+                  <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.516 17.306c-.218.358-.682.473-1.04.254-2.854-1.743-6.446-2.138-10.678-1.171-.409.093-.815-.162-.909-.57-.093-.408.162-.814.57-.908 4.637-1.06 8.608-.61 11.803 1.345.358.219.473.682.254 1.05zm1.472-3.276c-.274.446-.86.588-1.306.314-3.267-2.008-8.246-2.59-12.11-1.417-.499.152-1.03-.133-1.182-.633-.152-.5.133-1.03.633-1.182 4.417-1.34 9.914-.693 13.651 1.612.446.274.588.86.314 1.306zm.126-3.41C15.202 8.293 8.76 8.08 5.097 9.193c-.6.182-1.237-.16-1.419-.76-.182-.6.16-1.236.76-1.418 4.22-1.282 11.332-1.036 15.727 1.574.54.32.716 1.026.396 1.566-.32.54-1.026.716-1.566.396z"/>
+                </svg>
+              </span>
+              <div class="brand-info">
+                <div class="brand-name-status">
+                  <h4 class="brand-name">Spotify</h4>
+                  <span v-if="user.has_spotify_connected" class="status-badge connected spotify-connected">
+                    ● Conectado
+                  </span>
+                  <span v-else class="status-badge disconnected">
+                    ○ Não vinculado
+                  </span>
+                </div>
+                <div v-if="user.has_spotify_connected" class="account-username">
+                  Conta: <strong>{{ user.spotify_display_name || 'Spotify Conectado' }}</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Banners de feedback -->
+          <div v-if="spotifyMessage" class="feedback-banner success">
+            {{ spotifyMessage }}
+          </div>
+          <div v-if="spotifyError" class="feedback-banner error">
+            {{ spotifyError }}
+          </div>
+
+          <!-- Ação quando não conectado -->
+          <div v-if="!user.has_spotify_connected" class="connect-action-area">
+            <div class="spotify-connect-action">
+              <button
+                type="button"
+                class="retro-action-btn spotify-action-btn"
+                :disabled="isConnectingSpotify"
+                @click="handleConnectSpotify"
+              >
+                {{ isConnectingSpotify ? 'Abrindo Spotify...' : '🎵 Conectar Conta do Spotify' }}
+              </button>
+            </div>
+            <p class="account-hint">
+              Conecte sua conta para exibir a música que você está ouvindo em tempo real no seu perfil e na listagem de usuários online.
+            </p>
+          </div>
+
+          <!-- Ações quando conectado -->
+          <div v-else class="connected-action-area">
+            <div class="buttons-row">
+              <button
+                type="button"
+                class="retro-action-btn danger"
+                :disabled="isDisconnectingSpotify"
+                @click="handleDisconnectSpotify"
+              >
+                {{ isDisconnectingSpotify ? 'Desconectando...' : 'Desconectar Spotify' }}
+              </button>
+            </div>
+            <p class="account-hint">
+              Sua música atual aparecerá automaticamente para os outros membros da casa enquanto você estiver ouvindo.
             </p>
           </div>
         </div>
@@ -888,5 +1000,33 @@ async function handleSyncXbox() {
 .btn-cancel:hover {
   color: var(--color-text, #111827);
   text-decoration: underline;
+}
+
+/* Spotify Card Styles */
+.account-card.spotify-theme {
+  border-left: 4px solid #1db954;
+}
+
+.spotify-connected {
+  color: #15803d !important;
+  background-color: #dcfce7 !important;
+}
+
+.spotify-connect-action {
+  display: flex;
+}
+
+.spotify-action-btn {
+  background-color: #1db954;
+  color: #ffffff;
+  border-color: #16a34a;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.spotify-action-btn:hover:not(:disabled) {
+  background-color: #1aa34a;
 }
 </style>

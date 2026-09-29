@@ -218,6 +218,14 @@ const offlineCount = computed(() => otherUsers.value.filter(u => !u.is_online).l
                 <div class="user-details">
                   <span class="user-full-name">{{ user.name }}</span>
                   <span class="user-handle">@{{ user.username }}</span>
+                  <div
+                    v-if="user.spotify_current_track?.is_playing"
+                    class="mobile-listening-badge"
+                    :title="`Ouvindo: ${user.spotify_current_track.title} - ${user.spotify_current_track.artist}`"
+                  >
+                    <span class="music-note-icon">🎵</span>
+                    <span class="music-track-text">{{ user.spotify_current_track.title }} • {{ user.spotify_current_track.artist }}</span>
+                  </div>
                 </div>
 
                 <div class="user-status-col">
@@ -561,6 +569,30 @@ const offlineCount = computed(() => otherUsers.value.filter(u => !u.is_online).l
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.mobile-listening-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.68rem;
+  color: #16a34a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+  margin-top: 1px;
+}
+
+.music-note-icon {
+  font-size: 0.65rem;
+  flex-shrink: 0;
+}
+
+.music-track-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .user-status-col {

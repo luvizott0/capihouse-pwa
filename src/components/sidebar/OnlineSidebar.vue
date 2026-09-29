@@ -48,6 +48,14 @@ const displayUsers = computed(() => {
         <div class="user-info">
           <span class="user-name">{{ user.name }}</span>
           <span class="user-username">@{{ user.username }}</span>
+          <div
+            v-if="user.spotify_current_track?.is_playing"
+            class="listening-track-badge"
+            :title="`Ouvindo: ${user.spotify_current_track.title} - ${user.spotify_current_track.artist}`"
+          >
+            <span class="music-note-icon">🎵</span>
+            <span class="music-track-text">{{ user.spotify_current_track.title }} • {{ user.spotify_current_track.artist }}</span>
+          </div>
         </div>
         <span class="status-pill" :class="user.is_online ? 'pill-online' : 'pill-offline'">
           {{ user.is_online ? 'Online' : 'Offline' }}
@@ -78,6 +86,30 @@ const displayUsers = computed(() => {
 .user-info { display: flex; flex-direction: column; gap: 0.1rem; flex: 1; min-width: 0; }
 .user-name { font-size: 0.85rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .user-username { font-size: 0.72rem; color: var(--color-muted, #847062); font-family: var(--font-heading, monospace); }
+
+.listening-track-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.68rem;
+  color: #16a34a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 130px;
+  margin-top: 1px;
+}
+
+.music-note-icon {
+  font-size: 0.65rem;
+  flex-shrink: 0;
+}
+
+.music-track-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .status-pill {
   font-size: 0.65rem;
