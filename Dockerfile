@@ -22,6 +22,9 @@ RUN npm run build
 # Stage 2: Servidor Nginx ultra-leve
 FROM nginx:alpine
 
+# Instalar curl para healthchecks e deploy
+RUN apk add --no-cache curl
+
 # Copiar template de configuração com envsubst automático
 COPY docker/nginx.conf.template /etc/nginx/templates/default.conf.template
 

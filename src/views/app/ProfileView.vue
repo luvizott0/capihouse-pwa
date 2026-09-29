@@ -26,7 +26,7 @@ import PullToRefreshIndicator from '@/components/ui/PullToRefreshIndicator.vue'
 import { usePullToRefresh } from '@/composables/usePullToRefresh'
 import { pinPost } from '@/api/posts'
 import { updateFavoriteMusic, removeFavoriteMusic } from '@/api/spotify'
-import type { SpotifyTrack, SpotifyNowPlaying } from '@/types/models'
+import type { SpotifyTrack, SpotifyNowPlaying, Post } from '@/types/models'
 
 const route = useRoute()
 const router = useRouter()
