@@ -2,9 +2,14 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import type { User, SpotifyNowPlaying } from '@/types/models'
 import { getUserSpotifyStatus } from '@/api/spotify'
+import { formatRelativeTime } from '@/utils/date'
 
 const props = defineProps<{
   user: User
+}>()
+
+const emit = defineEmits<{
+  (e: 'repost', track: SpotifyNowPlaying): void
 }>()
 
 const nowPlaying = ref<SpotifyNowPlaying | null>(null)
@@ -30,6 +35,10 @@ const progressPercentage = computed(() => {
 
 const isPlaying = computed(() => {
   return !!nowPlaying.value?.is_playing && !!nowPlaying.value?.title
+})
+
+const shouldShowCard = computed(() => {
+  return !!props.user?.has_spotify_connected && !!nowPlaying.value?.title
 })
 
 async function fetchStatus() {
@@ -126,7 +135,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div v-if="isPlaying && nowPlaying" class="now-playing-container">
+  <div v-if="shouldShowCard && nowPlaying" class="now-playing-container">
     <div class="retro-box now-playing-box">
       <!-- Header do Card Retrô -->
       <div class="box-header spotify-header">
@@ -136,15 +145,20 @@ onUnmounted(() => {
               <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.516 17.306c-.218.358-.682.473-1.04.254-2.854-1.743-6.446-2.138-10.678-1.171-.409.093-.815-.162-.909-.57-.093-.408.162-.814.57-.908 4.637-1.06 8.608-.61 11.803 1.345.358.219.473.682.254 1.05zm1.472-3.276c-.274.446-.86.588-1.306.314-3.267-2.008-8.246-2.59-12.11-1.417-.499.152-1.03-.133-1.182-.633-.152-.5.133-1.03.633-1.182 4.417-1.34 9.914-.693 13.651 1.612.446.274.588.86.314 1.306zm.126-3.41C15.202 8.293 8.76 8.08 5.097 9.193c-.6.182-1.237-.16-1.419-.76-.182-.6.16-1.236.76-1.418 4.22-1.282 11.332-1.036 15.727 1.574.54.32.716 1.026.396 1.566-.32.54-1.026.716-1.566.396z"/>
             </svg>
           </span>
-          <span class="header-title">» Ouvindo Agora no Spotify</span>
+          <span class="header-title">
+            {{ isPlaying ? '» Ouvindo Agora no Spotify' : '» Última Tocada no Spotify' }}
+          </span>
         </div>
 
-        <!-- Equalizador animado em CSS -->
-        <div class="equalizer-bars" title="Reproduzindo agora">
+        <!-- Equalizador animado em CSS se tocando, ou badge de Pausado -->
+        <div v-if="isPlaying" class="equalizer-bars" title="Reproduzindo agora">
           <span class="eq-bar bar-1"></span>
           <span class="eq-bar bar-2"></span>
           <span class="eq-bar bar-3"></span>
           <span class="eq-bar bar-4"></span>
+        </div>
+        <div v-else class="recent-status-pill">
+          <span>[ Pausado ]</span>
         </div>
       </div>
 
@@ -167,7 +181,7 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <!-- Disco de Vinil Giratório -->
+            <!-- Disco de Vinil (Gira apenas se estiver tocando) -->
             <div class="vinyl-record-disc" :class="{ 'is-spinning': isPlaying }">
               <div class="vinyl-groove-inner">
                 <div class="vinyl-center-label">
@@ -191,8 +205,8 @@ onUnmounted(() => {
               </p>
             </div>
 
-            <!-- Barra de Progresso em Tempo Real -->
-            <div class="progress-section">
+            <!-- Barra de Progresso em Tempo Real (se tocando) -->
+            <div v-if="isPlaying" class="progress-section">
               <div class="progress-track-bar">
                 <div
                   class="progress-fill-bar"
@@ -205,9 +219,18 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <!-- Link para ouvir no Spotify -->
-            <div v-if="nowPlaying.spotify_url" class="track-actions">
+            <!-- Info de última reprodução (se pausado/recente) -->
+            <div v-else class="recent-time-info">
+              <span class="track-duration-tag">⏱️ {{ formatTime(nowPlaying.duration_ms) }}</span>
+              <span v-if="nowPlaying.played_at" class="track-played-at">
+                • Ouvida {{ formatRelativeTime(nowPlaying.played_at) }}
+              </span>
+            </div>
+
+            <!-- Ações: Link Spotify + Repostar no feed -->
+            <div class="track-actions">
               <a
+                v-if="nowPlaying.spotify_url"
                 :href="nowPlaying.spotify_url"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -215,6 +238,14 @@ onUnmounted(() => {
               >
                 <span>Ouvir no Spotify ↗</span>
               </a>
+              <button
+                type="button"
+                class="spotify-repost-btn"
+                title="Compartilhar esta música no feed"
+                @click="emit('repost', nowPlaying)"
+              >
+                <span>🔁 Repostar no Feed</span>
+              </button>
             </div>
           </div>
         </div>
@@ -473,10 +504,41 @@ onUnmounted(() => {
   font-family: var(--font-heading, monospace);
 }
 
+.recent-status-pill {
+  font-size: 0.68rem;
+  font-family: var(--font-heading, monospace);
+  color: #a3e635;
+  background-color: rgba(0, 0, 0, 0.3);
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.recent-time-info {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  color: var(--text-muted, #777);
+  font-family: var(--font-heading, monospace);
+  margin-top: 0.2rem;
+}
+
+.track-duration-tag {
+  color: var(--text-main, #333);
+  font-weight: 500;
+}
+
+.track-played-at {
+  font-style: italic;
+}
+
 .track-actions {
   display: flex;
   align-items: center;
-  margin-top: 0.1rem;
+  gap: 0.6rem;
+  margin-top: 0.2rem;
+  flex-wrap: wrap;
 }
 
 .spotify-listen-btn {
@@ -493,6 +555,27 @@ onUnmounted(() => {
 .spotify-listen-btn:hover {
   color: #16a34a;
   text-decoration: underline;
+}
+
+.spotify-repost-btn {
+  background: none;
+  border: 1px dashed #1db954;
+  color: #15803d;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.12rem 0.45rem;
+  border-radius: 3px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  transition: all 0.15s ease;
+  font-family: var(--font-heading, monospace);
+}
+
+.spotify-repost-btn:hover {
+  background-color: rgba(29, 185, 84, 0.12);
+  border-style: solid;
 }
 
 @media (max-width: 640px) {

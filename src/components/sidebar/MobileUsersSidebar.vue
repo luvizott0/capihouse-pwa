@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth'
 import UserAvatar from '@/components/ui/UserAvatar.vue'
 import OnlineIndicator from '@/components/ui/OnlineIndicator.vue'
 import type { User } from '@/types/models'
+import { getUserSpotifyStatus } from '@/api/spotify'
 
 const props = defineProps<{
   modelValue: boolean
@@ -21,6 +22,39 @@ const authStore = useAuthStore()
 
 const searchQuery = ref('')
 
+const selfSpotifyTrack = computed(() => {
+  const currentId = authStore.user?.id
+  const inStore = usersStore.allUsers.find(u => u.id === currentId) || usersStore.onlineUsers.find(u => u.id === currentId)
+  return inStore?.spotify_current_track || authStore.user?.spotify_current_track || null
+})
+
+async function checkSelfSpotify() {
+  if (authStore.user?.has_spotify_connected && authStore.user.username) {
+    try {
+      const res = await getUserSpotifyStatus(authStore.user.username)
+      if (res.data.is_playing && res.data.title) {
+        if (!authStore.user.spotify_current_track) {
+          authStore.user.spotify_current_track = {
+            is_playing: true,
+            title: res.data.title || '',
+            artist: res.data.artist || '',
+            spotify_url: res.data.spotify_url || null,
+          }
+        } else {
+          authStore.user.spotify_current_track.is_playing = true
+          authStore.user.spotify_current_track.title = res.data.title || ''
+          authStore.user.spotify_current_track.artist = res.data.artist || ''
+          authStore.user.spotify_current_track.spotify_url = res.data.spotify_url || null
+        }
+      } else if (authStore.user.spotify_current_track) {
+        authStore.user.spotify_current_track.is_playing = false
+      }
+    } catch {
+      // Falha silenciosa
+    }
+  }
+}
+
 watch(
   () => props.modelValue,
   (isOpen) => {
@@ -28,6 +62,7 @@ watch(
     if (isOpen) {
       document.body.style.overflow = 'hidden'
       document.body.style.touchAction = 'none'
+      checkSelfSpotify()
     } else {
       document.body.style.overflow = ''
       document.body.style.touchAction = ''
@@ -38,6 +73,7 @@ watch(
 
 onMounted(() => {
   usersStore.startPolling()
+  checkSelfSpotify()
 })
 
 onUnmounted(() => {
@@ -153,6 +189,14 @@ const offlineCount = computed(() => otherUsers.value.filter(u => !u.is_online).l
                 </div>
                 <span class="self-username">@{{ authStore.user.username }}</span>
                 <span class="self-status-text">🟢 Online no CapiHouse</span>
+                <div
+                  v-if="selfSpotifyTrack?.is_playing"
+                  class="mobile-listening-badge"
+                  :title="`Ouvindo: ${selfSpotifyTrack.title} - ${selfSpotifyTrack.artist}`"
+                >
+                  <span class="music-note-icon">🎵</span>
+                  <span class="music-track-text">{{ selfSpotifyTrack.title }} • {{ selfSpotifyTrack.artist }}</span>
+                </div>
               </div>
             </div>
 

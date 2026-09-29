@@ -76,10 +76,14 @@ function handleRepostCreated(newPost: any) {
   }
 }
 
+const isMusicPost = computed(() => {
+  return props.post.entertainment_type === 'music' || props.post.external_source === 'spotify' || !!props.post.metadata?.track_title
+})
+
 const isEntertainmentRepost = computed(() => {
   const rp = props.post.reposted_post
   if (!rp) return false
-  return rp.category === 'entertainment' || !!rp.entertainment_type || !!rp.metadata?.film_title || !!rp.metadata?.game_title
+  return rp.category === 'entertainment' || !!rp.entertainment_type || !!rp.metadata?.film_title || !!rp.metadata?.game_title || !!rp.metadata?.track_title
 })
 
 function openRepostedMediaModal(mediaList: any[], clickedIndex: number) {
@@ -610,6 +614,46 @@ async function confirmDeletePost() {
       <FormattedContent v-else :content="post.content" />
     </div>
 
+    <!-- Music Card (quando a própria publicação for de música/Spotify) -->
+    <div v-if="isMusicPost && post.metadata?.track_title" class="post-music-card">
+      <div class="music-card-stage">
+        <img
+          v-if="post.metadata.album_art"
+          :src="post.metadata.album_art"
+          :alt="post.metadata.track_title"
+          class="music-card-art"
+          loading="lazy"
+        />
+        <div v-else class="music-card-placeholder">🎵</div>
+      </div>
+      <div class="music-card-details">
+        <div class="music-card-title-row">
+          <span class="music-card-track" :title="post.metadata.track_title || undefined">{{ post.metadata.track_title }}</span>
+        </div>
+        <span class="music-card-artist" :title="post.metadata.track_artist || undefined">{{ post.metadata.track_artist }}</span>
+        <span v-if="post.metadata.track_album" class="music-card-album" :title="post.metadata.track_album || undefined">
+          Álbum: <em>{{ post.metadata.track_album }}</em>
+        </span>
+        <div class="music-card-footer">
+          <a
+            v-if="post.metadata.spotify_url"
+            :href="post.metadata.spotify_url"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="music-spotify-link"
+          >
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="#1DB954">
+              <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.516 17.306c-.218.358-.682.473-1.04.254-2.854-1.743-6.446-2.138-10.678-1.171-.409.093-.815-.162-.909-.57-.093-.408.162-.814.57-.908 4.637-1.06 8.608-.61 11.803 1.345.358.219.473.682.254 1.05zm1.472-3.276c-.274.446-.86.588-1.306.314-3.267-2.008-8.246-2.59-12.11-1.417-.499.152-1.03-.133-1.182-.633-.152-.5.133-1.03.633-1.182 4.417-1.34 9.914-.693 13.651 1.612.446.274.588.86.314 1.306zm.126-3.41C15.202 8.293 8.76 8.08 5.097 9.193c-.6.182-1.237-.16-1.419-.76-.182-.6.16-1.236.76-1.418 4.22-1.282 11.332-1.036 15.727 1.574.54.32.716 1.026.396 1.566-.32.54-1.026.716-1.566.396z"/>
+            </svg>
+            <span>Ouvir no Spotify ↗</span>
+          </a>
+          <span v-if="post.metadata.reposted_from" class="music-reposted-from">
+            • Compartilhado do perfil de @{{ post.metadata.reposted_from }}
+          </span>
+        </div>
+      </div>
+    </div>
+
     <!-- Embedded Repost Card (if post is a repost) -->
     <div
       v-if="post.reposted_post"
@@ -620,12 +664,18 @@ async function confirmDeletePost() {
       @click="handleRepostBoxClick"
       @keydown.enter="handleRepostBoxClick"
     >
-      <!-- Entertainment Repost (Film or Game) -->
+      <!-- Entertainment Repost (Music, Film, or Game) -->
       <template v-if="isEntertainmentRepost">
         <div class="embedded-repost-header">
           <div class="embedded-repost-header-left">
             <span
-              v-if="post.reposted_post.entertainment_type === 'game'"
+              v-if="post.reposted_post.entertainment_type === 'music' || post.reposted_post.external_source === 'spotify'"
+              class="embedded-repost-tag spotify-tag"
+            >
+              🎵 Spotify
+            </span>
+            <span
+              v-else-if="post.reposted_post.entertainment_type === 'game'"
               class="embedded-repost-tag"
               :class="post.reposted_post.external_source === 'xbox' ? 'xbox-tag' : 'game-tag'"
             >
@@ -633,26 +683,30 @@ async function confirmDeletePost() {
             </span>
             <span v-else class="embedded-repost-tag letterboxd-tag">🍿 Letterboxd</span>
             <span class="embedded-repost-author">
-              Avaliação de <router-link :to="`/profile/${post.reposted_post.user?.username}`" class="embedded-author-link">@{{ post.reposted_post.user?.username }}</router-link>
+              {{ (post.reposted_post.entertainment_type === 'music' || post.reposted_post.external_source === 'spotify') ? 'Compartilhado por' : 'Avaliação de' }} <router-link :to="`/profile/${post.reposted_post.user?.username}`" class="embedded-author-link">@{{ post.reposted_post.user?.username }}</router-link>
             </span>
           </div>
           <span class="embedded-repost-action-hint">Ver original ↗</span>
         </div>
         <div class="embedded-repost-body">
           <img
-            v-if="post.reposted_post.metadata?.poster_url || post.reposted_post.metadata?.box_art_url"
-            :src="post.reposted_post.metadata?.poster_url || post.reposted_post.metadata?.box_art_url || ''"
-            :alt="post.reposted_post.metadata?.film_title || post.reposted_post.metadata?.game_title || 'Pôster/Capa'"
+            v-if="post.reposted_post.metadata?.album_art || post.reposted_post.metadata?.poster_url || post.reposted_post.metadata?.box_art_url"
+            :src="post.reposted_post.metadata?.album_art || post.reposted_post.metadata?.poster_url || post.reposted_post.metadata?.box_art_url || ''"
+            :alt="post.reposted_post.metadata?.track_title || post.reposted_post.metadata?.film_title || post.reposted_post.metadata?.game_title || 'Pôster/Capa'"
             class="embedded-poster"
-            @click="openPoster(post.reposted_post.metadata?.poster_url || post.reposted_post.metadata?.box_art_url)"
+            @click="openPoster(post.reposted_post.metadata?.album_art || post.reposted_post.metadata?.poster_url || post.reposted_post.metadata?.box_art_url)"
             title="Clique para ampliar"
           />
           <div class="embedded-details">
             <div class="embedded-title-row">
-              <span class="embedded-film-title">{{ post.reposted_post.metadata?.film_title || post.reposted_post.metadata?.game_title }}</span>
-              <span v-if="post.reposted_post.metadata?.film_year" class="embedded-film-year">({{ post.reposted_post.metadata.film_year }})</span>
+              <span class="embedded-film-title">{{ post.reposted_post.metadata?.track_title || post.reposted_post.metadata?.film_title || post.reposted_post.metadata?.game_title }}</span>
+              <span v-if="post.reposted_post.metadata?.track_artist" class="embedded-film-year">• {{ post.reposted_post.metadata.track_artist }}</span>
+              <span v-else-if="post.reposted_post.metadata?.film_year" class="embedded-film-year">({{ post.reposted_post.metadata.film_year }})</span>
               <span v-else-if="post.reposted_post.metadata?.platform" class="embedded-film-year">[{{ post.reposted_post.metadata.platform }}]</span>
             </div>
+            <p v-if="post.reposted_post.metadata?.track_album" class="embedded-track-album">
+              Álbum: <em>{{ post.reposted_post.metadata.track_album }}</em>
+            </p>
             <div v-if="post.reposted_post.metadata?.rating" class="embedded-rating">
               <span class="embedded-stars">{{ renderRatingStars(post.reposted_post.metadata.rating) }}</span>
               <span class="embedded-score">{{ post.reposted_post.metadata.rating }} / 5</span>
@@ -664,7 +718,16 @@ async function confirmDeletePost() {
               "{{ post.reposted_post.content }}"
             </p>
             <a
-              v-if="post.reposted_post.metadata?.letterboxd_url"
+              v-if="post.reposted_post.metadata?.spotify_url"
+              :href="post.reposted_post.metadata.spotify_url"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="embedded-external-link spotify-link"
+            >
+              [ Ouvir no Spotify ↗ ]
+            </a>
+            <a
+              v-else-if="post.reposted_post.metadata?.letterboxd_url"
               :href="post.reposted_post.metadata.letterboxd_url"
               target="_blank"
               rel="noopener noreferrer"
@@ -2519,5 +2582,127 @@ async function confirmDeletePost() {
 }
 .post-menu-item.pin-item:hover {
   background-color: var(--retro-bg-hover, #f1ece4);
+}
+
+/* Post Music Card (Spotify) */
+.post-music-card {
+  display: flex;
+  gap: 0.85rem;
+  align-items: center;
+  margin: 0.6rem 0.75rem 0.75rem;
+  padding: 0.75rem 0.85rem;
+  background-color: #fbfbfb;
+  border: 1px solid #1db954;
+  border-left: 4px solid #1db954;
+  border-radius: 4px;
+  box-shadow: 2px 2px 0px rgba(29, 185, 84, 0.2);
+}
+
+.music-card-stage {
+  flex-shrink: 0;
+  width: 58px;
+  height: 58px;
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background-color: #222;
+}
+
+.music-card-art {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.music-card-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  background-color: #333;
+}
+
+.music-card-details {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+  gap: 0.15rem;
+}
+
+.music-card-track {
+  font-family: var(--font-heading, monospace);
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--color-primary-900, #222);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.music-card-artist {
+  font-size: 0.82rem;
+  color: #15803d;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.music-card-album {
+  font-size: 0.72rem;
+  color: #666;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.music-card-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.2rem;
+  flex-wrap: wrap;
+}
+
+.music-spotify-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  color: #15803d;
+  font-weight: 600;
+  text-decoration: none;
+  font-family: var(--font-mono, monospace);
+}
+
+.music-spotify-link:hover {
+  color: #16a34a;
+  text-decoration: underline;
+}
+
+.music-reposted-from {
+  font-size: 0.7rem;
+  color: #888;
+  font-style: italic;
+}
+
+.embedded-repost-tag.spotify-tag {
+  background-color: #dcfce7;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+.embedded-external-link.spotify-link {
+  color: #15803d;
+}
+
+.embedded-track-album {
+  font-size: 0.75rem;
+  color: #718096;
+  margin: 0;
 }
 </style>

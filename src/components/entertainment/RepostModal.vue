@@ -28,13 +28,16 @@ const isSubmitting = ref(false)
 const errorMessage = ref('')
 
 const isEntertainment = computed(() => {
-  return props.post?.category === 'entertainment' || !!props.post?.entertainment_type || !!props.post?.metadata?.film_title || !!props.post?.metadata?.game_title
+  return props.post?.category === 'entertainment' || !!props.post?.entertainment_type || !!props.post?.metadata?.film_title || !!props.post?.metadata?.game_title || !!props.post?.metadata?.track_title
 })
 
 const film = computed(() => isEntertainment.value ? props.post?.metadata : null)
 
 const placeholderText = computed(() => {
   if (isEntertainment.value) {
+    if (props.post?.entertainment_type === 'music' || props.post?.external_source === 'spotify') {
+      return 'O que achou desta música? Use @ para marcar amigos ou @todos...'
+    }
     return props.post?.entertainment_type === 'game'
       ? 'O que achou deste jogo? Use @ para marcar amigos ou @todos...'
       : 'O que achou deste filme? Use @ para marcar amigos ou @todos...'
@@ -113,17 +116,23 @@ async function handleRepost() {
         {{ errorMessage }}
       </div>
 
-      <!-- Preview of Film/Game to be reposted -->
+      <!-- Preview of Music/Film/Game to be reposted -->
       <div v-if="isEntertainment && film" class="film-preview-card">
         <img
-          v-if="film.poster_url || film.box_art_url"
-          :src="film.poster_url || film.box_art_url || ''"
-          :alt="film.film_title || film.game_title || 'Capa/Poster'"
+          v-if="film.album_art || film.poster_url || film.box_art_url"
+          :src="film.album_art || film.poster_url || film.box_art_url || ''"
+          :alt="film.track_title || film.film_title || film.game_title || 'Capa/Poster'"
           class="preview-poster"
         />
         <div class="preview-info">
           <span
-            v-if="post?.entertainment_type === 'game'"
+            v-if="post?.entertainment_type === 'music' || post?.external_source === 'spotify'"
+            class="preview-badge spotify-badge"
+          >
+            🎵 Spotify
+          </span>
+          <span
+            v-else-if="post?.entertainment_type === 'game'"
             class="preview-badge"
             :class="post?.external_source === 'xbox' ? 'xbox-badge' : 'game-badge'"
           >
@@ -131,10 +140,14 @@ async function handleRepost() {
           </span>
           <span v-else class="preview-badge letterboxd-badge">🍿 Letterboxd</span>
           <h4 class="preview-title">
-            {{ film.film_title || film.game_title }}
-            <span v-if="film.film_year" class="preview-year">({{ film.film_year }})</span>
+            {{ film.track_title || film.film_title || film.game_title }}
+            <span v-if="film.track_artist" class="preview-year">• {{ film.track_artist }}</span>
+            <span v-else-if="film.film_year" class="preview-year">({{ film.film_year }})</span>
             <span v-else-if="film.platform" class="preview-year">[{{ film.platform }}]</span>
           </h4>
+          <p v-if="film.track_album" class="preview-album-name">
+            Álbum: <em>{{ film.track_album }}</em>
+          </p>
           <div v-if="film.rating" class="preview-rating">
             <span class="stars">{{ renderRatingStars(film.rating) }}</span>
             <span class="numeric-rating">{{ film.rating }} / 5</span>
@@ -330,10 +343,22 @@ async function handleRepost() {
   border: 1px solid #e9d5ff;
 }
 
+.preview-badge.spotify-badge {
+  background-color: #dcfce7;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
 .preview-badge.feed-badge {
   background-color: #e0f2fe;
   color: #0369a1;
   border: 1px solid #bae6fd;
+}
+
+.preview-album-name {
+  font-size: 0.75rem;
+  color: #718096;
+  margin: 0;
 }
 
 .feed-preview-card {

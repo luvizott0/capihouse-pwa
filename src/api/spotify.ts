@@ -44,3 +44,17 @@ export async function removeFavoriteMusic() {
 export async function getUserSpotifyStatus(username: string) {
   return apiClient.get<SpotifyNowPlaying>(`/users/${username}/spotify-status`)
 }
+
+/**
+ * Publica uma música do Spotify como post no feed.
+ */
+export async function repostSpotifyTrack(payload: {
+  track: SpotifyTrack
+  content?: string
+  feeling_name?: string
+  feeling_emoji?: string
+  hashtags?: string[]
+  from_user?: string
+}) {
+  return apiClient.post<{ message: string; post: any }>('/spotify/repost', payload)
+}

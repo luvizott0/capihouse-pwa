@@ -18,6 +18,7 @@ import GameCard from '@/components/entertainment/GameCard.vue'
 import ConnectedAccountsModal from '@/components/profile/ConnectedAccountsModal.vue'
 import NowPlayingCard from '@/components/profile/NowPlayingCard.vue'
 import MusicSearchModal from '@/components/profile/MusicSearchModal.vue'
+import MusicRepostModal from '@/components/entertainment/MusicRepostModal.vue'
 import { formatBirthDate } from '@/utils/date'
 import { usePwaUpdate } from '@/composables/usePwaUpdate'
 import { useWebPush } from '@/composables/useWebPush'
@@ -25,7 +26,7 @@ import PullToRefreshIndicator from '@/components/ui/PullToRefreshIndicator.vue'
 import { usePullToRefresh } from '@/composables/usePullToRefresh'
 import { pinPost } from '@/api/posts'
 import { updateFavoriteMusic, removeFavoriteMusic } from '@/api/spotify'
-import type { SpotifyTrack } from '@/types/models'
+import type { SpotifyTrack, SpotifyNowPlaying } from '@/types/models'
 
 const route = useRoute()
 const router = useRouter()
@@ -157,6 +158,21 @@ async function handleRemoveFavoriteMusic() {
   } catch (err) {
     console.error('Erro ao remover música favorita:', err)
   }
+}
+
+const showMusicRepostModal = ref(false)
+const trackToRepost = ref<SpotifyTrack | SpotifyNowPlaying | null>(null)
+const repostFromUsername = ref<string | undefined>(undefined)
+
+function openRepostForTrack(track: SpotifyTrack | SpotifyNowPlaying, username?: string) {
+  trackToRepost.value = track
+  repostFromUsername.value = username && username !== authStore.user?.username ? username : undefined
+  showMusicRepostModal.value = true
+}
+
+function onMusicReposted(newPost: Post) {
+  feedStore.posts.unshift(newPost)
+  userPosts.value.unshift(newPost)
 }
 
 const wasVisitingOther = ref(false)
@@ -575,8 +591,12 @@ const {
     <div class="profile-sections-grid">
       <!-- Coluna Esquerda: Ouvindo Agora + Sobre Mim -->
       <div class="profile-left-col">
-        <!-- Card Ouvindo Agora (aparece se tiver Spotify conectado e estiver tocando) -->
-        <NowPlayingCard v-if="user" :user="user" />
+        <!-- Card Ouvindo Agora (aparece se tiver Spotify conectado e estiver tocando ou última tocada) -->
+        <NowPlayingCard
+          v-if="user"
+          :user="user"
+          @repost="(track) => openRepostForTrack(track, user?.username)"
+        />
 
         <!-- Sobre Mim -->
         <div class="retro-box section-box">
@@ -673,15 +693,25 @@ const {
                 <div class="pinned-music-info">
                   <span class="pinned-music-title" :title="user.favorite_music.title">{{ user.favorite_music.title }}</span>
                   <span class="pinned-music-artist" :title="user.favorite_music.artist">{{ user.favorite_music.artist }}</span>
-                  <a
-                    v-if="user.favorite_music.spotify_url"
-                    :href="user.favorite_music.spotify_url"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="pinned-music-spotify-link"
-                  >
-                    Ouvir no Spotify ↗
-                  </a>
+                  <div class="pinned-music-actions-row">
+                    <a
+                      v-if="user.favorite_music.spotify_url"
+                      :href="user.favorite_music.spotify_url"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="pinned-music-spotify-link"
+                    >
+                      Ouvir no Spotify ↗
+                    </a>
+                    <button
+                      type="button"
+                      class="pinned-music-repost-btn"
+                      title="Compartilhar no Feed"
+                      @click="openRepostForTrack(user.favorite_music, user.username)"
+                    >
+                      🔁 Repostar
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -1244,6 +1274,14 @@ const {
       v-model="isMusicSearchModalOpen"
       @selectTrack="handleSelectFavoriteMusic"
     />
+
+    <!-- Music Repost Modal -->
+    <MusicRepostModal
+      v-model="showMusicRepostModal"
+      :track="trackToRepost"
+      :from-username="repostFromUsername"
+      @reposted="onMusicReposted"
+    />
   </div>
 
   <div v-else-if="isLoadingProfile || profileStore.isLoading || !isProfileLoaded" class="profile-page-container profile-skeleton-container">
@@ -1643,12 +1681,19 @@ const {
   text-overflow: ellipsis;
 }
 
+.pinned-music-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.2rem;
+  flex-wrap: wrap;
+}
+
 .pinned-music-spotify-link {
   font-size: 0.7rem;
   color: #15803d;
   font-weight: 600;
   text-decoration: none;
-  margin-top: 0.1rem;
   display: inline-flex;
   align-items: center;
 }
@@ -1656,6 +1701,27 @@ const {
 .pinned-music-spotify-link:hover {
   text-decoration: underline;
   color: #16a34a;
+}
+
+.pinned-music-repost-btn {
+  background: none;
+  border: 1px dashed #1db954;
+  color: #15803d;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  transition: all 0.15s ease;
+  font-family: var(--font-heading, monospace);
+}
+
+.pinned-music-repost-btn:hover {
+  background-color: rgba(29, 185, 84, 0.12);
+  border-style: solid;
 }
 
 .btn-choose-music {

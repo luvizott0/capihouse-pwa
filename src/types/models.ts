@@ -20,6 +20,9 @@ export interface SpotifyTrack {
 
 export interface SpotifyNowPlaying {
   is_playing: boolean
+  is_recent?: boolean
+  has_spotify?: boolean
+  played_at?: string | null
   track_id?: string | null
   title?: string
   artist?: string
@@ -198,6 +201,17 @@ export interface EntertainmentMetadata {
   xbox_title_id?: string | null
   hours_played?: number | null
 
+  // Music (Spotify)
+  track_id?: string | null
+  track_title?: string | null
+  track_artist?: string | null
+  track_album?: string | null
+  album_art?: string | null
+  spotify_url?: string | null
+  preview_url?: string | null
+  duration_ms?: number | null
+  reposted_from?: string | null
+
   // Shared
   rating?: number | null
 }
@@ -210,7 +224,7 @@ export interface Post {
   event_id?: number | null
   event?: { id: number; name: string } | null
   category?: 'feed' | 'entertainment'
-  entertainment_type?: 'movie' | 'series' | 'game' | null
+  entertainment_type?: 'movie' | 'series' | 'game' | 'music' | null
   external_source?: string | null
   external_id?: string | null
   metadata?: EntertainmentMetadata | null
