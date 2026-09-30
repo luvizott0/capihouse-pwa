@@ -4,13 +4,14 @@ import type { Post } from '@/types/models'
 import RetroModal from '@/components/ui/RetroModal.vue'
 import RetroButton from '@/components/ui/RetroButton.vue'
 import { getInitials } from '@/utils/initials'
+import { parseRecapData } from '@/utils/recap'
 
 const props = defineProps<{
   modelValue: boolean
   post: Post
 }>()
 
-const emit = defineEmits<{
+defineEmits<{
   (e: 'update:modelValue', value: boolean): void
 }>()
 
@@ -22,13 +23,22 @@ const previewUrl = ref<string>('')
 const shareError = ref('')
 const shareSuccess = ref(false)
 
-import { parseRecapData } from '@/utils/recap'
+const EMOJI_FONT_STACK = 'system-ui, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Segoe UI Symbol", sans-serif'
 
 const recap = computed(() => parseRecapData(props.post))
 const targetUser = computed(() => recap.value.targetUser)
 const monthYear = computed(() => recap.value.monthYear)
 const emojiJourney = computed(() => recap.value.emojiJourney)
 const podium = computed(() => recap.value.podium)
+
+// Quando as fontes web terminarem de carregar, atualiza a pré-visualização se o modal estiver aberto
+if (typeof document !== 'undefined' && document.fonts) {
+  document.fonts.ready.then(() => {
+    if (props.modelValue) {
+      updatePreview()
+    }
+  }).catch(() => {})
+}
 
 // Função auxiliar para desenhar retângulos arredondados no Canvas
 function roundRect(
@@ -82,6 +92,11 @@ function loadAvatarImage(url: string | null | undefined): Promise<HTMLImageEleme
 
 // Renderizar o card no Canvas
 async function renderCard(): Promise<HTMLCanvasElement> {
+  if (typeof document !== 'undefined' && document.fonts) {
+    try {
+      await document.fonts.ready
+    } catch {}
+  }
   isRendering.value = true
   const isStory = currentFormat.value === 'story'
   const width = 1080
@@ -240,7 +255,8 @@ async function renderCard(): Promise<HTMLCanvasElement> {
   const rowHeight = isStory ? 68 : 52
 
   ctx.save()
-  ctx.font = `${emojiFontSize}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`
+  ctx.font = `${emojiFontSize}px ${EMOJI_FONT_STACK}`
+  ctx.fillStyle = '#2D1F17'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
 
@@ -317,20 +333,25 @@ async function renderCard(): Promise<HTMLCanvasElement> {
       ctx.save()
       ctx.textAlign = 'left'
       ctx.textBaseline = 'middle'
+      ctx.fillStyle = '#2D1F17'
 
       // Medalha
-      ctx.font = '54px "Apple Color Emoji", "Segoe UI Emoji", sans-serif'
+      ctx.font = `54px ${EMOJI_FONT_STACK}`
       ctx.fillText(item.medal, itemX + 30, itemY + itemHeight / 2)
 
       // Emoji
-      ctx.font = '58px "Apple Color Emoji", "Segoe UI Emoji", sans-serif'
-      ctx.fillText(item.emoji, itemX + 115, itemY + itemHeight / 2)
+      if (item.emoji) {
+        ctx.font = `58px ${EMOJI_FONT_STACK}`
+        ctx.fillText(item.emoji, itemX + 115, itemY + itemHeight / 2)
+      }
 
       // Palavra(s) do sentimento associada
       if (item.name) {
         ctx.fillStyle = '#7D4720'
         ctx.font = 'bold 32px "Space Mono", monospace'
-        ctx.fillText(item.name, itemX + 195, itemY + itemHeight / 2)
+        const nameX = item.emoji ? itemX + 195 : itemX + 115
+        const maxNameWidth = itW - (nameX - itemX) - 130
+        ctx.fillText(item.name, nameX, itemY + itemHeight / 2, maxNameWidth)
       }
 
       // Contagem
@@ -358,10 +379,12 @@ async function renderCard(): Promise<HTMLCanvasElement> {
       ctx.save()
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
+      ctx.fillStyle = '#2D1F17'
 
       // Medalha e Emoji juntos
-      ctx.font = '36px "Apple Color Emoji", "Segoe UI Emoji", sans-serif'
-      ctx.fillText(`${item.medal} ${item.emoji}`, colX + colWidth / 2, colY + 36)
+      const medalAndEmoji = [item.medal, item.emoji].filter(Boolean).join(' ')
+      ctx.font = `36px ${EMOJI_FONT_STACK}`
+      ctx.fillText(medalAndEmoji, colX + colWidth / 2, colY + 36)
 
       // Palavra(s) do sentimento associada
       if (item.name) {
@@ -476,9 +499,9 @@ async function shareImage() {
       // Fallback para dispositivos sem suporte ou desktop: baixa o arquivo
       await downloadImage()
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     // Ignora se o usuário cancelou o menu nativo de compartilhamento
-    if (err?.name !== 'AbortError') {
+    if ((err as Error)?.name !== 'AbortError') {
       console.error('Erro ao compartilhar:', err)
       // Tentar download direto como fallback seguro
       await downloadImage()

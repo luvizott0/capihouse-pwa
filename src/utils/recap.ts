@@ -60,23 +60,76 @@ export function parseRecapData(post: Post): RecapData {
       : new Date(post.created_at).getFullYear().toString()
 
   // 3. Jornada de sentimentos
-  const journeyMatch = content.match(/📜 Sua jornada de sentimentos no mês:\s*([\s\S]*?)\s*🏆 Pódio/i)
-  const emojiJourney =
-    journeyMatch && journeyMatch[1]
-      ? journeyMatch[1].trim().split(/\s+/).filter(Boolean)
-      : []
+  interface IntlSegment {
+    segment: string
+  }
+  interface IntlSegmenterInstance {
+    segment(input: string): Iterable<IntlSegment>
+  }
+  interface IntlWithSegmenter {
+    Segmenter?: new (locale: string, options?: { granularity: string }) => IntlSegmenterInstance
+  }
+
+  const emojiRegex = /\p{Extended_Pictographic}/u
+  const journeyMatch = content.match(/(?:📜\s*)?Sua jornada de sentimentos no mês:\s*([\s\S]*?)\s*(?:🏆\s*)?P[oó]dio/i)
+  let emojiJourney: string[] = []
+  const intlWithSeg = Intl as unknown as IntlWithSegmenter
+
+  if (journeyMatch && journeyMatch[1]) {
+    const rawJourney = journeyMatch[1].trim()
+    if (intlWithSeg.Segmenter) {
+      const segmenter = new intlWithSeg.Segmenter('en', { granularity: 'grapheme' })
+      emojiJourney = Array.from(segmenter.segment(rawJourney))
+        .map((s: IntlSegment) => String(s?.segment ?? '').trim())
+        .filter((s: string) => s.length > 0 && emojiRegex.test(s))
+    } else {
+      emojiJourney = rawJourney.split(/\s+/).filter(Boolean)
+    }
+  }
 
   // 4. Pódio
   const podium: PodiumItem[] = []
   const lines = content.split('\n')
   for (const line of lines) {
-    const match = line.match(/(🥇|🥈|🥉)\s*(\S+)(?:\s+(.*?))?\s*—\s*(\d+x|\d+)/)
-    if (match && match[1] && match[2] && match[4]) {
+    const trimmedLine = line.trim()
+    const match = trimmedLine.match(/^(🥇|🥈|🥉|⭐|\d+[ºª°]?)\s*(.*?)\s*(?:[-—–:]|\s+—\s+)\s*(\d+\s*x?|\d+\s*vezes?)/i)
+    if (match) {
+      const medal = match[1] ?? ''
+      const middle = (match[2] ?? '').trim()
+      const count = match[3] ?? ''
+
+      if (!medal || !count) continue
+
+      let emoji = ''
+      let name = ''
+
+      if (intlWithSeg.Segmenter) {
+        const segmenter = new intlWithSeg.Segmenter('en', { granularity: 'grapheme' })
+        const segments: string[] = Array.from(segmenter.segment(middle)).map((s: IntlSegment) => String(s?.segment ?? ''))
+        const firstSegment = segments[0] ?? ''
+        if (firstSegment && emojiRegex.test(firstSegment)) {
+          emoji = firstSegment
+          name = segments.slice(1).join('').trim()
+        } else {
+          name = middle
+        }
+      } else {
+        const spaceIdx = middle.indexOf(' ')
+        if (spaceIdx > -1) {
+          emoji = middle.substring(0, spaceIdx).trim()
+          name = middle.substring(spaceIdx + 1).trim()
+        } else if (emojiRegex.test(middle)) {
+          emoji = middle
+        } else {
+          name = middle
+        }
+      }
+
       podium.push({
-        medal: match[1],
-        emoji: match[2],
-        name: match[3]?.trim() || undefined,
-        count: match[4],
+        medal,
+        emoji,
+        name: name || undefined,
+        count,
       })
     }
   }

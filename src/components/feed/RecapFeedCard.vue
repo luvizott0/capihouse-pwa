@@ -90,7 +90,7 @@ const podiumColors = [
           >
             <div class="podium-left">
               <span class="podium-medal">{{ item.medal }}</span>
-              <span class="podium-emoji">{{ item.emoji }}</span>
+              <span v-if="item.emoji" class="podium-emoji">{{ item.emoji }}</span>
               <span v-if="item.name" class="podium-word" :title="item.name">{{ item.name }}</span>
             </div>
             <div class="podium-count">{{ item.count }}</div>
