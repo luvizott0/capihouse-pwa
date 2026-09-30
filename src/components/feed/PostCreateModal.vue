@@ -7,6 +7,7 @@ import RetroButton from '@/components/ui/RetroButton.vue'
 import EmojiPicker from '@/components/ui/EmojiPicker.vue'
 import MentionInput from '@/components/ui/MentionInput.vue'
 import { compressImageFile } from '@/utils/imageCompressor'
+import { useStorageStatus } from '@/composables/useStorageStatus'
 
 const props = withDefaults(
   defineProps<{
@@ -85,16 +86,34 @@ function formatBytes(bytes: number): string {
   return `${kb.toFixed(0)} KB`
 }
 
+const {
+  isStorageAvailable,
+  isCheckingStorage,
+  checkStorageStatus,
+} = useStorageStatus()
+
 onMounted(() => {
   groupsStore.fetchMyGroups()
+  if (props.modelValue) {
+    checkStorageStatus()
+  }
 })
 
 watch(() => props.modelValue, (isOpen) => {
   if (isOpen) {
     groupsStore.fetchMyGroups()
     errorMsg.value = ''
+    checkStorageStatus()
   } else {
     cleanupPreviews()
+  }
+})
+
+watch(isStorageAvailable, (available) => {
+  if (!available && selectedFiles.value.length > 0) {
+    cleanupPreviews()
+    selectedFiles.value = []
+    filePreviews.value = []
   }
 })
 
@@ -125,6 +144,10 @@ function removeHashtag(tag: string) {
 
 async function handleFileSelect(e: Event) {
   errorMsg.value = ''
+  if (!isStorageAvailable.value) {
+    errorMsg.value = 'O servidor NAS está offline. O envio de fotos e vídeos está bloqueado temporariamente.'
+    return
+  }
   const input = e.target as HTMLInputElement
   if (!input.files || input.files.length === 0) return
 
@@ -211,6 +234,12 @@ async function handleSubmit() {
     return
   }
 
+  if (!isStorageAvailable.value && selectedFiles.value.length > 0) {
+    errorMsg.value = 'O servidor NAS está fora do ar. Remova as fotos anexadas para publicar.'
+    scrollToError()
+    return
+  }
+
   const formData = new FormData()
   if (content.value.trim()) {
     formData.append('content', content.value)
@@ -255,19 +284,35 @@ async function handleSubmit() {
     filePreviews.value = []
     emit('created')
     emit('update:modelValue', false)
-  } catch (err: any) {
-    if (err.response?.status === 413) {
+  } catch (err: unknown) {
+    const error = err as {
+      response?: {
+        status?: number
+        data?: {
+          message?: string
+          errors?: Record<string, string[]>
+        }
+      }
+      code?: string
+    }
+    if (error.response?.status === 503) {
+      isStorageAvailable.value = false
+      errorMsg.value = error.response?.data?.message || 'O servidor de armazenamento (NAS) está temporariamente offline. Não foi possível enviar os arquivos.'
+    } else if (error.response?.status === 413) {
       errorMsg.value = 'Os arquivos enviados excedem o limite de tamanho do servidor (413 Payload Too Large). Tente reduzir a resolução ou quantidade das fotos.'
-    } else if (err.response?.status === 422 && err.response?.data?.errors) {
-      const errorObj = err.response.data.errors
+    } else if (error.response?.status === 422 && error.response?.data?.errors) {
+      const errorObj = error.response.data.errors
       const messages: string[] = []
       for (const key of Object.keys(errorObj)) {
-        messages.push(...errorObj[key])
+        const fieldErrors = errorObj[key]
+        if (fieldErrors) {
+          messages.push(...fieldErrors)
+        }
       }
-      errorMsg.value = messages.join(' ') || err.response?.data?.message || 'Erro de validação dos campos.'
-    } else if (err.response?.data?.message) {
-      errorMsg.value = err.response.data.message
-    } else if (err.code === 'ERR_NETWORK' || !err.response) {
+      errorMsg.value = messages.join(' ') || error.response?.data?.message || 'Erro de validação dos campos.'
+    } else if (error.response?.data?.message) {
+      errorMsg.value = error.response.data.message
+    } else if (error.code === 'ERR_NETWORK' || !error.response) {
       errorMsg.value = 'Falha na conexão com o servidor. Verifique sua rede ou se as fotos enviadas excederam o limite do proxy reverso.'
     } else {
       errorMsg.value = 'Erro ao publicar. Tente novamente mais tarde.'
@@ -291,6 +336,31 @@ function handleClose() {
     <div ref="formContainerRef" class="post-create-form">
       <div v-if="errorMsg" class="error-banner">
         ⚠️ {{ errorMsg }}
+      </div>
+
+      <!-- NAS Offline Warning Banner -->
+      <div v-if="!isStorageAvailable" class="nas-offline-banner" role="alert">
+        <div class="nas-offline-header">
+          <span class="nas-alert-icon">⚠️</span>
+          <span class="nas-alert-badge">[ SERVIDOR NAS OFFLINE ]</span>
+          <button
+            type="button"
+            class="nas-recheck-btn"
+            :disabled="isCheckingStorage"
+            @click="checkStorageStatus(true)"
+            title="Checar conexão novamente com o servidor NAS"
+          >
+            {{ isCheckingStorage ? 'Verificando...' : '🔄 Revalidar' }}
+          </button>
+        </div>
+        <div class="nas-offline-body">
+          <p class="nas-offline-main">
+            O servidor NAS de armazenamento está fora do ar na rede local. Por esse motivo, o envio de fotos e vídeos foi bloqueado temporariamente.
+          </p>
+          <p class="nas-offline-sub">
+            💡 Todas as outras funcionalidades estão funcionando normalmente: você pode escrever sua publicação, definir sentimentos, usar hashtags e criar votações normalmente!
+          </p>
+        </div>
       </div>
 
       <!-- Audience / Group selector -->
@@ -358,16 +428,23 @@ function handleClose() {
 
       <!-- Actions: Upload media & Hashtags -->
       <div class="media-upload-row">
-        <label class="upload-label-btn" :class="{ 'disabled-btn': selectedFiles.length >= MAX_FILES }">
+        <label
+          class="upload-label-btn"
+          :class="{
+            'disabled-btn': !isStorageAvailable || selectedFiles.length >= MAX_FILES,
+            'nas-offline-btn': !isStorageAvailable
+          }"
+          :title="!isStorageAvailable ? 'Servidor NAS offline. O envio de fotos e vídeos está bloqueado.' : ''"
+        >
           <input
             type="file"
             accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/quicktime"
             multiple
-            :disabled="selectedFiles.length >= MAX_FILES"
+            :disabled="!isStorageAvailable || selectedFiles.length >= MAX_FILES"
             class="hidden-file-input"
             @change="handleFileSelect"
           />
-          📷 [ Anexar Fotos ]
+          📷 {{ !isStorageAvailable ? '[ Fotos Indisponíveis (NAS Offline) ]' : '[ Anexar Fotos ]' }}
         </label>
 
         <button
@@ -514,6 +591,84 @@ function handleClose() {
   color: #b91c1c;
   font-size: 0.85rem;
   border-radius: 2px;
+}
+
+.nas-offline-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.65rem 0.75rem;
+  background-color: #fffbeb;
+  border: 2px solid #f59e0b;
+  box-shadow: 2px 2px 0px rgba(180, 83, 9, 0.15);
+  border-radius: 2px;
+  font-family: var(--font-body, 'Outfit', sans-serif);
+}
+
+.nas-offline-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.nas-alert-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.nas-alert-badge {
+  font-family: var(--font-heading, monospace);
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: #92400e;
+  letter-spacing: 0.5px;
+}
+
+.nas-recheck-btn {
+  margin-left: auto;
+  font-family: var(--font-heading, monospace);
+  font-size: 0.7rem;
+  font-weight: bold;
+  color: #78350f;
+  background: #fef3c7;
+  border: 1px solid #d97706;
+  padding: 0.15rem 0.5rem;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all 0.15s ease;
+}
+
+.nas-recheck-btn:hover:not(:disabled) {
+  background: #fde68a;
+}
+
+.nas-recheck-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.nas-offline-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.nas-offline-main {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #92400e;
+  line-height: 1.35;
+}
+
+.nas-offline-sub {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #065f46;
+  background: #d1fae5;
+  border: 1px dashed #10b981;
+  padding: 0.35rem 0.5rem;
+  border-radius: 2px;
+  line-height: 1.35;
 }
 
 .audience-row {
@@ -729,6 +884,13 @@ function handleClose() {
   opacity: 0.5;
   cursor: not-allowed;
   background-color: #eee;
+}
+.upload-label-btn.nas-offline-btn {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background-color: #f3f4f6;
+  border-color: #d1d5db;
+  color: #6b7280;
 }
 
 .poll-toggle-btn {

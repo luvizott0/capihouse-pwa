@@ -7,6 +7,7 @@ import RetroButton from '@/components/ui/RetroButton.vue'
 import EmojiPicker from '@/components/ui/EmojiPicker.vue'
 import MentionInput from '@/components/ui/MentionInput.vue'
 import { compressImageFile } from '@/utils/imageCompressor'
+import { useStorageStatus } from '@/composables/useStorageStatus'
 
 const props = defineProps<{
   modelValue: boolean
@@ -77,12 +78,26 @@ function populate() {
   }
 }
 
+const {
+  isStorageAvailable,
+  isCheckingStorage,
+  checkStorageStatus,
+} = useStorageStatus()
+
 watch(() => props.post, populate, { immediate: true })
 watch(() => props.modelValue, (isOpen) => {
   if (isOpen) {
     populate()
+    checkStorageStatus()
   } else {
     cleanupPreviews()
+  }
+})
+
+watch(isStorageAvailable, (available) => {
+  if (!available && selectedFiles.value.length > 0) {
+    cleanupPreviews()
+    selectedFiles.value = []
   }
 })
 
@@ -127,6 +142,10 @@ function removeNewFile(index: number) {
 
 async function handleFileSelect(e: Event) {
   errorMsg.value = ''
+  if (!isStorageAvailable.value) {
+    errorMsg.value = 'O servidor NAS está offline. Não é possível enviar novas mídias no momento.'
+    return
+  }
   const input = e.target as HTMLInputElement
   if (!input.files || input.files.length === 0) return
 
@@ -190,6 +209,11 @@ async function handleSubmit() {
     return
   }
 
+  if (!isStorageAvailable.value && selectedFiles.value.length > 0) {
+    errorMsg.value = 'O servidor NAS está offline. Remova as novas fotos anexadas para salvar a publicação.'
+    return
+  }
+
   const formData = new FormData()
   formData.append('content', content.value)
 
@@ -220,11 +244,22 @@ async function handleSubmit() {
     selectedFiles.value = []
     emit('updated')
     emit('update:modelValue', false)
-  } catch (err: any) {
-    if (err.response?.status === 413) {
+  } catch (err: unknown) {
+    const error = err as {
+      response?: {
+        status?: number
+        data?: {
+          message?: string
+        }
+      }
+    }
+    if (error.response?.status === 503) {
+      isStorageAvailable.value = false
+      errorMsg.value = error.response?.data?.message || 'O servidor de armazenamento (NAS) está temporariamente indisponível.'
+    } else if (error.response?.status === 413) {
       errorMsg.value = 'Os arquivos enviados excedem o limite de tamanho do servidor (413 Payload Too Large). Tente reduzir a resolução ou quantidade das fotos.'
     } else {
-      errorMsg.value = err.response?.data?.message || 'Erro ao salvar alterações.'
+      errorMsg.value = error.response?.data?.message || 'Erro ao salvar alterações.'
     }
   }
 }
@@ -240,6 +275,31 @@ function handleClose() {
     <div class="post-edit-form">
       <div v-if="errorMsg" class="error-banner">
         {{ errorMsg }}
+      </div>
+
+      <!-- NAS Offline Warning Banner -->
+      <div v-if="!isStorageAvailable" class="nas-offline-banner" role="alert">
+        <div class="nas-offline-header">
+          <span class="nas-alert-icon">⚠️</span>
+          <span class="nas-alert-badge">[ SERVIDOR NAS OFFLINE ]</span>
+          <button
+            type="button"
+            class="nas-recheck-btn"
+            :disabled="isCheckingStorage"
+            @click="checkStorageStatus(true)"
+            title="Checar conexão novamente com o servidor NAS"
+          >
+            {{ isCheckingStorage ? 'Verificando...' : '🔄 Revalidar' }}
+          </button>
+        </div>
+        <div class="nas-offline-body">
+          <p class="nas-offline-main">
+            O servidor NAS de armazenamento está fora do ar na rede local. A adição de novas fotos está desativada temporariamente.
+          </p>
+          <p class="nas-offline-sub">
+            💡 Você pode alterar o texto, sentimentos e hashtags da publicação normalmente!
+          </p>
+        </div>
       </div>
 
       <div class="form-group">
@@ -342,16 +402,23 @@ function handleClose() {
 
       <!-- Actions: Upload media -->
       <div class="media-upload-row">
-        <label class="upload-label-btn" :class="{ 'disabled-btn': totalMediaCount >= MAX_FILES }">
+        <label
+          class="upload-label-btn"
+          :class="{
+            'disabled-btn': !isStorageAvailable || totalMediaCount >= MAX_FILES,
+            'nas-offline-btn': !isStorageAvailable
+          }"
+          :title="!isStorageAvailable ? 'Servidor NAS offline. O envio de fotos e vídeos está bloqueado.' : ''"
+        >
           <input
             type="file"
             accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/quicktime"
             multiple
-            :disabled="totalMediaCount >= MAX_FILES"
+            :disabled="!isStorageAvailable || totalMediaCount >= MAX_FILES"
             class="hidden-file-input"
             @change="handleFileSelect"
           />
-          📷 [ Anexar Fotos ]
+          📷 {{ !isStorageAvailable ? '[ Fotos Indisponíveis (NAS Offline) ]' : '[ Adicionar Fotos ]' }}
         </label>
 
         <span v-if="isCompressing" class="compressing-hint">
@@ -426,6 +493,84 @@ function handleClose() {
   color: #b91c1c;
   font-size: 0.85rem;
   border-radius: 2px;
+}
+
+.nas-offline-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.65rem 0.75rem;
+  background-color: #fffbeb;
+  border: 2px solid #f59e0b;
+  box-shadow: 2px 2px 0px rgba(180, 83, 9, 0.15);
+  border-radius: 2px;
+  font-family: var(--font-body, 'Outfit', sans-serif);
+}
+
+.nas-offline-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.nas-alert-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.nas-alert-badge {
+  font-family: var(--font-heading, monospace);
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: #92400e;
+  letter-spacing: 0.5px;
+}
+
+.nas-recheck-btn {
+  margin-left: auto;
+  font-family: var(--font-heading, monospace);
+  font-size: 0.7rem;
+  font-weight: bold;
+  color: #78350f;
+  background: #fef3c7;
+  border: 1px solid #d97706;
+  padding: 0.15rem 0.5rem;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all 0.15s ease;
+}
+
+.nas-recheck-btn:hover:not(:disabled) {
+  background: #fde68a;
+}
+
+.nas-recheck-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.nas-offline-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.nas-offline-main {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #92400e;
+  line-height: 1.35;
+}
+
+.nas-offline-sub {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #065f46;
+  background: #d1fae5;
+  border: 1px dashed #10b981;
+  padding: 0.35rem 0.5rem;
+  border-radius: 2px;
+  line-height: 1.35;
 }
 
 .section-label {
@@ -584,6 +729,13 @@ function handleClose() {
   opacity: 0.5;
   cursor: not-allowed;
   background-color: #eee;
+}
+.upload-label-btn.nas-offline-btn {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background-color: #f3f4f6;
+  border-color: #d1d5db;
+  color: #6b7280;
 }
 
 .compressing-hint {
