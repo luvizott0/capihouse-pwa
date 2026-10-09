@@ -6,10 +6,19 @@ import { useEntertainmentStore, type EntertainmentTab } from '@/stores/entertain
 import LetterboxdCard from '@/components/entertainment/LetterboxdCard.vue'
 import GameCard from '@/components/entertainment/GameCard.vue'
 import GameReviewModal from '@/components/entertainment/GameReviewModal.vue'
+import SeriesActivityCard from '@/components/entertainment/SeriesActivityCard.vue'
 import PostCardSkeleton from '@/components/feed/PostCardSkeleton.vue'
 import NewPostsBanner from '@/components/feed/NewPostsBanner.vue'
 import PullToRefreshIndicator from '@/components/ui/PullToRefreshIndicator.vue'
 import { usePullToRefresh } from '@/composables/usePullToRefresh'
+
+function openCapyShowTimeApp() {
+  const isBmo = window.location.hostname.includes('.bmo')
+  const url = isBmo
+    ? 'https://capyshowtime.bmo'
+    : `http://${window.location.hostname}:8007`
+  window.open(url, '_blank')
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -340,7 +349,6 @@ onUnmounted(() => {
         @click="handleTabChange('series')"
       >
         📺 Séries
-        <span class="tab-badge soon-badge">Em breve</span>
       </button>
 
       <button
@@ -401,14 +409,52 @@ onUnmounted(() => {
         </div>
       </section>
 
-      <!-- Series Tab (Placeholder) -->
+      <!-- Series Tab (CapyShowTime Activities) -->
       <section v-else-if="activeTab === 'series'" class="tab-content">
-        <div class="retro-box upcoming-box">
-          <span class="upcoming-icon">📺</span>
-          <h3 class="upcoming-title">Em breve: Séries e Maratonas</h3>
-          <p class="upcoming-desc">
-            Estamos preparando integrações para você compartilhar suas séries favoritas, episódios assistidos e notas de temporadas.
+        <!-- Banner de Atalho para o CapyShowTime -->
+        <div class="capyshowtime-banner">
+          <div class="capy-banner-info">
+            <span class="capy-badge">📺 CapyShowTime</span>
+            <p class="capy-sub">O que os amigos da Capihouse estão assistindo</p>
+          </div>
+          <button
+            type="button"
+            class="open-capy-btn"
+            @click="openCapyShowTimeApp"
+          >
+            Abrir App ↗
+          </button>
+        </div>
+
+        <!-- Skeleton Loading -->
+        <div v-if="entertainmentStore.seriesIsLoading && !entertainmentStore.seriesActivities.length" class="loading-skeletons">
+          <PostCardSkeleton v-for="i in 3" :key="i" />
+        </div>
+
+        <!-- Activities List -->
+        <template v-else-if="entertainmentStore.seriesActivities.length">
+          <SeriesActivityCard
+            v-for="act in entertainmentStore.seriesActivities"
+            :key="act.id"
+            :activity="act"
+          />
+
+          <div class="infinite-end-card">
+            <span class="end-marker">📺</span>
+            <span class="end-text">Você visualizou todas as atividades recentes do CapyShowTime!</span>
+          </div>
+        </template>
+
+        <!-- Empty State -->
+        <div v-else class="retro-box empty-state">
+          <span class="empty-icon">📺</span>
+          <h3 class="empty-title">Nenhuma atividade de séries ainda</h3>
+          <p class="empty-desc">
+            Assim que você ou seus amigos marcarem episódios como assistidos no CapyShowTime, as novidades aparecerão aqui automaticamente!
           </p>
+          <button type="button" class="empty-action-link" @click="openCapyShowTimeApp">
+            [ Abrir CapyShowTime ]
+          </button>
         </div>
       </section>
 
@@ -841,5 +887,54 @@ onUnmounted(() => {
 }
 .empty-action-link:hover {
   text-decoration: underline;
+}
+
+.capyshowtime-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: var(--color-surface, #ffffff);
+  border: 2px solid var(--color-border, #D8CDC5);
+  border-radius: var(--radius-sm, 6px);
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  box-shadow: 2px 2px 0 var(--color-border, #D8CDC5);
+}
+
+.capy-banner-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.capy-badge {
+  font-family: var(--font-heading, monospace);
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--color-primary-900, #3d2a14);
+}
+
+.capy-sub {
+  font-size: 0.8rem;
+  color: var(--color-text-muted, #718096);
+  margin: 0;
+}
+
+.open-capy-btn {
+  background-color: #f5c518;
+  color: #12100e;
+  font-weight: 700;
+  font-size: 0.82rem;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 1px solid #d4a70a;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.open-capy-btn:hover {
+  background-color: #e0b312;
+  transform: translateY(-1px);
 }
 </style>

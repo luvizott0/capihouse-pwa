@@ -2,11 +2,36 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { Post, PostComment } from '@/types/models'
 import * as postsApi from '@/api/posts'
+import apiClient from '@/api/client'
 import { connectEcho } from '@/services/echo'
 
 const ENTERTAINMENT_CACHE_KEY = 'capihouse_entertainment_cache'
 
 export type EntertainmentTab = 'movies' | 'series' | 'games'
+
+export interface CapyActivity {
+  id: number
+  user: {
+    id: number
+    name: string
+    username: string
+    avatar_url: string | null
+  }
+  series: {
+    id: number
+    tmdb_id: number
+    name: string
+    poster_url: string | null
+  }
+  episode: {
+    id: number
+    season_number: number
+    episode_number: number
+    name: string
+  }
+  rating: number | null
+  watched_at: string
+}
 
 interface EntertainmentCacheData {
   posts: Post[]
@@ -62,6 +87,11 @@ export const useEntertainmentStore = defineStore('entertainment', () => {
   const gameHasLoaded = ref(false)
   const gameIsLoadingMore = ref(false)
   const pendingGamePosts = ref<Post[]>([])
+
+  // Series state (CapyShowTime)
+  const seriesActivities = ref<CapyActivity[]>([])
+  const seriesHasLoaded = ref(false)
+  const seriesIsLoading = ref(false)
 
   const isLoading = ref(false)
   const activeTab = ref<EntertainmentTab>('movies')
@@ -217,14 +247,33 @@ export const useEntertainmentStore = defineStore('entertainment', () => {
     await fetchEntertainmentPosts(currentPage.value + 1)
   }
 
+  async function fetchSeriesActivities(force = false) {
+    if (seriesHasLoaded.value && !force) return
+    seriesIsLoading.value = true
+    try {
+      const res = await apiClient.get<CapyActivity[]>('/capyshowtime/community-activity')
+      seriesActivities.value = res.data || []
+      seriesHasLoaded.value = true
+    } catch (err) {
+      console.error('Erro ao carregar atividades do CapyShowTime:', err)
+    } finally {
+      seriesIsLoading.value = false
+    }
+  }
+
   function setActiveTab(tab: EntertainmentTab) {
     if (activeTab.value === tab) return
     activeTab.value = tab
 
-    // Se a aba selecionada ainda não carregou dados, busca a primeira página
-    const alreadyLoaded = tab === 'games' ? gameHasLoaded.value : movieHasLoaded.value
-    if (!alreadyLoaded && (tab === 'movies' || tab === 'games')) {
-      fetchEntertainmentPosts(1, { tab })
+    if (tab === 'series') {
+      if (!seriesHasLoaded.value) {
+        fetchSeriesActivities()
+      }
+    } else {
+      const alreadyLoaded = tab === 'games' ? gameHasLoaded.value : movieHasLoaded.value
+      if (!alreadyLoaded && (tab === 'movies' || tab === 'games')) {
+        fetchEntertainmentPosts(1, { tab })
+      }
     }
   }
 
@@ -555,6 +604,10 @@ export const useEntertainmentStore = defineStore('entertainment', () => {
     toggleCommentLike,
     deletePost,
     removePostLocally,
+    seriesActivities,
+    seriesHasLoaded,
+    seriesIsLoading,
+    fetchSeriesActivities,
     subscribeToEntertainment,
     unsubscribeFromEntertainment,
   }
