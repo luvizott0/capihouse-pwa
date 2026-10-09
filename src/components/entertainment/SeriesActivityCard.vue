@@ -24,11 +24,7 @@ function formatEpCode(season: number, ep: number): string {
 }
 
 function openCapyShowTime() {
-  const isBmo = window.location.hostname.includes('.bmo')
-  const capyUrl = isBmo
-    ? `https://capyshowtime.bmo/series/${props.activity.series.tmdb_id}`
-    : `http://${window.location.hostname}:8007/series/${props.activity.series.tmdb_id}`
-  window.open(capyUrl, '_blank')
+  window.open(`https://bmo.tailf56388.ts.net:8443/series/${props.activity.series.tmdb_id}`, '_blank')
 }
 
 function goToUserProfile() {

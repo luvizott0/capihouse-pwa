@@ -13,11 +13,7 @@ import PullToRefreshIndicator from '@/components/ui/PullToRefreshIndicator.vue'
 import { usePullToRefresh } from '@/composables/usePullToRefresh'
 
 function openCapyShowTimeApp() {
-  const isBmo = window.location.hostname.includes('.bmo')
-  const url = isBmo
-    ? 'https://capyshowtime.bmo'
-    : `http://${window.location.hostname}:8007`
-  window.open(url, '_blank')
+  window.open('https://bmo.tailf56388.ts.net:8443', '_blank')
 }
 
 const route = useRoute()
