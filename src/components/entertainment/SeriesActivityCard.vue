@@ -358,9 +358,9 @@ function goToUserProfile() {
 }
 
 .comment-box {
-  background-color: var(--color-surface-sunken, #f9fafb);
-  border-left: 3px solid var(--color-primary, #d97706);
-  padding: 6px 10px;
+  background-color: rgba(245, 158, 11, 0.07);
+  border-left: 3px solid #f59e0b;
+  padding: 8px 12px;
   border-radius: 0 4px 4px 0;
   margin-bottom: 10px;
 }

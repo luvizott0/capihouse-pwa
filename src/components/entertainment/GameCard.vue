@@ -1472,8 +1472,11 @@ const statusLabel = computed(() => {
 
 .review-box {
   margin-top: 0.4rem;
-  border-left: 3px solid var(--color-primary, #a66130);
-  padding-left: 0.75rem;
+  margin-bottom: 0.25rem;
+  border-left: 3px solid #107c10;
+  padding: 0.5rem 0.75rem;
+  background-color: rgba(16, 124, 16, 0.07);
+  border-radius: 0 4px 4px 0;
 }
 
 .review-quote {

@@ -1954,7 +1954,28 @@ async function confirmDeletePost() {
   font-size: 0.88rem;
   color: var(--color-text, #2c2523);
   line-height: 1.5;
-  margin-top: 0.35rem;
+  margin-top: 0.45rem;
+  margin-bottom: 0.35rem;
+  padding: 0.45rem 0.75rem;
+  border-left: 3px solid var(--color-primary, #a66130);
+  background-color: var(--color-surface-sunken, rgba(0, 0, 0, 0.03));
+  border-radius: 0 4px 4px 0;
+  font-style: italic;
+}
+
+.movie-subcard .ent-review-text {
+  border-left-color: #00c030;
+  background-color: rgba(0, 192, 48, 0.07);
+}
+
+.series-subcard .ent-review-text {
+  border-left-color: #f59e0b;
+  background-color: rgba(245, 158, 11, 0.07);
+}
+
+.game-subcard .ent-review-text {
+  border-left-color: #107c10;
+  background-color: rgba(16, 124, 16, 0.07);
 }
 
 .ent-footer-link-row {
@@ -3132,10 +3153,14 @@ async function confirmDeletePost() {
 
 .embedded-review {
   font-size: 0.85rem;
-  color: #4a5568;
+  color: var(--color-text, #4a5568);
   font-style: italic;
-  margin: 0.2rem 0;
-  line-height: 1.4;
+  margin: 0.35rem 0;
+  line-height: 1.45;
+  padding: 0.35rem 0.65rem;
+  border-left: 3px solid var(--color-primary-400, #c88344);
+  background-color: var(--color-surface-sunken, rgba(0, 0, 0, 0.03));
+  border-radius: 0 4px 4px 0;
 }
 
 .embedded-external-link {
