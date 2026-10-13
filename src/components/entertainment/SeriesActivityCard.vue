@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import UserAvatar from '@/components/ui/UserAvatar.vue'
 import type { CapyActivity } from '@/stores/entertainment'
+import { openExternalUrl } from '@/utils/externalLinks'
 
 const props = defineProps<{
   activity: CapyActivity
@@ -24,7 +25,7 @@ function formatEpCode(season: number, ep: number): string {
 }
 
 function openCapyShowTime() {
-  window.open(`https://bmo.tailf56388.ts.net:8443/series/${props.activity.series.tmdb_id}`, '_blank')
+  openExternalUrl(`https://bmo.tailf56388.ts.net:8443/series/${props.activity.series.tmdb_id}`)
 }
 
 function goToUserProfile() {

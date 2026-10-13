@@ -11,9 +11,10 @@ import PostCardSkeleton from '@/components/feed/PostCardSkeleton.vue'
 import NewPostsBanner from '@/components/feed/NewPostsBanner.vue'
 import PullToRefreshIndicator from '@/components/ui/PullToRefreshIndicator.vue'
 import { usePullToRefresh } from '@/composables/usePullToRefresh'
+import { openExternalUrl } from '@/utils/externalLinks'
 
 function openCapyShowTimeApp() {
-  window.open('https://bmo.tailf56388.ts.net:8443', '_blank')
+  openExternalUrl('https://bmo.tailf56388.ts.net:8443')
 }
 
 const route = useRoute()

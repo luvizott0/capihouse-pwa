@@ -17,6 +17,7 @@ import { formatRelativeTime } from '@/utils/date'
 import { resolveMediaUrl } from '@/utils/media'
 import RepostModal from '@/components/entertainment/RepostModal.vue'
 import { pinPost } from '@/api/posts'
+import { openExternalUrl } from '@/utils/externalLinks'
 
 const props = withDefaults(
   defineProps<{
@@ -160,9 +161,9 @@ function resolveSeriesPoster(poster?: string | null): string | null {
 function openSeriesInCapyShowTime() {
   const tmdbId = props.post.metadata?.tmdb_id
   if (tmdbId) {
-    window.open(`https://bmo.tailf56388.ts.net:8443/series/${tmdbId}`, '_blank')
+    openExternalUrl(`https://bmo.tailf56388.ts.net:8443/series/${tmdbId}`)
   } else {
-    window.open('https://bmo.tailf56388.ts.net:8443', '_blank')
+    openExternalUrl('https://bmo.tailf56388.ts.net:8443')
   }
 }
 

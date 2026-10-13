@@ -22,6 +22,7 @@ const authStore = useAuthStore()
 
 import type { FeedTab } from '@/stores/feed'
 import GameReviewModal from '@/components/entertainment/GameReviewModal.vue'
+import { openExternalUrl } from '@/utils/externalLinks'
 
 const showCreateModal = ref(false)
 const showGameReviewModal = ref(false)
@@ -29,7 +30,7 @@ const sentinelRef = ref<HTMLElement | null>(null)
 let scrollObserver: IntersectionObserver | null = null
 
 function openCapyShowTimeApp() {
-  window.open('https://bmo.tailf56388.ts.net:8443', '_blank')
+  openExternalUrl('https://bmo.tailf56388.ts.net:8443')
 }
 
 const activeTab = computed<FeedTab>({

@@ -9,10 +9,14 @@ const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{ (e: 'update:modelValue', value: boolean): void }>()
 const profileStore = useProfileStore()
 
-const form = ref({ current_password: '', password: '', password_confirmation: '' })
+const form = ref({ password: '', password_confirmation: '' })
 const errorMsg = ref('')
 
 async function submit() {
+  if (form.value.password.length < 8) {
+    errorMsg.value = 'A senha deve ter pelo menos 8 caracteres.'
+    return
+  }
   if (form.value.password !== form.value.password_confirmation) {
     errorMsg.value = 'As senhas não coincidem.'
     return
@@ -26,9 +30,8 @@ async function submit() {
 }
 </script>
 <template>
-  <RetroModal :modelValue="modelValue" @update:modelValue="emit('update:modelValue', $event)" title="Alterar Senha" size="sm">
+  <RetroModal :modelValue="modelValue" @update:modelValue="emit('update:modelValue', $event)" title="Definir Nova Senha" size="sm">
     <form @submit.prevent="submit">
-      <RetroInput v-model="form.current_password" type="password" label="Senha Atual" required />
       <RetroInput v-model="form.password" type="password" label="Nova Senha" required />
       <RetroInput v-model="form.password_confirmation" type="password" label="Confirmar Nova Senha" required />
       
