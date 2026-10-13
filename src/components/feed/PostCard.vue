@@ -128,8 +128,16 @@ const gameStatusLabel = computed(() => {
 function formatDate(dateStr?: string | null): string {
   if (!dateStr) return ''
   try {
-    const [year, month, day] = dateStr.split('-')
-    if (day && month && year) return `${day}/${month}/${year}`
+    // Extrai a parte da data caso seja formato YYYY-MM-DD, YYYY-MM-DDTHH:mm:ss, ou YYYY-MM-DD HH:mm:ss
+    const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/)
+    if (match) {
+      const [, year, month, day] = match
+      return `${day}/${month}/${year}`
+    }
+    const d = new Date(dateStr)
+    if (!isNaN(d.getTime())) {
+      return new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC' }).format(d)
+    }
     return dateStr
   } catch {
     return dateStr || ''
