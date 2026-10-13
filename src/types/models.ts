@@ -221,8 +221,19 @@ export interface EntertainmentMetadata {
   duration_ms?: number | null
   reposted_from?: string | null
 
+  // Series (CapyShowTime)
+  series_name?: string | null
+  series_id?: number | null
+  tmdb_id?: number | string | null
+  type?: 'rating' | 'watched' | 'completed' | string | null
+  season_number?: number | null
+  episode_number?: number | null
+  episode_name?: string | null
+  is_spoiler?: boolean | null
+
   // Shared
   rating?: number | null
+  [key: string]: any
 }
 
 export interface Post {

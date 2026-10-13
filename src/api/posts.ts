@@ -13,6 +13,8 @@ export interface GetPostsParams {
   userId?: number
   category?: string
   entertainmentType?: string
+  tab?: string
+  feedType?: string
 }
 
 export function getPosts(paramsOrPage: number | GetPostsParams = 1, groupId?: number) {
@@ -31,6 +33,8 @@ export function getPosts(paramsOrPage: number | GetPostsParams = 1, groupId?: nu
     if (paramsOrPage.userId) params.user_id = paramsOrPage.userId
     if (paramsOrPage.category) params.category = paramsOrPage.category
     if (paramsOrPage.entertainmentType) params.entertainment_type = paramsOrPage.entertainmentType
+    if (paramsOrPage.tab) params.tab = paramsOrPage.tab
+    if (paramsOrPage.feedType) params.feed_type = paramsOrPage.feedType
   }
   return apiClient.get('/posts', { params })
 }

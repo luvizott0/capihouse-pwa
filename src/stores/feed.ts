@@ -6,6 +6,8 @@ import { connectEcho } from '@/services/echo'
 
 const FEED_CACHE_KEY = 'capihouse_feed_cache'
 
+export type FeedTab = 'all' | 'media' | 'movies' | 'series' | 'games'
+
 interface FeedCacheData {
   posts: Post[]
   lastPage: number
@@ -57,6 +59,11 @@ export const useFeedStore = defineStore('feed', () => {
 
   const activeGroupId = ref<number | undefined>(undefined)
   const activeEventId = ref<number | undefined>(undefined)
+  const activeTab = ref<FeedTab>('all')
+
+  function setActiveTab(tab: FeedTab) {
+    activeTab.value = tab
+  }
 
   /** Holds incoming posts that haven't been prepended yet (shown via banner). */
   const pendingPosts = ref<Post[]>([])
@@ -83,7 +90,17 @@ export const useFeedStore = defineStore('feed', () => {
 
   async function fetchPosts(
     page = 1,
-    options?: { groupId?: number; eventId?: number; search?: string; date?: string; startDate?: string; endDate?: string; userId?: number; forceRefresh?: boolean } | number
+    options?: {
+      groupId?: number
+      eventId?: number
+      search?: string
+      date?: string
+      startDate?: string
+      endDate?: string
+      userId?: number
+      forceRefresh?: boolean
+      tab?: FeedTab
+    } | number
   ) {
     if (page > 1) {
       isLoadingMore.value = true
@@ -97,6 +114,9 @@ export const useFeedStore = defineStore('feed', () => {
       groupId = options
     } else if (options) {
       groupId = options.groupId
+      if (options.tab !== undefined) {
+        activeTab.value = options.tab
+      }
       activeFilters.value = {
         search: options.search || undefined,
         date: options.date || undefined,
@@ -115,6 +135,7 @@ export const useFeedStore = defineStore('feed', () => {
 
     const hasAnyFilter = Boolean(
       targetGroupId ||
+      activeTab.value !== 'all' ||
       activeFilters.value.search ||
       activeFilters.value.date ||
       activeFilters.value.startDate ||
@@ -126,6 +147,7 @@ export const useFeedStore = defineStore('feed', () => {
       const res = await postsApi.getPosts({
         page,
         groupId: targetGroupId,
+        tab: activeTab.value !== 'all' ? activeTab.value : undefined,
         search: activeFilters.value.search,
         date: activeFilters.value.date,
         startDate: activeFilters.value.startDate,
@@ -545,8 +567,11 @@ export const useFeedStore = defineStore('feed', () => {
       .listen('.PostCreated', (data: { post: Post }) => {
         // Don't show banner for the author's own post (already prepended locally)
         if (data.post.user_id === currentUserId) return
-        // Don't show entertainment posts in general feed
-        if (data.post.category === 'entertainment') return
+        // Tab filter check for real-time incoming posts
+        if (activeTab.value === 'media' && (!data.post.media || !data.post.media.length)) return
+        if (activeTab.value === 'movies' && data.post.entertainment_type !== 'movie') return
+        if (activeTab.value === 'series' && data.post.entertainment_type !== 'series') return
+        if (activeTab.value === 'games' && data.post.entertainment_type !== 'game') return
         if (eventId) {
           const exists = eventPosts.value.some(p => p.id === data.post.id)
           if (!exists) {
@@ -715,6 +740,8 @@ export const useFeedStore = defineStore('feed', () => {
     eventPostsLastPage,
     activeGroupId,
     activeEventId,
+    activeTab,
+    setActiveTab,
     pendingPosts,
     activeFilters,
     isFiltered,

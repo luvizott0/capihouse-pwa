@@ -80,6 +80,90 @@ const isMusicPost = computed(() => {
   return props.post.entertainment_type === 'music' || props.post.external_source === 'spotify' || !!props.post.metadata?.track_title
 })
 
+const isMoviePost = computed(() => {
+  return (
+    props.post.entertainment_type === 'movie' ||
+    props.post.external_source === 'letterboxd' ||
+    (!props.post.entertainment_type && !!props.post.metadata?.film_title)
+  )
+})
+
+const isSeriesPost = computed(() => {
+  return (
+    props.post.entertainment_type === 'series' ||
+    props.post.external_source === 'capyshowtime' ||
+    (!props.post.entertainment_type && !!props.post.metadata?.series_name)
+  )
+})
+
+const isGamePost = computed(() => {
+  return (
+    props.post.entertainment_type === 'game' ||
+    props.post.external_source === 'xbox' ||
+    (!props.post.entertainment_type && !!props.post.metadata?.game_title)
+  )
+})
+
+const isAnyEntertainmentPost = computed(() => {
+  return isMoviePost.value || isSeriesPost.value || isGamePost.value || isMusicPost.value
+})
+
+const gameStatusLabel = computed(() => {
+  const s = props.post.metadata?.game_status
+  if (s === 'mastered' || (props.post.metadata?.progress_percentage ?? 0) >= 100) {
+    return { text: '🏆 100% Miletado', class: 'status-mastered' }
+  }
+  if (s === 'completed') {
+    return { text: '🏁 Zerado / Finalizado', class: 'status-completed' }
+  }
+  if (s === 'dropped') {
+    return { text: '⏸️ Pausado / Dropado', class: 'status-dropped' }
+  }
+  if (s === 'wishlist') {
+    return { text: '📌 Quero Jogar', class: 'status-wishlist' }
+  }
+  return { text: '🎮 Jogando', class: 'status-playing' }
+})
+
+function formatDate(dateStr?: string | null): string {
+  if (!dateStr) return ''
+  try {
+    const [year, month, day] = dateStr.split('-')
+    if (day && month && year) return `${day}/${month}/${year}`
+    return dateStr
+  } catch {
+    return dateStr || ''
+  }
+}
+
+function formatEpCode(season?: number, ep?: number): string {
+  if (season == null || ep == null) return ''
+  const s = String(season).padStart(2, '0')
+  const e = String(ep).padStart(2, '0')
+  return `S${s}E${e}`
+}
+
+function resolveSeriesPoster(poster?: string | null): string | null {
+  if (!poster) return null
+  if (poster.startsWith('http://') || poster.startsWith('https://')) return poster
+  return `https://image.tmdb.org/t/p/w500${poster}`
+}
+
+function openSeriesInCapyShowTime() {
+  const tmdbId = props.post.metadata?.tmdb_id
+  if (tmdbId) {
+    window.open(`https://bmo.tailf56388.ts.net:8443/series/${tmdbId}`, '_blank')
+  } else {
+    window.open('https://bmo.tailf56388.ts.net:8443', '_blank')
+  }
+}
+
+function openMediaPreview(url?: string | null, title?: string | null, sub?: string | null) {
+  if (url) {
+    imageViewer.openImage(url, title || 'Imagem', sub || undefined)
+  }
+}
+
 const isEntertainmentRepost = computed(() => {
   const rp = props.post.reposted_post
   if (!rp) return false
@@ -542,6 +626,18 @@ async function confirmDeletePost() {
             <span v-if="post.repost_of_id" class="repost-badge" title="Repost">
               🔁 Repost
             </span>
+            <span v-if="isMoviePost" class="media-type-badge movie-badge" title="Cinema e Filmes">
+              🍿 Letterboxd
+            </span>
+            <span v-if="isSeriesPost" class="media-type-badge series-badge" title="Séries no CapyShowTime">
+              📺 CapyShowTime
+            </span>
+            <span v-if="isGamePost" class="media-type-badge game-badge" :class="{ 'xbox-badge': post.external_source === 'xbox' }" title="Jogos">
+              {{ post.external_source === 'xbox' ? '🎮 Xbox Live' : '🕹️ Análise de Jogo' }}
+            </span>
+            <span v-if="isMusicPost" class="media-type-badge spotify-badge" title="Música no Spotify">
+              🎵 Spotify
+            </span>
             <span v-if="isPinned" class="pinned-badge" title="Publicação fixada no perfil">
               📌 Fixado
             </span>
@@ -608,10 +704,183 @@ async function confirmDeletePost() {
       </div>
     </div>
 
-    <!-- Post Content: Card Visual se for Recap, ou texto formatado padrão -->
-    <div v-if="post.content" class="post-body" :class="{ 'recap-body': isRecapPost }">
+    <!-- Post Content: Card Visual se for Recap, ou texto formatado padrão para posts regulares -->
+    <div v-if="post.content && !isMoviePost && !isSeriesPost && !isGamePost" class="post-body" :class="{ 'recap-body': isRecapPost }">
       <RecapFeedCard v-if="isRecapPost" :post="post" />
       <FormattedContent v-else :content="post.content" />
+    </div>
+
+    <!-- Movie Subcard (Filme / Letterboxd) -->
+    <div v-if="isMoviePost && (post.metadata?.film_title || post.content)" class="post-entertainment-subcard movie-subcard">
+      <div
+        v-if="post.metadata?.poster_url"
+        class="ent-media-stage poster-stage"
+        @click="openMediaPreview(post.metadata.poster_url, post.metadata.film_title, post.metadata.film_year ? String(post.metadata.film_year) : undefined)"
+        title="Clique para ampliar o pôster"
+      >
+        <img
+          :src="post.metadata.poster_url"
+          :alt="post.metadata.film_title || 'Pôster do filme'"
+          class="ent-media-thumb movie-poster-thumb"
+          loading="lazy"
+        />
+        <span class="zoom-pill">🔍</span>
+      </div>
+      <div class="ent-media-content">
+        <div class="ent-title-row">
+          <h3 class="ent-main-title">
+            {{ post.metadata?.film_title || 'Filme' }}
+          </h3>
+          <span v-if="post.metadata?.film_year" class="ent-year-tag">
+            ({{ post.metadata.film_year }})
+          </span>
+        </div>
+
+        <div class="ent-meta-row">
+          <div v-if="post.metadata?.rating" class="ent-rating-box" :title="`Nota: ${post.metadata.rating} de 5`">
+            <span class="stars">{{ renderRatingStars(post.metadata.rating) }}</span>
+            <span class="rating-num">{{ post.metadata.rating }}</span>
+          </div>
+          <span v-else class="no-rating-pill">Sem nota</span>
+
+          <span v-if="post.metadata?.rewatch" class="rewatch-pill" title="Filme reassistido">
+            🔁 Reassistido
+          </span>
+
+          <span v-if="post.metadata?.watched_date" class="watched-date-pill">
+            📅 {{ formatDate(post.metadata.watched_date) }}
+          </span>
+        </div>
+
+        <div v-if="post.content" class="ent-review-text">
+          <FormattedContent :content="post.content" />
+        </div>
+
+        <div v-if="post.metadata?.letterboxd_url" class="ent-footer-link-row">
+          <a
+            :href="post.metadata.letterboxd_url"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="ent-external-link letterboxd-link"
+          >
+            [ Ver no Letterboxd ↗ ]
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Series Subcard (Série / CapyShowTime) -->
+    <div v-if="isSeriesPost && (post.metadata?.series_name || post.content)" class="post-entertainment-subcard series-subcard">
+      <div
+        v-if="resolveSeriesPoster(post.metadata?.poster_url)"
+        class="ent-media-stage poster-stage"
+        @click="openMediaPreview(resolveSeriesPoster(post.metadata?.poster_url), post.metadata?.series_name)"
+        title="Clique para ampliar o pôster"
+      >
+        <img
+          :src="resolveSeriesPoster(post.metadata?.poster_url)!"
+          :alt="post.metadata?.series_name || 'Pôster da série'"
+          class="ent-media-thumb series-poster-thumb"
+          loading="lazy"
+        />
+        <span class="zoom-pill">🔍</span>
+      </div>
+      <div class="ent-media-content">
+        <div class="ent-title-row">
+          <h3 class="ent-main-title">
+            {{ post.metadata?.series_name || 'Série' }}
+          </h3>
+        </div>
+
+        <div class="ent-meta-row">
+          <div v-if="post.metadata?.rating" class="ent-rating-box" :title="`Nota: ${post.metadata.rating} de 5`">
+            <span class="stars">{{ renderRatingStars(post.metadata.rating) }}</span>
+            <span class="rating-num">{{ post.metadata.rating }}</span>
+          </div>
+
+          <span v-if="post.metadata?.type === 'completed'" class="completed-pill">
+            🏆 Série Concluída
+          </span>
+
+          <span v-if="post.metadata?.season_number && post.metadata?.episode_number" class="ep-code-pill">
+            {{ formatEpCode(post.metadata.season_number, post.metadata.episode_number) }}
+            <span v-if="post.metadata.episode_name">• {{ post.metadata.episode_name }}</span>
+          </span>
+
+          <span v-if="post.metadata?.is_spoiler" class="spoiler-warning-pill">
+            ⚠️ Spoiler
+          </span>
+        </div>
+
+        <div v-if="post.content" class="ent-review-text">
+          <FormattedContent :content="post.content" />
+        </div>
+
+        <div class="ent-footer-link-row">
+          <button
+            type="button"
+            class="ent-external-link capyshowtime-btn"
+            @click="openSeriesInCapyShowTime"
+          >
+            [ Abrir no CapyShowTime ↗ ]
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Game Subcard (Jogo / Xbox / Análise) -->
+    <div v-if="isGamePost && (post.metadata?.game_title || post.content)" class="post-entertainment-subcard game-subcard">
+      <div
+        v-if="post.metadata?.box_art_url"
+        class="ent-media-stage boxart-stage"
+        @click="openMediaPreview(post.metadata.box_art_url, post.metadata.game_title, post.metadata.platform)"
+        title="Clique para ampliar a capa"
+      >
+        <img
+          :src="post.metadata.box_art_url"
+          :alt="post.metadata.game_title || 'Capa do jogo'"
+          class="ent-media-thumb game-boxart-thumb"
+          loading="lazy"
+        />
+        <span class="zoom-pill">🔍</span>
+      </div>
+      <div v-else class="ent-media-stage placeholder-stage">
+        <span class="placeholder-icon">🎮</span>
+      </div>
+
+      <div class="ent-media-content">
+        <div class="ent-title-row">
+          <h3 class="ent-main-title">
+            {{ post.metadata?.game_title || 'Jogo' }}
+          </h3>
+          <span v-if="post.metadata?.platform" class="ent-platform-tag">
+            [{{ post.metadata.platform }}]
+          </span>
+        </div>
+
+        <div class="ent-meta-row">
+          <span class="game-status-pill" :class="gameStatusLabel.class">
+            {{ gameStatusLabel.text }}
+          </span>
+
+          <div v-if="post.metadata?.rating" class="ent-rating-box" :title="`Nota: ${post.metadata.rating} de 5`">
+            <span class="stars">{{ renderRatingStars(post.metadata.rating) }}</span>
+            <span class="rating-num">{{ post.metadata.rating }}</span>
+          </div>
+
+          <span v-if="post.metadata?.gamerscore != null" class="gamerscore-pill" title="Gamerscore conquistado">
+            🎮 {{ post.metadata.gamerscore }} G
+          </span>
+
+          <span v-if="post.metadata?.hours_played" class="hours-pill" title="Horas jogadas">
+            ⏱️ {{ post.metadata.hours_played }}h
+          </span>
+        </div>
+
+        <div v-if="post.content" class="ent-review-text">
+          <FormattedContent :content="post.content" />
+        </div>
+      </div>
     </div>
 
     <!-- Music Card (quando a própria publicação for de música/Spotify) -->
@@ -1346,6 +1615,338 @@ async function confirmDeletePost() {
   background-color: #831843;
   color: #fce7f3;
   border-color: #db2777;
+}
+
+/* Media Type Badges in Header */
+.media-type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.1rem 0.45rem;
+  border-radius: 4px;
+  margin-left: 0.35rem;
+  vertical-align: middle;
+  letter-spacing: -0.01em;
+}
+
+.movie-badge {
+  background-color: #ffedd5;
+  color: #9a3412;
+  border: 1px solid #fb923c;
+}
+:deep([data-theme='dark']) .movie-badge,
+:global([data-theme='dark']) .movie-badge {
+  background-color: #7c2d12;
+  color: #ffedd5;
+  border-color: #ea580c;
+}
+
+.series-badge {
+  background-color: #e0e7ff;
+  color: #3730a3;
+  border: 1px solid #818cf8;
+}
+:deep([data-theme='dark']) .series-badge,
+:global([data-theme='dark']) .series-badge {
+  background-color: #312e81;
+  color: #e0e7ff;
+  border-color: #6366f1;
+}
+
+.game-badge {
+  background-color: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #34d399;
+}
+.game-badge.xbox-badge {
+  background-color: #f0fdf4;
+  color: #166534;
+  border: 1px solid #22c55e;
+}
+:deep([data-theme='dark']) .game-badge,
+:global([data-theme='dark']) .game-badge {
+  background-color: #064e3b;
+  color: #d1fae5;
+  border-color: #059669;
+}
+
+.spotify-badge {
+  background-color: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #4ade80;
+}
+:deep([data-theme='dark']) .spotify-badge,
+:global([data-theme='dark']) .spotify-badge {
+  background-color: #14532d;
+  color: #dcfce7;
+  border-color: #22c55e;
+}
+
+/* Entertainment Subcards (Movies, Series, Games) */
+.post-entertainment-subcard {
+  display: flex;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  margin: 0.5rem 1rem 0.75rem;
+  background-color: var(--color-primary-50, #f8f6f1);
+  border: 1px solid var(--color-border, #D8CDC5);
+  border-radius: 3px;
+  transition: border-color 0.15s ease;
+}
+.post-entertainment-subcard:hover {
+  border-color: var(--color-primary-300, #dab48e);
+}
+
+.ent-media-stage {
+  flex-shrink: 0;
+  position: relative;
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid var(--color-border, #D8CDC5);
+  background-color: #ffffff;
+  cursor: pointer;
+}
+
+.poster-stage {
+  width: 84px;
+  height: 126px;
+}
+
+.boxart-stage {
+  width: 90px;
+  height: 120px;
+}
+
+.placeholder-stage {
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-primary-100, #f3ede6);
+}
+.placeholder-stage .placeholder-icon {
+  font-size: 2rem;
+}
+
+.ent-media-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.zoom-pill {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #ffffff;
+  font-size: 0.65rem;
+  padding: 1px 4px;
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+.ent-media-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.ent-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.ent-main-title {
+  margin: 0;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-primary-900, #46280b);
+  line-height: 1.3;
+}
+
+.ent-year-tag,
+.ent-platform-tag {
+  font-family: var(--font-heading, monospace);
+  font-size: 0.78rem;
+  color: var(--color-muted, #847062);
+  font-weight: 600;
+}
+
+.ent-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+}
+
+.ent-rating-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  font-family: var(--font-heading, monospace);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.ent-rating-box .stars {
+  color: #d97706;
+  letter-spacing: 1px;
+}
+
+.no-rating-pill {
+  font-size: 0.72rem;
+  color: var(--color-muted, #847062);
+  font-style: italic;
+}
+
+.rewatch-pill,
+.completed-pill,
+.ep-code-pill,
+.watched-date-pill,
+.spoiler-warning-pill,
+.gamerscore-pill,
+.hours-pill {
+  font-family: var(--font-heading, monospace);
+  font-size: 0.72rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.rewatch-pill {
+  background: #ede9fe;
+  color: #5b21b6;
+  border: 1px solid #c4b5fd;
+}
+
+.completed-pill {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #f59e0b;
+  font-weight: 700;
+}
+
+.ep-code-pill {
+  background: #e0e7ff;
+  color: #3730a3;
+  border: 1px solid #a5b4fc;
+  font-weight: 700;
+}
+
+.watched-date-pill {
+  color: var(--color-muted, #847062);
+}
+
+.spoiler-warning-pill {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #f87171;
+  font-weight: 700;
+}
+
+.gamerscore-pill {
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #86efac;
+  font-weight: 700;
+}
+
+.hours-pill {
+  background: var(--color-primary-100, #f3ede6);
+  color: var(--color-primary-800, #5f4120);
+  border: 1px solid var(--color-border, #D8CDC5);
+}
+
+.game-status-pill {
+  font-family: var(--font-heading, monospace);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.1rem 0.45rem;
+  border-radius: 3px;
+}
+.status-mastered {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #f59e0b;
+}
+.status-completed {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #34d399;
+}
+.status-playing {
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #7dd3fc;
+}
+.status-dropped {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+.status-wishlist {
+  background: #f3f4f6;
+  color: #4b5563;
+  border: 1px solid #d1d5db;
+}
+
+.ent-review-text {
+  font-size: 0.88rem;
+  color: var(--color-text, #2c2523);
+  line-height: 1.5;
+  margin-top: 0.35rem;
+}
+
+.ent-footer-link-row {
+  margin-top: 0.4rem;
+}
+
+.ent-external-link {
+  display: inline-block;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--color-primary, #a66130);
+  transition: color 0.15s ease;
+}
+.ent-external-link:hover {
+  color: var(--color-primary-700, #7d5628);
+  text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+  .post-entertainment-subcard {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .poster-stage,
+  .boxart-stage {
+    width: 90px;
+    height: 135px;
+  }
 }
 
 .recap-action-banner {

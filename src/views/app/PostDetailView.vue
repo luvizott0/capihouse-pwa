@@ -4,8 +4,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { useFeedStore } from '@/stores/feed'
 import type { Post } from '@/types/models'
 import PostCard from '@/components/feed/PostCard.vue'
-import LetterboxdCard from '@/components/entertainment/LetterboxdCard.vue'
-import GameCard from '@/components/entertainment/GameCard.vue'
 import RetroButton from '@/components/ui/RetroButton.vue'
 
 const route = useRoute()
@@ -102,20 +100,7 @@ function handlePostDeleted() {
 
     <!-- Post Highlight Card -->
     <div v-else class="post-wrapper">
-      <GameCard
-        v-if="post.category === 'entertainment' && post.entertainment_type === 'game'"
-        :post="post"
-        :default-show-comments="true"
-        @deleted="handlePostDeleted"
-      />
-      <LetterboxdCard
-        v-else-if="post.category === 'entertainment'"
-        :post="post"
-        :default-show-comments="true"
-        @deleted="handlePostDeleted"
-      />
       <PostCard
-        v-else
         :post="post"
         :default-show-comments="true"
         @deleted="handlePostDeleted"

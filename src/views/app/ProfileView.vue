@@ -792,20 +792,7 @@ const {
       </div>
 
       <div class="pinned-card-container">
-        <GameCard
-          v-if="user.pinned_post.entertainment_type === 'game'"
-          :post="user.pinned_post"
-          @deleted="onPinnedPostDeleted"
-          @pinned="onPinnedStateChanged"
-        />
-        <LetterboxdCard
-          v-else-if="user.pinned_post.entertainment_type === 'movie' || user.pinned_post.entertainment_type === 'series' || user.pinned_post.category === 'entertainment'"
-          :post="user.pinned_post"
-          @deleted="onPinnedPostDeleted"
-          @pinned="onPinnedStateChanged"
-        />
         <PostCard
-          v-else
           :post="user.pinned_post"
           @deleted="onPinnedPostDeleted"
           @pinned="onPinnedStateChanged"
@@ -843,31 +830,13 @@ const {
       </div>
       <template v-else-if="userPosts.length">
         <div class="posts-stream">
-          <template v-if="profilePostTab === 'entertainment'">
-            <template v-for="post in userPosts" :key="post.id">
-              <GameCard
-                v-if="post.entertainment_type === 'game'"
-                :post="post"
-                @deleted="feedStore.deletePost(post.id)"
-                @pinned="onPinnedStateChanged"
-              />
-              <LetterboxdCard
-                v-else
-                :post="post"
-                @deleted="feedStore.deletePost(post.id)"
-                @pinned="onPinnedStateChanged"
-              />
-            </template>
-          </template>
-          <template v-else>
-            <PostCard
-              v-for="post in userPosts"
-              :key="post.id"
-              :post="post"
-              @deleted="feedStore.deletePost(post.id)"
-              @pinned="onPinnedStateChanged"
-            />
-          </template>
+          <PostCard
+            v-for="post in userPosts"
+            :key="post.id"
+            :post="post"
+            @deleted="feedStore.deletePost(post.id)"
+            @pinned="onPinnedStateChanged"
+          />
         </div>
         <div v-if="feedStore.hasMoreUserPosts" class="load-more-container">
           <button

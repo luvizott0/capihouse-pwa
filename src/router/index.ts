@@ -56,8 +56,7 @@ const router = createRouter({
           path: 'entertainment',
           name: 'entertainment',
           alias: ['entretenimento', 'midias', 'mídias'],
-          component: () => import('@/views/app/EntertainmentView.vue'),
-          meta: { requiresApproved: true }
+          redirect: (to) => ({ path: '/feed', query: to.query, hash: to.hash }),
         },
         {
           path: 'profile',

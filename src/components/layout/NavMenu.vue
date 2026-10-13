@@ -11,8 +11,6 @@ function handleNavClick(targetPath: string, e: MouseEvent) {
 
   if (targetPath === '/feed') {
     isCurrent = route.path === '/feed' || route.name === 'feed'
-  } else if (targetPath === '/entertainment') {
-    isCurrent = route.path === '/entertainment' || route.name === 'entertainment'
   } else if (targetPath === '/events') {
     isCurrent = route.path === '/events' || route.name === 'events'
   } else if (targetPath === '/profile') {
@@ -46,14 +44,6 @@ function handleNavClick(targetPath: string, e: MouseEvent) {
             @click="(e) => handleNavClick('/feed', e)"
           >
             Feed
-          </router-link>
-          <router-link
-            to="/entertainment"
-            class="nav-tab"
-            active-class="active"
-            @click="(e) => handleNavClick('/entertainment', e)"
-          >
-            Mídias
           </router-link>
           <router-link
             to="/events"
@@ -102,19 +92,6 @@ function handleNavClick(targetPath: string, e: MouseEvent) {
               <path stroke-linecap="round" stroke-linejoin="round" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
             </svg>
             <span class="tab-label">Feed</span>
-          </router-link>
-
-          <!-- Entertainment Tab -->
-          <router-link
-            to="/entertainment"
-            class="mobile-tab"
-            active-class="active"
-            @click="(e) => handleNavClick('/entertainment', e)"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" class="tab-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
-            </svg>
-            <span class="tab-label">Mídias</span>
           </router-link>
 
           <!-- Events Tab -->
@@ -252,12 +229,12 @@ function handleNavClick(targetPath: string, e: MouseEvent) {
 
   .mobile-nav-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     height: 60px;
   }
 
   .mobile-nav-grid.has-admin {
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(4, 1fr);
   }
 
   .mobile-tab {

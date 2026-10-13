@@ -20,9 +20,49 @@ const router = useRouter()
 const feedStore = useFeedStore()
 const authStore = useAuthStore()
 
+import type { FeedTab } from '@/stores/feed'
+import GameReviewModal from '@/components/entertainment/GameReviewModal.vue'
+
 const showCreateModal = ref(false)
+const showGameReviewModal = ref(false)
 const sentinelRef = ref<HTMLElement | null>(null)
 let scrollObserver: IntersectionObserver | null = null
+
+function openCapyShowTimeApp() {
+  window.open('https://bmo.tailf56388.ts.net:8443', '_blank')
+}
+
+const activeTab = computed<FeedTab>({
+  get: () => feedStore.activeTab,
+  set: (val: FeedTab) => feedStore.setActiveTab(val),
+})
+
+function syncTabFromRoute() {
+  const tabFromQuery = route.query.tab as FeedTab
+  if (tabFromQuery && ['all', 'media', 'movies', 'series', 'games'].includes(tabFromQuery)) {
+    if (feedStore.activeTab !== tabFromQuery) {
+      feedStore.setActiveTab(tabFromQuery)
+    }
+  } else if (!tabFromQuery && feedStore.activeTab !== 'all') {
+    feedStore.setActiveTab('all')
+  }
+}
+
+function handleTabChange(tab: FeedTab) {
+  feedStore.setActiveTab(tab)
+  router.replace({
+    query: {
+      ...route.query,
+      tab: tab !== 'all' ? tab : undefined,
+    },
+  })
+}
+
+function handleGameCreated(newPost: any) {
+  if (feedStore.posts && Array.isArray(feedStore.posts)) {
+    feedStore.posts.unshift(newPost)
+  }
+}
 
 const {
   pullDistance,
@@ -61,12 +101,15 @@ const dateFilterLabel = computed(() => {
 })
 
 async function loadPostsForCurrentRoute(force = false) {
-  // Se já temos posts carregados da rede nesta sessão, não é um reload forçado nem há filtros de busca ativos, reutiliza o estado do Pinia
-  if (!force && !hasSearchFilters.value && feedStore.hasLoaded && !feedStore.isFiltered) {
+  syncTabFromRoute()
+
+  // Se já temos posts carregados da rede nesta sessão, não é um reload forçado nem há filtros ativos, reutiliza o estado do Pinia
+  if (!force && !hasSearchFilters.value && activeTab.value === 'all' && feedStore.hasLoaded && !feedStore.isFiltered && feedStore.posts.length > 0) {
     return
   }
 
   await feedStore.fetchPosts(1, {
+    tab: activeTab.value,
     search: searchTerms.value || undefined,
     date: filterDate.value || undefined,
     startDate: filterStartDate.value || undefined,
@@ -122,9 +165,15 @@ watch(
     route.query.end_date,
     route.query.date,
     route.query.user_id,
+    route.query.tab,
   ],
-  ([name, q, search, startDate, endDate, date, userId], [, oldQ, oldSearch, oldStartDate, oldEndDate, oldDate, oldUserId]) => {
+  ([name, q, search, startDate, endDate, date, userId, tab], [, oldQ, oldSearch, oldStartDate, oldEndDate, oldDate, oldUserId, oldTab]) => {
     if (name !== 'feed') return
+    if (tab !== oldTab) {
+      syncTabFromRoute()
+      loadPostsForCurrentRoute(true)
+      return
+    }
     if (q !== oldQ || search !== oldSearch || startDate !== oldStartDate || endDate !== oldEndDate || date !== oldDate || userId !== oldUserId) {
       loadPostsForCurrentRoute(true)
     }
@@ -132,7 +181,11 @@ watch(
 )
 
 function clearSearch() {
-  router.push({ path: '/feed' })
+  const query: Record<string, string> = {}
+  if (route.query.tab) {
+    query.tab = String(route.query.tab)
+  }
+  router.push({ path: '/feed', query: Object.keys(query).length ? query : undefined })
 }
 
 onMounted(async () => {
@@ -204,8 +257,52 @@ onUnmounted(() => {
     <!-- Real-time new posts banner -->
     <NewPostsBanner />
 
-    <!-- Quick Create Post Box -->
-    <div class="quick-post-card" @click="showCreateModal = true">
+    <!-- Filter Tabs (no topo do feed) -->
+    <div class="feed-tabs-bar">
+      <button
+        type="button"
+        class="feed-tab-btn"
+        :class="{ active: activeTab === 'all' }"
+        @click="handleTabChange('all')"
+      >
+        🌐 Todas
+      </button>
+      <button
+        type="button"
+        class="feed-tab-btn"
+        :class="{ active: activeTab === 'media' }"
+        @click="handleTabChange('media')"
+      >
+        📷 Mídias
+      </button>
+      <button
+        type="button"
+        class="feed-tab-btn"
+        :class="{ active: activeTab === 'movies' }"
+        @click="handleTabChange('movies')"
+      >
+        🎬 Filmes
+      </button>
+      <button
+        type="button"
+        class="feed-tab-btn"
+        :class="{ active: activeTab === 'series' }"
+        @click="handleTabChange('series')"
+      >
+        📺 Séries
+      </button>
+      <button
+        type="button"
+        class="feed-tab-btn"
+        :class="{ active: activeTab === 'games' }"
+        @click="handleTabChange('games')"
+      >
+        🎮 Jogos
+      </button>
+    </div>
+
+    <!-- Quick Create Post Box (quando no feed geral ou mídias) -->
+    <div v-if="activeTab === 'all' || activeTab === 'media'" class="quick-post-card" @click="showCreateModal = true">
       <div class="quick-post-row">
         <UserAvatar v-if="authStore.user" :user="authStore.user" size="sm" />
         <div class="fake-input">
@@ -228,6 +325,39 @@ onUnmounted(() => {
           [ Criar post ]
         </button>
       </div>
+    </div>
+
+    <!-- Atalho quando na aba de Jogos -->
+    <div v-else-if="activeTab === 'games'" class="quick-action-banner game-banner">
+      <div class="banner-info">
+        <span class="banner-title">🎮 Análises de Jogos</span>
+        <span class="banner-sub">Compartilhe sua opinião sobre jogos que zerou ou está jogando</span>
+      </div>
+      <button type="button" class="btn-create-game" @click="showGameReviewModal = true">
+        [ + Escrever Review ]
+      </button>
+    </div>
+
+    <!-- Atalho quando na aba de Séries -->
+    <div v-else-if="activeTab === 'series'" class="quick-action-banner series-banner">
+      <div class="banner-info">
+        <span class="banner-title">📺 CapyShowTime</span>
+        <span class="banner-sub">Acompanhe episódios e séries com a comunidade da CapiHouse</span>
+      </div>
+      <button type="button" class="btn-open-capy" @click="openCapyShowTimeApp">
+        [ Abrir CapyShowTime ↗ ]
+      </button>
+    </div>
+
+    <!-- Atalho quando na aba de Filmes -->
+    <div v-else-if="activeTab === 'movies'" class="quick-action-banner movies-banner">
+      <div class="banner-info">
+        <span class="banner-title">🍿 Cinema & Letterboxd</span>
+        <span class="banner-sub">Avaliações e resenhas importadas diretamente do Letterboxd</span>
+      </div>
+      <router-link to="/profile" class="btn-connect-letterboxd">
+        [ Perfil e Letterboxd ]
+      </router-link>
     </div>
 
     <!-- Feed Header Title -->
@@ -313,22 +443,85 @@ onUnmounted(() => {
     <!-- Empty State -->
     <div v-else class="empty-feed-card">
       <img src="/capihouse-logo.png" alt="Capivara" class="empty-capivara-logo" />
-      <h3 class="empty-title">{{ hasSearchFilters ? 'Nenhuma publicação encontrada' : 'Nenhuma publicação ainda' }}</h3>
+      <h3 class="empty-title">
+        <template v-if="hasSearchFilters">Nenhuma publicação encontrada</template>
+        <template v-else-if="activeTab === 'movies'">Nenhum filme compartilhado ainda</template>
+        <template v-else-if="activeTab === 'series'">Nenhuma série compartilhada ainda</template>
+        <template v-else-if="activeTab === 'games'">Nenhum jogo compartilhado ainda</template>
+        <template v-else-if="activeTab === 'media'">Nenhuma mídia encontrada</template>
+        <template v-else>Nenhuma publicação ainda</template>
+      </h3>
       <p class="empty-subtitle">
-        {{ hasSearchFilters ? 'Tente ajustar os filtros ou pesquisar por outros termos.' : 'Seja o primeiro a compartilhar algo com os amigos da casa!' }}
+        <template v-if="hasSearchFilters">
+          Tente ajustar os filtros ou pesquisar por outros termos.
+        </template>
+        <template v-else-if="activeTab === 'movies'">
+          Conecte sua conta do Letterboxd no perfil para sincronizar seus filmes ou compartilhe o que assistiu!
+        </template>
+        <template v-else-if="activeTab === 'series'">
+          Assista no CapyShowTime para registrar automaticamente seus episódios no feed da casa!
+        </template>
+        <template v-else-if="activeTab === 'games'">
+          Conecte sua conta Xbox ou cadastre uma análise do seu jogo favorito para movimentar a casa!
+        </template>
+        <template v-else-if="activeTab === 'media'">
+          Seja o primeiro a compartilhar uma foto ou vídeo com os moradores!
+        </template>
+        <template v-else>
+          Seja o primeiro a compartilhar algo com os amigos da casa!
+        </template>
       </p>
-      <button v-if="hasSearchFilters" type="button" class="empty-create-btn" @click="clearSearch">
-        [ Limpar busca ]
-      </button>
-      <button v-else type="button" class="empty-create-btn" @click="showCreateModal = true">
-        [ Criar primeira publicação ]
-      </button>
+
+      <div class="empty-actions">
+        <button v-if="hasSearchFilters" type="button" class="empty-create-btn" @click="clearSearch">
+          [ Limpar busca ]
+        </button>
+        <template v-else>
+          <button
+            v-if="activeTab === 'games'"
+            type="button"
+            class="empty-create-btn"
+            @click="showGameReviewModal = true"
+          >
+            [ Cadastrar Análise de Jogo ]
+          </button>
+          <button
+            v-else-if="activeTab === 'series'"
+            type="button"
+            class="empty-create-btn"
+            @click="openCapyShowTimeApp"
+          >
+            [ Assistir no CapyShowTime ]
+          </button>
+          <router-link
+            v-else-if="activeTab === 'movies'"
+            to="/profile"
+            class="empty-create-btn"
+          >
+            [ Configurar Letterboxd no Perfil ]
+          </router-link>
+          <button
+            v-else
+            type="button"
+            class="empty-create-btn"
+            @click="showCreateModal = true"
+          >
+            [ Criar primeira publicação ]
+          </button>
+        </template>
+      </div>
     </div>
 
     <!-- Modal to Create Post -->
     <PostCreateModal
       v-model="showCreateModal"
       @created="feedStore.fetchPosts(1)"
+    />
+
+    <!-- Modal to Create Game Review -->
+    <GameReviewModal
+      v-model="showGameReviewModal"
+      @created="handleGameCreated"
     />
   </div>
 </template>
@@ -692,5 +885,161 @@ onUnmounted(() => {
 
 .end-marker {
   font-size: 1rem;
+}
+
+/* Feed Tabs Bar */
+.feed-tabs-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding: 0.35rem 0.25rem 0.5rem 0.25rem;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.feed-tabs-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.feed-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.85rem;
+  background-color: #ffffff;
+  border: 1.5px solid var(--color-border, #D8CDC5);
+  border-radius: 9999px;
+  font-family: var(--font-heading, monospace);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #795548;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  box-shadow: 0 1px 2px rgba(62, 39, 35, 0.04);
+}
+
+.feed-tab-btn:hover {
+  background-color: #fcf9f5;
+  border-color: #bcaaa4;
+  color: #4e342e;
+}
+
+.feed-tab-btn.active {
+  background-color: #4a2e18;
+  border-color: #4a2e18;
+  color: #ffffff;
+  box-shadow: 0 2px 4px rgba(74, 46, 24, 0.25);
+}
+
+.feed-tab-icon {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+/* Quick Action Banners */
+.quick-action-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.9rem;
+  border-radius: 4px;
+  border: 1.5px solid;
+  margin-top: -0.25rem;
+}
+
+.game-banner {
+  background: #f1f8e9;
+  border-color: #aed581;
+}
+
+.series-banner {
+  background: #ede7f6;
+  border-color: #b39ddb;
+}
+
+.movies-banner {
+  background: #fff8e1;
+  border-color: #ffe082;
+}
+
+.banner-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.banner-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.banner-text {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #3e2723;
+  line-height: 1.25;
+}
+
+.banner-text small {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #6d4c41;
+  opacity: 0.9;
+}
+
+.btn-create-game,
+.btn-open-capy,
+.btn-connect-letterboxd {
+  padding: 0.4rem 0.75rem;
+  font-family: var(--font-heading, monospace);
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.btn-create-game {
+  background: #2e7d32;
+  color: #ffffff;
+  border: 1px solid #1b5e20;
+}
+.btn-create-game:hover {
+  background: #1b5e20;
+}
+
+.btn-open-capy {
+  background: #512da8;
+  color: #ffffff;
+  border: 1px solid #311b92;
+}
+.btn-open-capy:hover {
+  background: #311b92;
+}
+
+.btn-connect-letterboxd {
+  background: #e65100;
+  color: #ffffff;
+  border: 1px solid #bf360c;
+}
+.btn-connect-letterboxd:hover {
+  background: #bf360c;
+}
+
+.empty-actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
 }
 </style>
