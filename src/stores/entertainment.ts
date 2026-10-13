@@ -10,7 +10,8 @@ const ENTERTAINMENT_CACHE_KEY = 'capihouse_entertainment_cache'
 export type EntertainmentTab = 'movies' | 'series' | 'games'
 
 export interface CapyActivity {
-  id: number
+  id: string | number
+  type?: 'rating' | 'comment' | 'completed'
   user: {
     id: number
     name: string
@@ -22,14 +23,20 @@ export interface CapyActivity {
     tmdb_id: number
     name: string
     poster_url: string | null
+    number_of_seasons?: number
   }
-  episode: {
+  episode?: {
     id: number
     season_number: number
     episode_number: number
     name: string
-  }
-  rating: number | null
+  } | null
+  comment?: {
+    id: number
+    content: string
+    is_spoiler: boolean
+  } | null
+  rating?: number | null
   watched_at: string
 }
 

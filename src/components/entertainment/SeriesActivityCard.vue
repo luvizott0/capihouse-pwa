@@ -45,9 +45,20 @@ function goToUserProfile() {
           <span class="activity-time">{{ activity.watched_at }}</span>
         </div>
       </div>
-      <span class="platform-badge" title="Atividade registrada no CapyShowTime">
-        📺 CapyShowTime
-      </span>
+      <div class="header-badges">
+        <span v-if="activity.type === 'completed'" class="type-tag completed">
+          🏆 Concluiu a série
+        </span>
+        <span v-else-if="activity.type === 'comment'" class="type-tag comment">
+          💬 Comentou
+        </span>
+        <span v-else-if="activity.rating" class="type-tag rating">
+          ⭐ Avaliou
+        </span>
+        <span class="platform-badge" title="Atividade registrada no CapyShowTime">
+          📺 CapyShowTime
+        </span>
+      </div>
     </div>
 
     <!-- Conteúdo da Série / Episódio -->
@@ -72,11 +83,26 @@ function goToUserProfile() {
           </h4>
         </div>
 
-        <div class="episode-box">
+        <!-- Série Concluída -->
+        <div v-if="activity.type === 'completed'" class="completed-headline">
+          <span class="completed-pill">🏆 Concluiu todas as temporadas!</span>
+          <span v-if="activity.series.number_of_seasons" class="seasons-count">
+            {{ activity.series.number_of_seasons }} temp.
+          </span>
+        </div>
+
+        <!-- Episódio (para avaliação ou comentário) -->
+        <div v-else-if="activity.episode" class="episode-box">
           <span class="ep-badge">
             {{ formatEpCode(activity.episode.season_number, activity.episode.episode_number) }}
           </span>
           <span class="ep-name">{{ activity.episode.name }}</span>
+        </div>
+
+        <!-- Comentário em Episódio -->
+        <div v-if="activity.comment" class="comment-box">
+          <span v-if="activity.comment.is_spoiler" class="spoiler-badge">⚠️ Contém Spoiler</span>
+          <p class="comment-content">“{{ activity.comment.content }}”</p>
         </div>
 
         <div class="card-footer-meta">
@@ -84,7 +110,12 @@ function goToUserProfile() {
             <span class="star-icon">⭐</span>
             <span class="rating-value">{{ Number(activity.rating).toFixed(1) }}</span>
           </div>
-          <span v-else class="watched-tag">✓ Assistido</span>
+          <div v-else-if="activity.type === 'comment'" class="meta-tag comment-meta">
+            💬 Comentário
+          </div>
+          <div v-else-if="activity.type === 'completed'" class="meta-tag completed-meta">
+            🏆 Série Finalizada
+          </div>
 
           <button
             type="button"
@@ -269,10 +300,101 @@ function goToUserProfile() {
   border: 1px solid #facc15;
 }
 
-.watched-tag {
+.header-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.type-tag {
+  font-family: var(--font-heading, monospace);
+  font-size: 0.7rem;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.type-tag.completed {
+  background-color: #dcfce7;
+  color: #15803d;
+  border: 1px solid #86efac;
+}
+
+.type-tag.comment {
+  background-color: #dbeafe;
+  color: #1d4ed8;
+  border: 1px solid #93c5fd;
+}
+
+.type-tag.rating {
+  background-color: #fef08a;
+  color: #854d0e;
+  border: 1px solid #facc15;
+}
+
+.completed-headline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.completed-pill {
   font-size: 0.8rem;
-  color: var(--color-success, #16a34a);
-  font-weight: 600;
+  font-weight: 700;
+  color: #15803d;
+  background-color: #dcfce7;
+  border: 1px solid #86efac;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.seasons-count {
+  font-size: 0.78rem;
+  color: var(--color-text-muted, #666);
+  font-family: var(--font-heading, monospace);
+}
+
+.comment-box {
+  background-color: var(--color-surface-sunken, #f9fafb);
+  border-left: 3px solid var(--color-primary, #d97706);
+  padding: 6px 10px;
+  border-radius: 0 4px 4px 0;
+  margin-bottom: 10px;
+}
+
+.spoiler-badge {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #b45309;
+  background-color: #fef3c7;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-bottom: 4px;
+}
+
+.comment-content {
+  font-size: 0.82rem;
+  color: var(--color-text-main, inherit);
+  font-style: italic;
+  margin: 0;
+  line-height: 1.35;
+}
+
+.meta-tag {
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.comment-meta {
+  color: #2563eb;
+}
+
+.completed-meta {
+  color: #16a34a;
 }
 
 .view-series-btn {
