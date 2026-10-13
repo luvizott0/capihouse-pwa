@@ -1964,13 +1964,13 @@ async function confirmDeletePost() {
 }
 
 .movie-subcard .ent-review-text {
-  border-left-color: #00c030;
-  background-color: rgba(0, 192, 48, 0.07);
+  border-left-color: #fb923c;
+  background-color: rgba(245, 158, 11, 0.07);
 }
 
 .series-subcard .ent-review-text {
-  border-left-color: #f59e0b;
-  background-color: rgba(245, 158, 11, 0.07);
+  border-left-color: #f5c518;
+  background-color: rgba(245, 197, 24, 0.15);
 }
 
 .game-subcard .ent-review-text {

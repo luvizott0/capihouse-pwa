@@ -1299,7 +1299,7 @@ async function handleAddComment() {
   font-size: 0.9rem;
   color: var(--color-primary-900, #3d2a14);
   line-height: 1.5;
-  background-color: rgba(0, 192, 48, 0.07);
+  background-color: rgba(245, 158, 11, 0.07);
   border-left: 3px solid #00c030;
   padding: 0.5rem 0.75rem;
   margin-top: 0.35rem;

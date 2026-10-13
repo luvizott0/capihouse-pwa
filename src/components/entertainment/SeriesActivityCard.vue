@@ -358,8 +358,8 @@ function goToUserProfile() {
 }
 
 .comment-box {
-  background-color: rgba(245, 158, 11, 0.07);
-  border-left: 3px solid #f59e0b;
+  background-color: rgba(245, 197, 24, 0.15);
+  border-left: 3px solid #f5c518;
   padding: 8px 12px;
   border-radius: 0 4px 4px 0;
   margin-bottom: 10px;
