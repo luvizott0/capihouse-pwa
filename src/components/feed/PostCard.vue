@@ -184,8 +184,12 @@ const seriesCommentText = computed(() => {
     return commentMatch[1].trim()
   }
 
-  // Se for apenas notificação de avaliação gerada pelo sistema: Assistiu e avaliou o episódio (...) com nota...
-  if (/^Assistiu e avaliou o epis[oó]dio/i.test(content)) {
+  // Se for notificação gerada pelo sistema (avaliação, conclusão ou marcação de episódio)
+  if (
+    /^Assistiu e avaliou o epis[oó]dio/i.test(content) ||
+    /^Assistiu o epis[oó]dio/i.test(content) ||
+    /^Concluiu a s[eé]rie/i.test(content)
+  ) {
     return ''
   }
 

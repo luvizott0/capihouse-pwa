@@ -446,7 +446,7 @@ onUnmounted(() => {
           <span class="empty-icon">📺</span>
           <h3 class="empty-title">Nenhuma atividade de séries ainda</h3>
           <p class="empty-desc">
-            Assim que você ou seus amigos marcarem episódios como assistidos no CapyShowTime, as novidades aparecerão aqui automaticamente!
+            Assim que você ou seus amigos avaliarem episódios, comentarem ou concluírem séries no CapyShowTime, as novidades aparecerão aqui automaticamente!
           </p>
           <button type="button" class="empty-action-link" @click="openCapyShowTimeApp">
             [ Abrir CapyShowTime ]

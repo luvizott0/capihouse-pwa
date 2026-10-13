@@ -39,7 +39,7 @@ const activeTab = computed<FeedTab>({
 
 function syncTabFromRoute() {
   const tabFromQuery = route.query.tab as FeedTab
-  if (tabFromQuery && ['all', 'media', 'movies', 'series', 'games'].includes(tabFromQuery)) {
+  if (tabFromQuery && ['all', 'text', 'media', 'movies', 'series', 'games'].includes(tabFromQuery)) {
     if (feedStore.activeTab !== tabFromQuery) {
       feedStore.setActiveTab(tabFromQuery)
     }
@@ -270,6 +270,14 @@ onUnmounted(() => {
       <button
         type="button"
         class="feed-tab-btn"
+        :class="{ active: activeTab === 'text' }"
+        @click="handleTabChange('text')"
+      >
+        ✍️ Capits
+      </button>
+      <button
+        type="button"
+        class="feed-tab-btn"
         :class="{ active: activeTab === 'media' }"
         @click="handleTabChange('media')"
       >
@@ -301,8 +309,8 @@ onUnmounted(() => {
       </button>
     </div>
 
-    <!-- Quick Create Post Box (quando no feed geral ou mídias) -->
-    <div v-if="activeTab === 'all' || activeTab === 'media'" class="quick-post-card" @click="showCreateModal = true">
+    <!-- Quick Create Post Box (quando no feed geral, capits ou mídias) -->
+    <div v-if="activeTab === 'all' || activeTab === 'text' || activeTab === 'media'" class="quick-post-card" @click="showCreateModal = true">
       <div class="quick-post-row">
         <UserAvatar v-if="authStore.user" :user="authStore.user" size="sm" />
         <div class="fake-input">
@@ -442,6 +450,7 @@ onUnmounted(() => {
       <img src="/capihouse-logo.png" alt="Capivara" class="empty-capivara-logo" />
       <h3 class="empty-title">
         <template v-if="hasSearchFilters">Nenhuma publicação encontrada</template>
+        <template v-else-if="activeTab === 'text'">Nenhum Capit publicado ainda</template>
         <template v-else-if="activeTab === 'movies'">Nenhum filme compartilhado ainda</template>
         <template v-else-if="activeTab === 'series'">Nenhuma série compartilhada ainda</template>
         <template v-else-if="activeTab === 'games'">Nenhum jogo compartilhado ainda</template>
@@ -452,11 +461,14 @@ onUnmounted(() => {
         <template v-if="hasSearchFilters">
           Tente ajustar os filtros ou pesquisar por outros termos.
         </template>
+        <template v-else-if="activeTab === 'text'">
+          Seja o primeiro a publicar um Capit para os amigos da casa!
+        </template>
         <template v-else-if="activeTab === 'movies'">
           Conecte sua conta do Letterboxd no perfil para sincronizar seus filmes ou compartilhe o que assistiu!
         </template>
         <template v-else-if="activeTab === 'series'">
-          Assista no CapyShowTime para registrar automaticamente seus episódios no feed da casa!
+          Avalie episódios, comente ou conclua séries no CapyShowTime para compartilhar com a casa!
         </template>
         <template v-else-if="activeTab === 'games'">
           Conecte sua conta Xbox ou cadastre uma análise do seu jogo favorito para movimentar a casa!

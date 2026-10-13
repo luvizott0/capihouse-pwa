@@ -6,7 +6,7 @@ import { connectEcho } from '@/services/echo'
 
 const FEED_CACHE_KEY = 'capihouse_feed_cache'
 
-export type FeedTab = 'all' | 'media' | 'movies' | 'series' | 'games'
+export type FeedTab = 'all' | 'text' | 'media' | 'movies' | 'series' | 'games'
 
 interface FeedCacheData {
   posts: Post[]
