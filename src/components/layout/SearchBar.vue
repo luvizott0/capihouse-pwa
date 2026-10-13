@@ -65,12 +65,11 @@ const activeFilterCount = computed(() => {
 const hasActiveFilters = computed(() => activeFilterCount.value > 0)
 
 function executeSearch() {
+  const isEntertainment = selectedScope.value === 'entertainment'
   const targetPath = selectedScope.value === 'events'
     ? '/events'
     : selectedScope.value === 'groups'
     ? '/groups'
-    : selectedScope.value === 'entertainment'
-    ? '/entertainment'
     : '/feed'
 
   const query: Record<string, string> = {}
@@ -80,11 +79,10 @@ function executeSearch() {
   if (selectedEndDate.value) query.end_date = selectedEndDate.value
   if (selectedUserId.value !== null) query.user_id = String(selectedUserId.value)
 
-  if (targetPath === '/entertainment') {
-    const currentTab = route.query.tab || (route.path.startsWith('/entertainment') ? entertainmentStore.activeTab : undefined)
-    if (currentTab && currentTab !== 'movies') {
-      query.tab = String(currentTab)
-    }
+  if (isEntertainment) {
+    query.tab = 'media'
+  } else if (route.query.tab && targetPath === '/feed') {
+    query.tab = String(route.query.tab)
   }
 
   router.push({

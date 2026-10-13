@@ -158,6 +158,32 @@ function openSeriesInCapyShowTime() {
   }
 }
 
+const seriesWatchedDate = computed(() => {
+  return (
+    props.post.watched_at ||
+    props.post.metadata?.watched_date ||
+    props.post.created_at
+  )
+})
+
+const seriesCommentText = computed(() => {
+  if (!props.post.content) return ''
+  const content = props.post.content.trim()
+
+  // Se for o texto gerado automaticamente: Comentou no episódio S01E03 (...) de Série: "Comentário"
+  const commentMatch = content.match(/Comentou no epis[oó]dio [^:]+:\s*["“]([\s\S]+?)["”]$/i)
+  if (commentMatch && commentMatch[1]) {
+    return commentMatch[1].trim()
+  }
+
+  // Se for apenas notificação de avaliação gerada pelo sistema: Assistiu e avaliou o episódio (...) com nota...
+  if (/^Assistiu e avaliou o epis[oó]dio/i.test(content)) {
+    return ''
+  }
+
+  return content
+})
+
 function openMediaPreview(url?: string | null, title?: string | null, sub?: string | null) {
   if (url) {
     imageViewer.openImage(url, title || 'Imagem', sub || undefined)
@@ -807,13 +833,17 @@ async function confirmDeletePost() {
             <span v-if="post.metadata.episode_name">• {{ post.metadata.episode_name }}</span>
           </span>
 
+          <span v-if="seriesWatchedDate" class="watched-date-pill">
+            📅 {{ formatDate(seriesWatchedDate) }}
+          </span>
+
           <span v-if="post.metadata?.is_spoiler" class="spoiler-warning-pill">
             ⚠️ Spoiler
           </span>
         </div>
 
-        <div v-if="post.content" class="ent-review-text">
-          <FormattedContent :content="post.content" />
+        <div v-if="seriesCommentText" class="ent-review-text">
+          <FormattedContent :content="seriesCommentText" />
         </div>
 
         <div class="ent-footer-link-row">
@@ -1645,15 +1675,15 @@ async function confirmDeletePost() {
 }
 
 .series-badge {
-  background-color: #e0e7ff;
-  color: #3730a3;
-  border: 1px solid #818cf8;
+  background-color: #fef08a;
+  color: #854d0e;
+  border: 1px solid #eab308;
 }
 :deep([data-theme='dark']) .series-badge,
 :global([data-theme='dark']) .series-badge {
-  background-color: #312e81;
-  color: #e0e7ff;
-  border-color: #6366f1;
+  background-color: #713f12;
+  color: #fef08a;
+  border-color: #ca8a04;
 }
 
 .game-badge {

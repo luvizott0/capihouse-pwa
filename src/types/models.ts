@@ -247,6 +247,7 @@ export interface Post {
   entertainment_type?: 'movie' | 'series' | 'game' | 'music' | null
   external_source?: string | null
   external_id?: string | null
+  watched_at?: string | null
   metadata?: EntertainmentMetadata | null
   repost_of_id?: number | null
   reposted_post?: Post | null

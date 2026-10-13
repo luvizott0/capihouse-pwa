@@ -328,36 +328,33 @@ onUnmounted(() => {
     </div>
 
     <!-- Atalho quando na aba de Jogos -->
-    <div v-else-if="activeTab === 'games'" class="quick-action-banner game-banner">
-      <div class="banner-info">
-        <span class="banner-title">🎮 Análises de Jogos</span>
-        <span class="banner-sub">Compartilhe sua opinião sobre jogos que zerou ou está jogando</span>
+    <div v-else-if="activeTab === 'games'" class="capyshowtime-banner games-shortcut-banner">
+      <div class="capy-banner-info">
+        <span class="capy-badge">🎮 Análises de Jogos</span>
+        <p class="capy-sub">O que os amigos da Capihouse estão jogando</p>
       </div>
-      <button type="button" class="btn-create-game" @click="showGameReviewModal = true">
-        [ + Escrever Review ]
+      <button
+        type="button"
+        class="open-game-review-btn"
+        @click="showGameReviewModal = true"
+      >
+        + Review
       </button>
     </div>
 
-    <!-- Atalho quando na aba de Séries -->
-    <div v-else-if="activeTab === 'series'" class="quick-action-banner series-banner">
-      <div class="banner-info">
-        <span class="banner-title">📺 CapyShowTime</span>
-        <span class="banner-sub">Acompanhe episódios e séries com a comunidade da CapiHouse</span>
+    <!-- Atalho quando na aba de Séries (Banner estilo CapyShowTime com botão amarelo) -->
+    <div v-else-if="activeTab === 'series'" class="capyshowtime-banner">
+      <div class="capy-banner-info">
+        <span class="capy-badge">📺 CapyShowTime</span>
+        <p class="capy-sub">O que os amigos da Capihouse estão assistindo</p>
       </div>
-      <button type="button" class="btn-open-capy" @click="openCapyShowTimeApp">
-        [ Abrir CapyShowTime ↗ ]
+      <button
+        type="button"
+        class="open-capy-btn"
+        @click="openCapyShowTimeApp"
+      >
+        Abrir App ↗
       </button>
-    </div>
-
-    <!-- Atalho quando na aba de Filmes -->
-    <div v-else-if="activeTab === 'movies'" class="quick-action-banner movies-banner">
-      <div class="banner-info">
-        <span class="banner-title">🍿 Cinema & Letterboxd</span>
-        <span class="banner-sub">Avaliações e resenhas importadas diretamente do Letterboxd</span>
-      </div>
-      <router-link to="/profile" class="btn-connect-letterboxd">
-        [ Perfil e Letterboxd ]
-      </router-link>
     </div>
 
     <!-- Feed Header Title -->
@@ -908,7 +905,7 @@ onUnmounted(() => {
   padding: 0.45rem 0.85rem;
   background-color: #ffffff;
   border: 1.5px solid var(--color-border, #D8CDC5);
-  border-radius: 9999px;
+  border-radius: 2px;
   font-family: var(--font-heading, monospace);
   font-size: 0.78rem;
   font-weight: 700;
@@ -916,20 +913,21 @@ onUnmounted(() => {
   white-space: nowrap;
   cursor: pointer;
   transition: all 0.15s ease-in-out;
-  box-shadow: 0 1px 2px rgba(62, 39, 35, 0.04);
+  box-shadow: 1px 1px 0 var(--color-border, #D8CDC5);
 }
 
 .feed-tab-btn:hover {
   background-color: #fcf9f5;
   border-color: #bcaaa4;
   color: #4e342e;
+  transform: translateY(-1px);
 }
 
 .feed-tab-btn.active {
   background-color: #4a2e18;
   border-color: #4a2e18;
   color: #ffffff;
-  box-shadow: 0 2px 4px rgba(74, 46, 24, 0.25);
+  box-shadow: 2px 2px 0 rgba(74, 46, 24, 0.35);
 }
 
 .feed-tab-icon {
@@ -937,103 +935,74 @@ onUnmounted(() => {
   line-height: 1;
 }
 
-/* Quick Action Banners */
-.quick-action-banner {
+/* CapyShowTime & Games Banners */
+.capyshowtime-banner {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.65rem 0.9rem;
-  border-radius: 4px;
-  border: 1.5px solid;
+  background-color: var(--color-surface, #ffffff);
+  border: 2px solid var(--color-border, #D8CDC5);
+  border-radius: var(--radius-sm, 4px);
+  padding: 10px 14px;
+  box-shadow: 2px 2px 0 var(--color-border, #D8CDC5);
   margin-top: -0.25rem;
 }
 
-.game-banner {
-  background: #f1f8e9;
-  border-color: #aed581;
-}
-
-.series-banner {
-  background: #ede7f6;
-  border-color: #b39ddb;
-}
-
-.movies-banner {
-  background: #fff8e1;
-  border-color: #ffe082;
-}
-
-.banner-left {
+.capy-banner-info {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.banner-icon {
-  font-size: 1.25rem;
-  flex-shrink: 0;
-}
-
-.banner-text {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: #3e2723;
-  line-height: 1.25;
-}
-
-.banner-text small {
-  display: block;
-  font-size: 0.72rem;
-  font-weight: 500;
-  color: #6d4c41;
-  opacity: 0.9;
-}
-
-.btn-create-game,
-.btn-open-capy,
-.btn-connect-letterboxd {
-  padding: 0.4rem 0.75rem;
+.capy-badge {
   font-family: var(--font-heading, monospace);
-  font-size: 0.75rem;
   font-weight: 700;
-  border-radius: 3px;
+  font-size: 0.92rem;
+  color: var(--color-primary-900, #3d2a14);
+}
+
+.capy-sub {
+  font-size: 0.78rem;
+  color: var(--color-text-muted, #718096);
+  margin: 0;
+}
+
+.open-capy-btn {
+  background-color: #f5c518;
+  color: #12100e;
+  font-weight: 700;
+  font-size: 0.82rem;
+  font-family: var(--font-heading, monospace);
+  padding: 8px 14px;
+  border-radius: 4px;
+  border: 1px solid #d4a70a;
   cursor: pointer;
-  white-space: nowrap;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   transition: all 0.15s ease;
-  flex-shrink: 0;
+  white-space: nowrap;
 }
 
-.btn-create-game {
-  background: #2e7d32;
-  color: #ffffff;
-  border: 1px solid #1b5e20;
-}
-.btn-create-game:hover {
-  background: #1b5e20;
+.open-capy-btn:hover {
+  background-color: #e0b312;
+  transform: translateY(-1px);
 }
 
-.btn-open-capy {
-  background: #512da8;
-  color: #ffffff;
-  border: 1px solid #311b92;
-}
-.btn-open-capy:hover {
-  background: #311b92;
+.open-game-review-btn {
+  background-color: #f5c518;
+  color: #12100e;
+  font-weight: 700;
+  font-size: 0.82rem;
+  font-family: var(--font-heading, monospace);
+  padding: 8px 14px;
+  border-radius: 4px;
+  border: 1px solid #d4a70a;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
 }
 
-.btn-connect-letterboxd {
-  background: #e65100;
-  color: #ffffff;
-  border: 1px solid #bf360c;
-}
-.btn-connect-letterboxd:hover {
-  background: #bf360c;
+.open-game-review-btn:hover {
+  background-color: #e0b312;
+  transform: translateY(-1px);
 }
 
 .empty-actions {
