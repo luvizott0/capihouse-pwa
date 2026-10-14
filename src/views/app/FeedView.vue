@@ -922,7 +922,7 @@ onUnmounted(() => {
   font-family: var(--font-heading, monospace);
   font-size: 0.78rem;
   font-weight: 700;
-  color: #795548;
+  color: var(--color-primary-800, #5f4120);
   white-space: nowrap;
   cursor: pointer;
   transition: all 0.15s ease-in-out;
@@ -930,17 +930,17 @@ onUnmounted(() => {
 }
 
 .feed-tab-btn:hover {
-  background-color: #fcf9f5;
-  border-color: #bcaaa4;
-  color: #4e342e;
+  background-color: var(--color-primary-50, #fcf9f5);
+  border-color: var(--color-primary-300, #bcaaa4);
+  color: var(--color-primary-900, #422d16);
   transform: translateY(-1px);
 }
 
 .feed-tab-btn.active {
-  background-color: #4a2e18;
-  border-color: #4a2e18;
+  background-color: var(--color-primary, #a66130);
+  border-color: var(--color-primary-800, #5f4120);
   color: #ffffff;
-  box-shadow: 2px 2px 0 rgba(74, 46, 24, 0.35);
+  box-shadow: 2px 2px 0 var(--color-primary-800, #5f4120);
 }
 
 .feed-tab-icon {
