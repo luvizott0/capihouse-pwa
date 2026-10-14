@@ -177,21 +177,25 @@ const seriesWatchedDate = computed(() => {
 
 const seriesCommentText = computed(() => {
   if (!props.post.content) return ''
-  const content = props.post.content.trim()
+  let content = props.post.content.trim()
 
-  // Se for o texto gerado automaticamente: Comentou no episódio S01E03 (...) de Série: "Comentário"
-  const commentMatch = content.match(/Comentou no epis[oó]dio [^:]+:\s*["“]([\s\S]+?)["”]$/i)
-  if (commentMatch && commentMatch[1]) {
-    return commentMatch[1].trim()
-  }
-
-  // Se for notificação gerada pelo sistema (avaliação, conclusão ou marcação de episódio)
+  // Se for notificação gerada pelo sistema (avaliação, conclusão ou marcação de episódio sem comentário)
   if (
     /^Assistiu e avaliou o epis[oó]dio/i.test(content) ||
     /^Assistiu o epis[oó]dio/i.test(content) ||
-    /^Concluiu a s[eé]rie/i.test(content)
+    /^Concluiu a s[eé]rie/i.test(content) ||
+    /^Abandonou a s[eé]rie/i.test(content)
   ) {
     return ''
+  }
+
+  // Se for comentário com o texto/prefixo gerado pelo sistema:
+  // "Comentou no episódio S01E03 (...) de Série: "meu comentário""
+  if (/^Comentou no epis[oó]dio/i.test(content)) {
+    content = content.replace(/^Comentou no epis[oó]dio[\s\S]*?:\s*/i, '')
+    // Remove aspas envolventes se houver
+    content = content.replace(/^["“]([\s\S]*?)["”]$/, '$1').trim()
+    return content
   }
 
   return content
@@ -832,13 +836,16 @@ async function confirmDeletePost() {
         </div>
 
         <div class="ent-meta-row">
-          <div v-if="post.metadata?.rating" class="ent-rating-box" :title="`Nota: ${post.metadata.rating} de 5`">
-            <span class="stars">{{ renderRatingStars(post.metadata.rating) }}</span>
-            <span class="rating-num">{{ post.metadata.rating }}</span>
+          <div v-if="post.metadata?.rating" class="ent-rating-box series-rating-box" :title="`Nota: ${post.metadata.rating} de 10`">
+            <span class="series-rating-badge">★ {{ post.metadata.rating }}<small>/10</small></span>
           </div>
 
           <span v-if="post.metadata?.type === 'completed'" class="completed-pill">
             🏆 Série Concluída
+          </span>
+
+          <span v-else-if="post.metadata?.type === 'dropped'" class="dropped-pill">
+            🛑 Abandonada
           </span>
 
           <span v-if="post.metadata?.season_number && post.metadata?.episode_number" class="ep-code-pill">
@@ -1860,6 +1867,7 @@ async function confirmDeletePost() {
 
 .rewatch-pill,
 .completed-pill,
+.dropped-pill,
 .ep-code-pill,
 .watched-date-pill,
 .spoiler-warning-pill,
@@ -1885,6 +1893,29 @@ async function confirmDeletePost() {
   color: #92400e;
   border: 1px solid #f59e0b;
   font-weight: 700;
+}
+
+.dropped-pill {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #f87171;
+  font-weight: 700;
+}
+
+.series-rating-badge {
+  font-family: var(--font-heading, monospace);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #d97706;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.series-rating-badge small {
+  font-size: 0.68rem;
+  color: var(--color-muted, #847062);
+  font-weight: normal;
 }
 
 .ep-code-pill {

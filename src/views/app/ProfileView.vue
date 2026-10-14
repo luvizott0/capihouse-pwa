@@ -67,10 +67,8 @@ const showThemeModal = ref(false)
 // Settings form
 const settingsName = ref('')
 const settingsUsername = ref('')
-const settingsCurrentPassword = ref('')
 const settingsPassword = ref('')
 const settingsPasswordConfirmation = ref('')
-const showCurrentPassword = ref(false)
 const showNewPassword = ref(false)
 const showConfirmPassword = ref(false)
 const settingsError = ref('')
@@ -388,7 +386,6 @@ function openSettings() {
     settingsName.value = user.value.name
     settingsUsername.value = user.value.username
   }
-  settingsCurrentPassword.value = ''
   settingsPassword.value = ''
   settingsPasswordConfirmation.value = ''
   settingsError.value = ''
