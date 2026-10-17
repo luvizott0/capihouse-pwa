@@ -1,1 +1,3 @@
-/*    /index.html   200
+/capihouse-media/*    https://api.capihouse.com.br/capihouse-media/:splat    200
+/storage/*            https://api.capihouse.com.br/storage/:splat            200
+/*                    /index.html                                             200
