@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { UserTheme } from '@/types/models'
+import { resolveMediaUrl } from '@/utils/media'
 
 // ──────────────────────────────────────────
 // Default (original) theme constants
@@ -107,9 +108,10 @@ export const useThemeStore = defineStore('theme', () => {
 
     // ── Background ─────────────────────────────────────────
     if (t.bg_type === 'image' && t.bg_value) {
+      const bgImageUrl = resolveMediaUrl(t.bg_value)
       root.style.setProperty('--bg-paper', 'transparent')
       root.style.setProperty('--bg-app-color', 'transparent')
-      root.style.setProperty('--bg-app-image', `url("${t.bg_value}")`)
+      root.style.setProperty('--bg-app-image', `url("${bgImageUrl}")`)
       root.style.setProperty('--bg-app-size',     t.bg_size     || 'cover')
       root.style.setProperty('--bg-app-repeat',   t.bg_repeat   || 'no-repeat')
       root.style.setProperty('--bg-app-position', t.bg_position || 'center')
