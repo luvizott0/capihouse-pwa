@@ -38,3 +38,10 @@ npm run type-check # Run vue-tsc type checking
 npm run test:unit  # Run Vitest tests
 npm run lint       # Run Oxlint and ESLint
 ```
+
+## 🌿 Git & Deployment Policy for AI Agents
+- **NEVER commit or push directly to `main` or `release` without explicit user permission.**
+- Always work in `feat/*` or `fix/*` branches created from `develop`.
+- `release` triggers deployment to Homelab Sandbox (BMO).
+- `main` triggers deployment to Production (Cloudflare Pages).
+
