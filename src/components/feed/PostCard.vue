@@ -161,9 +161,9 @@ function resolveSeriesPoster(poster?: string | null): string | null {
 function openSeriesInCapyShowTime() {
   const tmdbId = props.post.metadata?.tmdb_id
   if (tmdbId) {
-    openExternalUrl(`https://bmo.tailf56388.ts.net:8443/series/${tmdbId}`)
+    openExternalUrl(`https://cst.capihouse.com.br/series/${tmdbId}`)
   } else {
-    openExternalUrl('https://bmo.tailf56388.ts.net:8443')
+    openExternalUrl('https://cst.capihouse.com.br')
   }
 }
 

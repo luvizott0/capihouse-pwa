@@ -25,7 +25,7 @@ function formatEpCode(season: number, ep: number): string {
 }
 
 function openCapyShowTime() {
-  openExternalUrl(`https://bmo.tailf56388.ts.net:8443/series/${props.activity.series.tmdb_id}`)
+  openExternalUrl(`https://cst.capihouse.com.br/series/${props.activity.series.tmdb_id}`)
 }
 
 function goToUserProfile() {

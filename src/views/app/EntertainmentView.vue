@@ -14,7 +14,7 @@ import { usePullToRefresh } from '@/composables/usePullToRefresh'
 import { openExternalUrl } from '@/utils/externalLinks'
 
 function openCapyShowTimeApp() {
-  openExternalUrl('https://bmo.tailf56388.ts.net:8443')
+  openExternalUrl('https://cst.capihouse.com.br')
 }
 
 const route = useRoute()

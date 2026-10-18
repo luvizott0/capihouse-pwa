@@ -30,7 +30,7 @@ const sentinelRef = ref<HTMLElement | null>(null)
 let scrollObserver: IntersectionObserver | null = null
 
 function openCapyShowTimeApp() {
-  openExternalUrl('https://bmo.tailf56388.ts.net:8443')
+  openExternalUrl('https://cst.capihouse.com.br')
 }
 
 const activeTab = computed<FeedTab>({
