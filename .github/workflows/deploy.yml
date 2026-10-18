@@ -1,9 +1,9 @@
-name: Deploy Homelab - PWA
+name: Deploy Sandbox Homelab - PWA
 
 on:
   push:
     branches:
-      - main
+      - release
     paths-ignore:
       - '**.md'
       - '.gitignore'
