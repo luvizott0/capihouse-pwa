@@ -1,8 +1,16 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
-import data from '@emoji-mart/data'
 import i18nPt from '@emoji-mart/data/i18n/pt.json'
 import { Picker } from 'emoji-mart'
+import { getBilingualEmojiData } from '@/utils/bilingualEmojiData'
+
+export interface SelectedEmojiData {
+  native?: string
+  id?: string
+  name?: string
+  unified?: string
+  [key: string]: unknown
+}
 
 const props = withDefaults(
   defineProps<{
@@ -21,7 +29,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: string): void
-  (e: 'select', emoji: any): void
+  (e: 'select', emoji: SelectedEmojiData): void
 }>()
 
 const isOpen = ref(false)
@@ -40,18 +48,18 @@ function checkMobile() {
   isMobile.value = window.innerWidth < 640
 }
 
-let pickerInstance: any = null
+let pickerInstance: HTMLElement | null = null
 
 function createPicker() {
   return new Picker({
-    data,
+    data: getBilingualEmojiData(),
     i18n: i18nPt,
     locale: 'pt',
     theme: 'light',
     previewPosition: 'none',
     skinTonePosition: 'search',
     navPosition: 'top',
-    onEmojiSelect: (selectedEmoji: any) => {
+    onEmojiSelect: (selectedEmoji: SelectedEmojiData) => {
       const emoji = selectedEmoji?.native
       if (emoji) {
         emit('update:modelValue', emoji)
@@ -108,12 +116,14 @@ function mountPicker() {
   const container = isMobile.value ? pickerMobileContainer.value : pickerDesktopContainer.value
   if (!container) return
 
-  if (!pickerInstance) {
-    pickerInstance = createPicker()
-  }
-
+  // Always create a fresh picker instance: emoji-mart custom element permanently marks
+  // itself as disconnected when unmounted, so re-attaching a detached instance prevents it
+  // from re-rendering emojis.
+  pickerInstance = createPicker() as unknown as HTMLElement
   container.innerHTML = ''
-  container.appendChild(pickerInstance)
+  if (pickerInstance) {
+    container.appendChild(pickerInstance)
+  }
 }
 
 function toggle() {
@@ -135,6 +145,7 @@ function open() {
 
 function close() {
   isOpen.value = false
+  pickerInstance = null
 }
 
 function handleResize() {
@@ -154,6 +165,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  pickerInstance = null
   window.removeEventListener('resize', handleResize)
   window.removeEventListener('scroll', updatePopoverPosition, true)
 })
