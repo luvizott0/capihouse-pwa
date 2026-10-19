@@ -169,12 +169,13 @@ function openRepostForTrack(track: SpotifyTrack | SpotifyNowPlaying, username?: 
 function onMusicReposted(newPost: Post) {
   feedStore.posts.unshift(newPost)
   userPosts.value.unshift(newPost)
+  feedStore.invalidateUserPostsCache()
 }
 
 const wasVisitingOther = ref(false)
 const isLoadingProfile = ref(false)
 
-async function loadProfile() {
+async function loadProfile(forceRefresh = false) {
   if (route.query.spotify === 'connected') {
     await authStore.fetchMe()
     showNotice('» Spotify Conectado', 'Sua conta do Spotify foi conectada com sucesso!')
@@ -216,7 +217,7 @@ async function loadProfile() {
     birthInput.value = user.value.birth ? user.value.birth.substring(0, 10) : ''
     syncTabFromRoute()
     // Fetch posts for this user profile (authored posts and tagged posts)
-    await feedStore.fetchUserPosts(user.value.id, 1, profilePostTab.value)
+    await feedStore.fetchUserPosts(user.value.id, 1, profilePostTab.value, forceRefresh)
   }
 }
 
@@ -283,7 +284,9 @@ onMounted(async () => {
   await loadProfile()
 })
 
-watch(() => route.params.username, loadProfile)
+watch(() => route.params.username, () => {
+  loadProfile()
+})
 watch(() => authStore.user, (u) => {
   if (u && isOwner.value) {
     settingsName.value = u.name
@@ -462,11 +465,12 @@ function handleGameCreated(newPost: Post) {
   if (feedStore.posts && Array.isArray(feedStore.posts)) {
     feedStore.posts.unshift(newPost)
   }
+  feedStore.invalidateUserPostsCache()
 }
 
 function handlePostCreated() {
   if (user.value) {
-    feedStore.fetchUserPosts(user.value.id, 1, profilePostTab.value)
+    feedStore.fetchUserPosts(user.value.id, 1, profilePostTab.value, true)
   }
 }
 
@@ -579,7 +583,7 @@ function handleConnectedUserUpdated(updatedUser: any) {
     Object.assign(user.value, updatedUser)
   }
   if (user.value) {
-    feedStore.fetchUserPosts(user.value.id, 1, profilePostTab.value)
+    feedStore.fetchUserPosts(user.value.id, 1, profilePostTab.value, true)
   }
 }
 
@@ -593,7 +597,7 @@ const {
   if (isOwner.value) {
     await authStore.fetchMe()
   }
-  await loadProfile()
+  await loadProfile(true)
 })
 </script>
 
@@ -930,7 +934,7 @@ const {
           class="refresh-btn"
           :class="{ 'is-refreshing': feedStore.isLoadingUserPosts }"
           :disabled="feedStore.isLoadingUserPosts"
-          @click="user && feedStore.fetchUserPosts(user.id, 1, profilePostTab)"
+          @click="user && feedStore.fetchUserPosts(user.id, 1, profilePostTab, true)"
           title="Recarregar publicações"
         >
           <svg
