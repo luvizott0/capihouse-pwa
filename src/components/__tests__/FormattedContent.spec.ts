@@ -155,7 +155,7 @@ describe('FormattedContent', () => {
     expect(store.url).toBe('https://github.com/luvizott0')
   })
 
-  it('renders quick copy button for each external link', () => {
+  it('does not render an inline copy button beside the external link', () => {
     const wrapper = mount(FormattedContent, {
       props: { content: 'Link: https://teste.com' },
       global: {
@@ -166,6 +166,6 @@ describe('FormattedContent', () => {
     })
 
     const copyBtn = wrapper.find('.link-quick-copy-btn')
-    expect(copyBtn.exists()).toBe(true)
+    expect(copyBtn.exists()).toBe(false)
   })
 })

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { useExternalLinkStore } from '@/stores/externalLink'
 
 const props = defineProps<{
@@ -7,7 +7,6 @@ const props = defineProps<{
 }>()
 
 const externalLinkStore = useExternalLinkStore()
-const copiedLink = ref<string | null>(null)
 
 interface Token {
   type: 'text' | 'mention' | 'link'
@@ -68,31 +67,6 @@ const tokens = computed<Token[]>(() => {
 function onLinkClick(targetUrl: string) {
   externalLinkStore.open(targetUrl)
 }
-
-async function copyQuickLink(targetUrl: string) {
-  try {
-    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(targetUrl)
-    } else if (typeof document !== 'undefined') {
-      const el = document.createElement('textarea')
-      el.value = targetUrl
-      el.style.position = 'fixed'
-      el.style.opacity = '0'
-      document.body.appendChild(el)
-      el.select()
-      document.execCommand('copy')
-      document.body.removeChild(el)
-    }
-    copiedLink.value = targetUrl
-    setTimeout(() => {
-      if (copiedLink.value === targetUrl) {
-        copiedLink.value = null
-      }
-    }, 2000)
-  } catch (err) {
-    console.warn('Erro ao copiar link:', err)
-  }
-}
 </script>
 
 <template>
@@ -111,31 +85,19 @@ async function copyQuickLink(targetUrl: string) {
         class="mention-link"
         @click.stop
       >{{ token.value }}</router-link>
-      <span v-else-if="token.type === 'link' && token.url" class="external-link-inline">
-        <a
-          :href="token.url"
-          class="external-link-anchor"
-          target="_blank"
-          rel="noopener noreferrer"
-          :title="`Abrir link externo: ${token.url}`"
-          @click.stop.prevent="onLinkClick(token.url)"
-        >
-          <span class="link-icon">🔗</span>
-          <span class="link-label">{{ token.value }}</span>
-          <span class="external-arrow">↗</span>
-        </a>
-        <button
-          type="button"
-          class="link-quick-copy-btn"
-          :class="{ 'copied': copiedLink === token.url }"
-          :title="copiedLink === token.url ? 'Link copiado!' : 'Copiar link'"
-          :aria-label="copiedLink === token.url ? 'Link copiado!' : 'Copiar link'"
-          @click.stop.prevent="copyQuickLink(token.url)"
-        >
-          <span v-if="copiedLink === token.url" class="copied-check">✓</span>
-          <span v-else class="copy-icon">📋</span>
-        </button>
-      </span>
+      <a
+        v-else-if="token.type === 'link' && token.url"
+        :href="token.url"
+        class="external-link-anchor"
+        target="_blank"
+        rel="noopener noreferrer"
+        :title="`Abrir link externo: ${token.url}`"
+        @click.stop.prevent="onLinkClick(token.url)"
+      >
+        <span class="link-icon">🔗</span>
+        <span class="link-label">{{ token.value }}</span>
+        <span class="external-arrow">↗</span>
+      </a>
       <span v-else>{{ token.value }}</span>
     </template>
   </span>
@@ -230,38 +192,5 @@ async function copyQuickLink(targetUrl: string) {
 .external-arrow {
   font-size: 0.85em;
   line-height: 1;
-}
-
-.link-quick-copy-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background-color: #ffffff;
-  border: 1px solid var(--color-border, #D8CDC5);
-  border-radius: 3px;
-  padding: 0.1rem 0.25rem;
-  font-size: 0.75em;
-  cursor: pointer;
-  line-height: 1;
-  transition: all 0.15s ease;
-  color: #6b7280;
-}
-
-.link-quick-copy-btn:hover {
-  background-color: var(--color-primary-100, #f8efe6);
-  border-color: var(--color-primary-400, #c4884e);
-  color: var(--color-primary-900, #38200a);
-}
-
-.link-quick-copy-btn.copied {
-  background-color: #dcfce7 !important;
-  border-color: #86efac !important;
-  color: #15803d !important;
-  font-weight: bold;
-}
-
-.copied-check {
-  font-weight: bold;
-  color: #15803d;
 }
 </style>
