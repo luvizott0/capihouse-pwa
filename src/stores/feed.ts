@@ -182,26 +182,40 @@ export const useFeedStore = defineStore('feed', () => {
     await fetchPosts(currentPage.value + 1)
   }
 
-  const activeProfileCategory = ref<string | undefined>(undefined)
+  const activeProfileTab = ref<FeedTab>('all')
 
-  async function fetchUserPosts(userId: number, page = 1, category?: string) {
+  async function fetchUserPosts(userId: number, page = 1, tabOrCategory?: FeedTab | string) {
+    let tab: FeedTab = 'all'
+    if (tabOrCategory) {
+      if (tabOrCategory === 'feed') {
+        tab = 'all'
+      } else if (tabOrCategory === 'entertainment') {
+        tab = 'movies'
+      } else if (['all', 'text', 'media', 'movies', 'series', 'games'].includes(tabOrCategory)) {
+        tab = tabOrCategory as FeedTab
+      }
+    }
+
     if (page > 1) {
       isLoadingMoreUserPosts.value = true
     } else {
-      if (activeProfileUserId.value !== userId || activeProfileCategory.value !== category) {
+      if (activeProfileUserId.value !== userId || activeProfileTab.value !== tab) {
         userPosts.value = []
       }
       isLoadingUserPosts.value = true
       activeProfileUserId.value = userId
-      activeProfileCategory.value = category
+      activeProfileTab.value = tab
     }
 
     try {
-      const res = await postsApi.getPosts({
+      const params: postsApi.GetPostsParams = {
         page,
         userId,
-        category,
-      })
+      }
+      if (tab !== 'all') {
+        params.tab = tab
+      }
+      const res = await postsApi.getPosts(params)
       if (page === 1) {
         userPosts.value = res.data.data
       } else {
@@ -220,7 +234,7 @@ export const useFeedStore = defineStore('feed', () => {
 
   async function loadMoreUserPosts() {
     if (isLoadingUserPosts.value || isLoadingMoreUserPosts.value || !hasMoreUserPosts.value || !activeProfileUserId.value) return
-    await fetchUserPosts(activeProfileUserId.value, userPostsCurrentPage.value + 1, activeProfileCategory.value)
+    await fetchUserPosts(activeProfileUserId.value, userPostsCurrentPage.value + 1, activeProfileTab.value)
   }
 
   async function fetchEventPosts(eventId: number, page = 1) {
@@ -742,6 +756,7 @@ export const useFeedStore = defineStore('feed', () => {
     activeEventId,
     activeTab,
     setActiveTab,
+    activeProfileTab,
     pendingPosts,
     activeFilters,
     isFiltered,

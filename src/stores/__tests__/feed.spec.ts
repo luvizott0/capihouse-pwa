@@ -158,6 +158,27 @@ describe('Feed Store', () => {
     expect(store.isFiltered).toBe(false)
   })
 
+  it('fetchUserPosts passes tab parameter when specified', async () => {
+    vi.mocked(postsApi.getPosts).mockResolvedValueOnce({
+      data: {
+        data: [mockPost1],
+        current_page: 1,
+        last_page: 1,
+      },
+    } as any)
+
+    const store = useFeedStore()
+    await store.fetchUserPosts(10, 1, 'games')
+
+    expect(postsApi.getPosts).toHaveBeenCalledWith({
+      page: 1,
+      userId: 10,
+      tab: 'games',
+    })
+    expect(store.activeProfileTab).toBe('games')
+    expect(store.userPosts).toHaveLength(1)
+  })
+
   it('toggleLike updates posts in both feed and userPosts', async () => {
     const store = useFeedStore()
     store.posts = [{ ...mockPost1 }]

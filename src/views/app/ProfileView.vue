@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useProfileStore } from '@/stores/profile'
 import { useAuthStore } from '@/stores/auth'
-import { useFeedStore } from '@/stores/feed'
+import { useFeedStore, type FeedTab } from '@/stores/feed'
 import { useThemeStore } from '@/stores/theme'
 import { useImageViewerStore } from '@/stores/imageViewer'
 import RetroModal from '@/components/ui/RetroModal.vue'
@@ -13,12 +13,13 @@ import ImageCropper from '@/components/profile/ImageCropper.vue'
 import ThemeCustomizerModal from '@/components/profile/ThemeCustomizerModal.vue'
 import PostCard from '@/components/feed/PostCard.vue'
 import PostCardSkeleton from '@/components/feed/PostCardSkeleton.vue'
-import LetterboxdCard from '@/components/entertainment/LetterboxdCard.vue'
-import GameCard from '@/components/entertainment/GameCard.vue'
+import PostCreateModal from '@/components/feed/PostCreateModal.vue'
+import GameReviewModal from '@/components/entertainment/GameReviewModal.vue'
 import ConnectedAccountsModal from '@/components/profile/ConnectedAccountsModal.vue'
 import NowPlayingCard from '@/components/profile/NowPlayingCard.vue'
 import MusicSearchModal from '@/components/profile/MusicSearchModal.vue'
 import MusicRepostModal from '@/components/entertainment/MusicRepostModal.vue'
+import UserAvatar from '@/components/ui/UserAvatar.vue'
 import { formatBirthDate } from '@/utils/date'
 import { usePwaUpdate } from '@/composables/usePwaUpdate'
 import { useWebPush } from '@/composables/useWebPush'
@@ -26,6 +27,7 @@ import PullToRefreshIndicator from '@/components/ui/PullToRefreshIndicator.vue'
 import { usePullToRefresh } from '@/composables/usePullToRefresh'
 import { pinPost } from '@/api/posts'
 import { updateFavoriteMusic, removeFavoriteMusic } from '@/api/spotify'
+import { openExternalUrl } from '@/utils/externalLinks'
 import type { SpotifyTrack, SpotifyNowPlaying, Post } from '@/types/models'
 
 const route = useRoute()
@@ -87,18 +89,14 @@ const {
 
 // Web Push Notifications
 const {
-  isSupported: isPushSupported,
   isIos: isIosDevice,
   isStandalone: isPwaStandalone,
-  permission: pushPermission,
   isSubscribed: isPushSubscribed,
   isLoading: isPushLoading,
   isTesting: isPushTesting,
-  isSavingPreferences: isSavingNotificationPreferences,
   statusMessage: pushStatusMessage,
   errorMessage: pushErrorMessage,
   preferences: notificationPreferences,
-  registeredDevicesCount: pushDevicesCount,
   checkSubscription: checkPushSubscription,
   loadPreferences: loadNotificationPreferences,
   subscribe: subscribePush,
@@ -216,6 +214,7 @@ async function loadProfile() {
     settingsUsername.value = user.value.username
     bioInput.value = user.value.bio || ''
     birthInput.value = user.value.birth ? user.value.birth.substring(0, 10) : ''
+    syncTabFromRoute()
     // Fetch posts for this user profile (authored posts and tagged posts)
     await feedStore.fetchUserPosts(user.value.id, 1, profilePostTab.value)
   }
@@ -270,12 +269,17 @@ async function onPinnedStateChanged(payload: { postId: number; pinned: boolean }
 
 // Restore own theme when leaving a visited profile page
 onUnmounted(() => {
+  if (profileScrollObserver) {
+    profileScrollObserver.disconnect()
+    profileScrollObserver = null
+  }
   if (wasVisitingOther.value) {
     themeStore.loadThemeFromUser(authStore.user)
   }
 })
 
 onMounted(async () => {
+  setupProfileScrollObserver()
   await loadProfile()
 })
 
@@ -443,15 +447,124 @@ async function saveSettings() {
 // User's own posts and posts where user is tagged
 const userPosts = computed(() => feedStore.userPosts)
 
-// Profile publication tabs: feed vs entertainment
-const profilePostTab = ref<'feed' | 'entertainment'>('feed')
+// Modals for post creation and game review
+const showCreateModal = ref(false)
+const showGameReviewModal = ref(false)
 
-async function setProfilePostTab(tab: 'feed' | 'entertainment') {
+function openCapyShowTimeApp() {
+  openExternalUrl('https://cst.capihouse.com.br')
+}
+
+function handleGameCreated(newPost: Post) {
+  if (userPosts.value && Array.isArray(userPosts.value)) {
+    userPosts.value.unshift(newPost)
+  }
+  if (feedStore.posts && Array.isArray(feedStore.posts)) {
+    feedStore.posts.unshift(newPost)
+  }
+}
+
+function handlePostCreated() {
+  if (user.value) {
+    feedStore.fetchUserPosts(user.value.id, 1, profilePostTab.value)
+  }
+}
+
+// Profile publication tabs: aligned with feed (all, text, media, movies, series, games)
+const profilePostTab = ref<FeedTab>('all')
+
+function syncTabFromRoute() {
+  const tabFromQuery = route.query.tab as FeedTab
+  if (tabFromQuery && ['all', 'text', 'media', 'movies', 'series', 'games'].includes(tabFromQuery)) {
+    if (profilePostTab.value !== tabFromQuery) {
+      profilePostTab.value = tabFromQuery
+    }
+  } else if (!tabFromQuery && profilePostTab.value !== 'all') {
+    profilePostTab.value = 'all'
+  }
+}
+
+async function setProfilePostTab(tab: FeedTab) {
   profilePostTab.value = tab
+  router.replace({
+    query: {
+      ...route.query,
+      tab: tab !== 'all' ? tab : undefined,
+    },
+  })
   if (user.value) {
     await feedStore.fetchUserPosts(user.value.id, 1, tab)
   }
 }
+
+// Infinite scroll sentinel observer
+const profileSentinelRef = ref<HTMLElement | null>(null)
+let profileScrollObserver: IntersectionObserver | null = null
+
+function checkProfileSentinelIntersection() {
+  if (!profileSentinelRef.value || !feedStore.hasMoreUserPosts || feedStore.isLoadingUserPosts || feedStore.isLoadingMoreUserPosts) {
+    return
+  }
+  const rect = profileSentinelRef.value.getBoundingClientRect()
+  if (rect.top <= window.innerHeight + 300) {
+    feedStore.loadMoreUserPosts()
+  }
+}
+
+function setupProfileScrollObserver() {
+  if (profileScrollObserver) {
+    profileScrollObserver.disconnect()
+  }
+
+  profileScrollObserver = new IntersectionObserver(
+    (entries) => {
+      const first = entries[0]
+      if (
+        first?.isIntersecting &&
+        feedStore.hasMoreUserPosts &&
+        !feedStore.isLoadingUserPosts &&
+        !feedStore.isLoadingMoreUserPosts
+      ) {
+        feedStore.loadMoreUserPosts()
+      }
+    },
+    {
+      rootMargin: '300px',
+      threshold: 0.1,
+    }
+  )
+
+  if (profileSentinelRef.value) {
+    profileScrollObserver.observe(profileSentinelRef.value)
+  }
+}
+
+watch(
+  () => feedStore.isLoadingUserPosts,
+  (loading) => {
+    if (!loading && feedStore.hasMoreUserPosts && profileSentinelRef.value) {
+      nextTick(() => {
+        checkProfileSentinelIntersection()
+      })
+    }
+  }
+)
+
+watch(profileSentinelRef, (newEl) => {
+  if (newEl && profileScrollObserver) {
+    profileScrollObserver.observe(newEl)
+  }
+})
+
+watch(
+  () => route.query.tab,
+  async (newTab, oldTab) => {
+    if (newTab !== oldTab && user.value) {
+      syncTabFromRoute()
+      await feedStore.fetchUserPosts(user.value.id, 1, profilePostTab.value)
+    }
+  }
+)
 
 // Connected Accounts Modal state
 const showConnectedAccountsModal = ref(false)
@@ -463,8 +576,8 @@ function handleConnectedUserUpdated(updatedUser: any) {
   if (user.value) {
     Object.assign(user.value, updatedUser)
   }
-  if (profilePostTab.value === 'entertainment' && user.value) {
-    feedStore.fetchUserPosts(user.value.id, 1, 'entertainment')
+  if (user.value) {
+    feedStore.fetchUserPosts(user.value.id, 1, profilePostTab.value)
   }
 }
 
@@ -810,30 +923,169 @@ const {
     <div class="user-posts-section">
       <div class="user-posts-header">
         <h2 class="user-posts-title">» Atividades de {{ user.name }}</h2>
-      </div>
-
-      <div class="profile-tabs-bar">
         <button
           type="button"
-          class="profile-tab-btn"
-          :class="{ active: profilePostTab === 'feed' }"
-          @click="setProfilePostTab('feed')"
+          class="refresh-btn"
+          :class="{ 'is-refreshing': feedStore.isLoadingUserPosts }"
+          :disabled="feedStore.isLoadingUserPosts"
+          @click="user && feedStore.fetchUserPosts(user.id, 1, profilePostTab)"
+          title="Recarregar publicações"
         >
-          📰 Feed
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="refresh-icon"
+            :class="{ 'spin': feedStore.isLoadingUserPosts }"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+            />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Filter Tabs (no estilo do feed) -->
+      <div class="feed-tabs-bar">
+        <button
+          type="button"
+          class="feed-tab-btn"
+          :class="{ active: profilePostTab === 'all' }"
+          @click="setProfilePostTab('all')"
+        >
+          🌐 Todas
         </button>
         <button
           type="button"
-          class="profile-tab-btn"
-          :class="{ active: profilePostTab === 'entertainment' }"
-          @click="setProfilePostTab('entertainment')"
+          class="feed-tab-btn"
+          :class="{ active: profilePostTab === 'text' }"
+          @click="setProfilePostTab('text')"
         >
-          🍿 Mídias
+          ✍️ Capits
+        </button>
+        <button
+          type="button"
+          class="feed-tab-btn"
+          :class="{ active: profilePostTab === 'media' }"
+          @click="setProfilePostTab('media')"
+        >
+          📷 Mídias
+        </button>
+        <button
+          type="button"
+          class="feed-tab-btn"
+          :class="{ active: profilePostTab === 'movies' }"
+          @click="setProfilePostTab('movies')"
+        >
+          🎬 Filmes
+        </button>
+        <button
+          type="button"
+          class="feed-tab-btn"
+          :class="{ active: profilePostTab === 'series' }"
+          @click="setProfilePostTab('series')"
+        >
+          📺 Séries
+        </button>
+        <button
+          type="button"
+          class="feed-tab-btn"
+          :class="{ active: profilePostTab === 'games' }"
+          @click="setProfilePostTab('games')"
+        >
+          🎮 Jogos
         </button>
       </div>
 
+      <!-- Quick Create Post Box (no próprio perfil, quando em 'all', 'text' ou 'media') -->
+      <div
+        v-if="isOwner && (profilePostTab === 'all' || profilePostTab === 'text' || profilePostTab === 'media')"
+        class="quick-post-card"
+        @click="showCreateModal = true"
+      >
+        <div class="quick-post-row">
+          <UserAvatar v-if="authStore.user" :user="authStore.user" size="sm" />
+          <div class="fake-input">
+            No que você está pensando, Capivara?
+          </div>
+        </div>
+        <div class="quick-actions-row">
+          <div class="quick-actions-left">
+            <button type="button" class="quick-action-btn" @click.stop="showCreateModal = true">
+              <span class="action-icon">📷</span>
+              <span class="action-text-full">Anexar foto</span>
+              <span class="action-text-short">Foto</span>
+            </button>
+            <button type="button" class="quick-action-btn" @click.stop="showCreateModal = true">
+              <span class="action-icon">😊</span>
+              <span>Sentimento</span>
+            </button>
+          </div>
+          <button type="button" class="quick-publish-btn" @click.stop="showCreateModal = true">
+            [ Criar post ]
+          </button>
+        </div>
+      </div>
+
+      <!-- Atalho quando na aba de Jogos -->
+      <div v-else-if="profilePostTab === 'games'" class="capyshowtime-banner games-shortcut-banner">
+        <div class="capy-banner-info">
+          <span class="capy-badge">🎮 Análises de Jogos</span>
+          <p class="capy-sub">
+            {{ isOwner ? 'Suas análises e jogatinas da casa' : `Jogos e análises de ${user.name}` }}
+          </p>
+        </div>
+        <button
+          v-if="isOwner"
+          type="button"
+          class="open-game-review-btn"
+          @click="showGameReviewModal = true"
+        >
+          + Review
+        </button>
+      </div>
+
+      <!-- Atalho quando na aba de Séries -->
+      <div v-else-if="profilePostTab === 'series'" class="capyshowtime-banner">
+        <div class="capy-banner-info">
+          <span class="capy-badge">📺 CapyShowTime</span>
+          <p class="capy-sub">
+            {{ isOwner ? 'Seu histórico e episódios assistidos' : `Séries que ${user.name} está acompanhando` }}
+          </p>
+        </div>
+        <button
+          type="button"
+          class="open-capy-btn"
+          @click="openCapyShowTimeApp"
+        >
+          Abrir App ↗
+        </button>
+      </div>
+
+      <!-- Atalho quando na aba de Filmes -->
+      <div v-else-if="profilePostTab === 'movies' && isOwner && !user.letterboxd_username" class="capyshowtime-banner movies-shortcut-banner">
+        <div class="capy-banner-info">
+          <span class="capy-badge">🎬 Letterboxd</span>
+          <p class="capy-sub">Conecte sua conta do Letterboxd para sincronizar seus filmes e avaliações automaticamente</p>
+        </div>
+        <button
+          type="button"
+          class="open-capy-btn"
+          @click="showConnectedAccountsModal = true"
+        >
+          Conectar ↗
+        </button>
+      </div>
+
+      <!-- Loading State com Skeletons Shimmer -->
       <div v-if="feedStore.isLoadingUserPosts && !userPosts.length" class="posts-stream">
         <PostCardSkeleton v-for="i in 2" :key="i" />
       </div>
+
       <template v-else-if="userPosts.length">
         <div class="posts-stream">
           <PostCard
@@ -842,8 +1094,19 @@ const {
             :post="post"
             @deleted="feedStore.deletePost(post.id)"
             @pinned="onPinnedStateChanged"
+            @reposted="(newPost: Post) => { if (isOwner) userPosts.unshift(newPost) }"
           />
         </div>
+
+        <!-- Sentinel para Infinite Scroll -->
+        <div ref="profileSentinelRef" class="sentinel-element"></div>
+
+        <!-- Loading Mais Posts Indicator -->
+        <div v-if="feedStore.isLoadingMoreUserPosts" class="infinite-loading-bar">
+          <span class="refresh-dot"></span>
+          <span>Carregando mais publicações antigas...</span>
+        </div>
+
         <div v-if="feedStore.hasMoreUserPosts" class="load-more-container">
           <button
             type="button"
@@ -854,14 +1117,78 @@ const {
             {{ feedStore.isLoadingMoreUserPosts ? 'Carregando mais...' : '[ Carregar mais ]' }}
           </button>
         </div>
+
+        <!-- Final do Feed -->
+        <div v-else-if="!feedStore.hasMoreUserPosts && userPosts.length > 0" class="infinite-end-card">
+          <span class="end-marker">🐾</span>
+          <span class="end-text">Você visualizou todas as publicações de {{ isOwner ? 'seu perfil' : user.name }}!</span>
+        </div>
       </template>
+
+      <!-- Empty State contextual -->
       <div v-else class="retro-box empty-user-posts">
-        <p v-if="profilePostTab === 'entertainment'">
-          Nenhuma atividade de mídias registrada ainda por este usuário.
+        <div class="empty-icon">
+          <span v-if="profilePostTab === 'movies'">🎬</span>
+          <span v-else-if="profilePostTab === 'series'">📺</span>
+          <span v-else-if="profilePostTab === 'games'">🎮</span>
+          <span v-else-if="profilePostTab === 'media'">📷</span>
+          <span v-else-if="profilePostTab === 'text'">✍️</span>
+          <span v-else>🐾</span>
+        </div>
+        <p class="empty-text">
+          <template v-if="profilePostTab === 'movies'">
+            {{ isOwner ? 'Você ainda não possui filmes registrados ou sincronizados do Letterboxd.' : `Nenhum filme avaliado ou assistido por ${user.name} ainda.` }}
+          </template>
+          <template v-else-if="profilePostTab === 'series'">
+            {{ isOwner ? 'Você ainda não registrou atividades de séries no CapyShowTime.' : `Nenhuma atividade de série registrada por ${user.name} ainda.` }}
+          </template>
+          <template v-else-if="profilePostTab === 'games'">
+            {{ isOwner ? 'Você ainda não registrou jogos ou análises do Xbox/Jogos.' : `Nenhum jogo registrado ou avaliado por ${user.name} ainda.` }}
+          </template>
+          <template v-else-if="profilePostTab === 'media'">
+            {{ isOwner ? 'Você ainda não publicou nenhuma foto ou mídia.' : `Nenhuma foto ou mídia publicada por ${user.name} ainda.` }}
+          </template>
+          <template v-else-if="profilePostTab === 'text'">
+            {{ isOwner ? 'Você ainda não publicou nenhum capit de texto.' : `Nenhum capit de texto publicado por ${user.name} ainda.` }}
+          </template>
+          <template v-else>
+            {{ isOwner ? 'Você ainda não realizou nenhuma publicação no feed.' : `Nenhuma atividade recente registrada por ${user.name}.` }}
+          </template>
         </p>
-        <p v-else>
-          Nenhuma publicação feita ainda por este usuário no feed.
-        </p>
+        <div v-if="isOwner" class="empty-actions">
+          <button
+            v-if="profilePostTab === 'all' || profilePostTab === 'text' || profilePostTab === 'media'"
+            type="button"
+            class="retro-action-btn"
+            @click="showCreateModal = true"
+          >
+            [ + Criar publicação ]
+          </button>
+          <button
+            v-else-if="profilePostTab === 'games'"
+            type="button"
+            class="retro-action-btn"
+            @click="showGameReviewModal = true"
+          >
+            [ + Criar análise de jogo ]
+          </button>
+          <button
+            v-else-if="profilePostTab === 'series'"
+            type="button"
+            class="retro-action-btn"
+            @click="openCapyShowTimeApp"
+          >
+            [ Abrir CapyShowTime ↗ ]
+          </button>
+          <button
+            v-else-if="profilePostTab === 'movies' && !user.letterboxd_username"
+            type="button"
+            class="retro-action-btn"
+            @click="showConnectedAccountsModal = true"
+          >
+            [ Conectar Letterboxd ↗ ]
+          </button>
+        </div>
       </div>
     </div>
 
@@ -1242,6 +1569,18 @@ const {
       :track="trackToRepost"
       :from-username="repostFromUsername"
       @reposted="onMusicReposted"
+    />
+
+    <!-- Post Create Modal -->
+    <PostCreateModal
+      v-model="showCreateModal"
+      @created="handlePostCreated"
+    />
+
+    <!-- Game Review Modal -->
+    <GameReviewModal
+      v-model="showGameReviewModal"
+      @created="handleGameCreated"
     />
   </div>
 
@@ -1829,46 +2168,369 @@ const {
   margin: 0;
 }
 
-.profile-tabs-bar {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-top: 0.25rem;
-  margin-bottom: 0.25rem;
-}
-
-.profile-tab-btn {
+.refresh-btn {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  padding: 0.4rem 0.85rem;
-  background-color: var(--color-primary-50, #f8f6f1);
-  border: 1px solid var(--color-border, #D8CDC5);
-  color: var(--color-primary-800, #5f4120);
+  background-color: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.4);
   border-radius: 2px;
-  font-family: var(--font-mono, monospace);
-  font-size: 0.82rem;
-  font-weight: 600;
+  padding: 0.3rem 0.6rem;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #ffffff;
   cursor: pointer;
   transition: all 0.15s ease;
-  box-shadow: 1px 1px 0px rgba(0, 0, 0, 0.05);
 }
-
-.profile-tab-btn:hover {
-  background-color: var(--color-primary-100, #fdf8f3);
-  border-color: var(--color-primary, #a66130);
-}
-
-.profile-tab-btn.active {
-  background-color: var(--color-primary, #a66130);
+.refresh-btn:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.25);
+  border-color: #ffffff;
   color: #ffffff;
-  border-color: var(--color-primary-800, #5f4120);
+}
+.refresh-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
-.empty-user-posts {
-  padding: 2rem;
-  text-align: center;
+.refresh-icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin {
+  animation: spin 0.8s linear infinite;
+}
+
+/* Feed Tabs Bar */
+.feed-tabs-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding: 0.35rem 0.25rem 0.5rem 0.25rem;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.feed-tabs-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.feed-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.85rem;
+  background-color: #ffffff;
+  border: 1.5px solid var(--color-border, #D8CDC5);
+  border-radius: 2px;
+  font-family: var(--font-heading, monospace);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-primary-800, #5f4120);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  box-shadow: 1px 1px 0 var(--color-border, #D8CDC5);
+}
+
+.feed-tab-btn:hover {
+  background-color: var(--color-primary-50, #fcf9f5);
+  border-color: var(--color-primary-300, #bcaaa4);
+  color: var(--color-primary-900, #422d16);
+  transform: translateY(-1px);
+}
+
+.feed-tab-btn.active {
+  background-color: var(--color-primary, #a66130);
+  border-color: var(--color-primary-800, #5f4120);
+  color: #ffffff;
+  box-shadow: 2px 2px 0 var(--color-primary-800, #5f4120);
+}
+
+/* Quick Create Post Box */
+.quick-post-card {
+  background-color: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: 2px;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  transition: border-color 0.15s ease;
+}
+.quick-post-card:hover {
+  border-color: var(--color-primary-400, #c4884e);
+}
+
+.quick-post-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.fake-input {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+  font-family: var(--font-body);
   color: var(--color-muted);
+  background-color: var(--color-primary-50, #f8f6f1);
+  border: 1px solid var(--color-border);
+  border-radius: 2px;
+}
+
+.quick-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-top: 1px solid var(--color-primary-100);
+  padding-top: 0.5rem;
+}
+
+.quick-actions-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.quick-action-btn {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--color-primary-800);
+  font-family: var(--font-heading);
+  cursor: pointer;
+  white-space: nowrap;
+  padding: 0.25rem 0.4rem;
+  transition: all 0.15s ease;
+}
+.quick-action-btn:hover {
+  background-color: var(--color-primary-50, #f8f6f1);
+  border-color: var(--color-border);
+}
+
+.action-icon {
+  font-size: 0.95rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+}
+
+.action-text-short {
+  display: none;
+}
+.action-text-full {
+  display: inline;
+}
+
+@media (max-width: 480px) {
+  .action-text-full {
+    display: none;
+  }
+  .action-text-short {
+    display: inline;
+  }
+}
+
+.quick-publish-btn {
+  background-color: var(--color-primary);
+  color: white;
+  border: none;
+  font-family: var(--font-heading);
+  font-size: 0.8rem;
+  font-weight: bold;
+  padding: 0.35rem 0.65rem;
+  border-radius: 2px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background-color 0.15s ease;
+}
+.quick-publish-btn:hover {
+  background-color: var(--color-primary-600);
+}
+
+/* CapyShowTime & Games & Movies Banners */
+.capyshowtime-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: var(--color-surface, #ffffff);
+  border: 2px solid var(--color-border, #D8CDC5);
+  border-radius: var(--radius-sm, 4px);
+  padding: 10px 14px;
+  box-shadow: 2px 2px 0 var(--color-border, #D8CDC5);
+}
+
+.capy-banner-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.capy-badge {
+  font-family: var(--font-heading, monospace);
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--color-primary-900, #3d2a14);
+}
+
+.capy-sub {
+  font-size: 0.78rem;
+  color: var(--color-text-muted, #718096);
+  margin: 0;
+}
+
+.open-capy-btn {
+  background-color: #f5c518;
+  color: #12100e;
+  font-weight: 700;
+  font-size: 0.82rem;
+  font-family: var(--font-heading, monospace);
+  padding: 8px 14px;
+  border-radius: 4px;
+  border: 1px solid #d4a70a;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.open-capy-btn:hover {
+  background-color: #e0b312;
+  transform: translateY(-1px);
+}
+
+.open-game-review-btn {
+  background-color: #f5c518;
+  color: #12100e;
+  font-weight: 700;
+  font-size: 0.82rem;
+  font-family: var(--font-heading, monospace);
+  padding: 8px 14px;
+  border-radius: 4px;
+  border: 1px solid #d4a70a;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.open-game-review-btn:hover {
+  background-color: #e0b312;
+  transform: translateY(-1px);
+}
+
+/* Sentinel & Infinite Scroll Indicators */
+.sentinel-element {
+  height: 20px;
+  width: 100%;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.infinite-loading-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 0.85rem 1.25rem;
+  background-color: #fdf8f3;
+  border: 1px dashed #d4a574;
+  border-radius: 4px;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.82rem;
+  font-weight: bold;
+  color: #5f4120;
+  box-shadow: 0 1px 3px rgba(62, 39, 35, 0.06);
+}
+
+.refresh-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--color-primary);
+  animation: pulse 1s infinite alternate;
+}
+
+@keyframes pulse {
+  from {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+.infinite-end-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1.25rem;
+  text-align: center;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #5f4120;
+  background-color: #fdf8f3;
+  border: 1px solid #e8c9a5;
+  border-radius: 4px;
+  box-shadow: 0 1px 4px rgba(62, 39, 35, 0.08);
+  margin-top: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.end-marker {
+  font-size: 1rem;
+}
+
+/* Contextual Empty State */
+.empty-user-posts {
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.empty-user-posts .empty-icon {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+
+.empty-user-posts .empty-text {
+  font-size: 0.88rem;
+  color: var(--color-muted);
+  max-width: 420px;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.empty-actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
 }
 
 /* Connected Accounts Section */
