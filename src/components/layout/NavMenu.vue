@@ -1,10 +1,27 @@
 <script setup lang="ts">
-import { useRoute } from 'vue-router'
+import { ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { smoothScrollToTop } from '@/utils/scroll'
+import RetroConfirmModal from '@/components/ui/RetroConfirmModal.vue'
 
 const route = useRoute()
+const router = useRouter()
 const authStore = useAuthStore()
+
+const showLogoutConfirm = ref(false)
+const isLoggingOut = ref(false)
+
+async function handleLogout() {
+  isLoggingOut.value = true
+  try {
+    await authStore.logout()
+    showLogoutConfirm.value = false
+    router.push('/login')
+  } finally {
+    isLoggingOut.value = false
+  }
+}
 
 function handleNavClick(targetPath: string, e: MouseEvent) {
   let isCurrent = false
@@ -71,11 +88,28 @@ function handleNavClick(targetPath: string, e: MouseEvent) {
             Admin
           </router-link>
         </div>
-        <button type="button" class="btn-logout" @click="authStore.logout">
+        <button
+          type="button"
+          class="btn-logout"
+          title="Sair da conta"
+          @click="showLogoutConfirm = true"
+        >
           [ Sair ]
         </button>
       </div>
     </nav>
+
+    <!-- Logout Confirm Modal (Desktop & Mobile) -->
+    <RetroConfirmModal
+      v-model="showLogoutConfirm"
+      title="» Sair da Conta"
+      message="Tem certeza que deseja sair?"
+      confirmText="Sair"
+      cancelText="Cancelar"
+      variant="danger"
+      :loading="isLoggingOut"
+      @confirm="handleLogout"
+    />
 
     <!-- Mobile Bottom App Navigation Bar (Teleported to body to detach from sticky header) -->
     <Teleport to="body">

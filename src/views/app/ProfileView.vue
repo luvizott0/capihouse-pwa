@@ -105,9 +105,17 @@ const {
   updatePreference: setNotificationPreference,
 } = useWebPush()
 
+const isLoggingOut = ref(false)
+
 async function handleLogout() {
-  await authStore.logout()
-  router.push('/login')
+  isLoggingOut.value = true
+  try {
+    await authStore.logout()
+    showLogoutConfirm.value = false
+    router.push('/login')
+  } finally {
+    isLoggingOut.value = false
+  }
 }
 
 // Inline editing: Bio
@@ -1524,10 +1532,19 @@ const {
         </div>
 
         <div class="modal-footer">
-          <RetroButton variant="secondary" @click="showSettingsModal = false">Cancelar</RetroButton>
-          <RetroButton :loading="isSavingSettings" @click="saveSettings">
-            Salvar Configurações
+          <RetroButton
+            type="button"
+            variant="danger"
+            @click="showSettingsModal = false; showLogoutConfirm = true"
+          >
+            Sair da Conta
           </RetroButton>
+          <div class="modal-footer-right">
+            <RetroButton variant="secondary" @click="showSettingsModal = false">Cancelar</RetroButton>
+            <RetroButton :loading="isSavingSettings" @click="saveSettings">
+              Salvar Configurações
+            </RetroButton>
+          </div>
         </div>
       </div>
     </RetroModal>
@@ -1548,10 +1565,11 @@ const {
     <RetroConfirmModal
       v-model="showLogoutConfirm"
       title="» Sair da Conta"
-      message="Tem certeza que deseja encerrar a sua sessão no CapiHouse?"
-      confirmText="Sair da Conta"
+      message="Tem certeza que deseja sair?"
+      confirmText="Sair"
       cancelText="Cancelar"
       variant="danger"
+      :loading="isLoggingOut"
       @confirm="handleLogout"
     />
 
@@ -3059,10 +3077,19 @@ const {
 
 .modal-footer {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   gap: 0.75rem;
   border-top: 1px solid var(--color-border);
   padding-top: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.modal-footer-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-left: auto;
 }
 
 .load-more-container {
