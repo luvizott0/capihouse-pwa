@@ -122,15 +122,22 @@ onUnmounted(() => {
       refreshing-text="Atualizando grupos..."
     />
 
-    <!-- Header line -->
-    <div class="groups-header-line">
-      <div class="header-left">
-        <h2 class="section-marker">» Meus Grupos de Filtro</h2>
+    <!-- Header -->
+    <div class="groups-header">
+      <div>
+        <h2 class="section-title">» {{ hasSearchFilters ? 'Grupos Encontrados' : 'Meus Grupos de Filtro' }}</h2>
+        <p v-if="hasSearchFilters" class="section-subtitle">
+          Resultados filtrados da sua busca de grupos.
+        </p>
       </div>
-      <div class="header-actions">
-        <RetroButton size="sm" @click="openCreateModal">
-          + Novo Grupo
-        </RetroButton>
+      <div class="groups-header-actions">
+        <button
+          type="button"
+          class="btn-new-group"
+          @click="openCreateModal"
+        >
+          [ + Novo Grupo ]
+        </button>
         <button
           type="button"
           class="refresh-btn"
@@ -305,53 +312,94 @@ onUnmounted(() => {
   width: 100%;
 }
 
-.groups-header-line {
+.groups-header {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-}
-
-.header-left {
-  display: flex;
   align-items: center;
+  gap: 0.5rem;
+  background-color: var(--color-primary, #a66130);
+  border: 1px solid var(--color-primary-800, #5f4120);
+  border-radius: 2px;
+  padding: 0.6rem 0.85rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
-.section-marker {
-  font-family: var(--font-heading, monospace);
-  font-size: 1.15rem;
+.section-title {
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 1.05rem;
   font-weight: 700;
-  color: var(--color-primary-800, #5f4120);
+  color: #ffffff;
   margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.header-actions {
+.section-subtitle {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0.2rem 0 0 0;
+}
+
+.groups-header-actions {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.btn-new-group {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  padding: 0.25rem 0.65rem;
+  border-radius: 3px;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.btn-new-group:hover {
+  background: rgba(255, 255, 255, 0.35);
+  border-color: #ffffff;
+  color: #ffffff;
 }
 
 .refresh-btn {
-  background: none;
-  border: none;
-  padding: 0.25rem;
-  cursor: pointer;
-  color: var(--color-primary-600, #c4884e);
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
-  transition: all 0.2s ease;
+  gap: 0.4rem;
+  background-color: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 2px;
+  padding: 0.3rem 0.6rem;
+  font-family: var(--font-heading, 'Space Mono', monospace);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.15s ease;
 }
 
 .refresh-btn:hover:not(:disabled) {
-  background-color: var(--color-primary-100, #f8efe6);
-  color: var(--color-primary-900, #38200a);
+  background-color: rgba(255, 255, 255, 0.25);
+  border-color: #ffffff;
+  color: #ffffff;
+}
+
+.refresh-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .refresh-icon {
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1rem;
+  height: 1rem;
 }
 
 .refresh-icon.spin {
