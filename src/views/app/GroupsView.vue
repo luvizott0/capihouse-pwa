@@ -6,16 +6,25 @@ defineOptions({
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGroupsStore } from '@/stores/groups'
+import type { Group } from '@/types/models'
 import GroupCardSkeleton from '@/components/groups/GroupCardSkeleton.vue'
 import GroupCreateModal from '@/components/groups/GroupCreateModal.vue'
 import RetroButton from '@/components/ui/RetroButton.vue'
+import RetroConfirmModal from '@/components/ui/RetroConfirmModal.vue'
+import UserAvatar from '@/components/ui/UserAvatar.vue'
 import PullToRefreshIndicator from '@/components/ui/PullToRefreshIndicator.vue'
 import { usePullToRefresh } from '@/composables/usePullToRefresh'
 
 const route = useRoute()
 const router = useRouter()
 const groupsStore = useGroupsStore()
+
 const showCreateModal = ref(false)
+const groupToEdit = ref<Group | null>(null)
+
+const showDeleteModal = ref(false)
+const groupToDelete = ref<Group | null>(null)
+const isDeleting = ref(false)
 
 const {
   pullDistance,
@@ -26,31 +35,11 @@ const {
 } = usePullToRefresh(() => loadGroups(true))
 
 const hasSearchFilters = computed(() => {
-  return !!(route.query.q || route.query.search || route.query.start_date || route.query.end_date || route.query.date || route.query.user_id)
+  return !!(route.query.q || route.query.search)
 })
 
 const searchTerms = computed(() => {
   return (route.query.q as string) || (route.query.search as string) || ''
-})
-const filterStartDate = computed(() => (route.query.start_date as string) || '')
-const filterEndDate = computed(() => (route.query.end_date as string) || '')
-const filterDate = computed(() => (route.query.date as string) || '')
-const filterUserId = computed(() => route.query.user_id ? Number(route.query.user_id) : null)
-
-const dateFilterLabel = computed(() => {
-  if (filterStartDate.value && filterEndDate.value) {
-    return `Período: ${filterStartDate.value} até ${filterEndDate.value}`
-  }
-  if (filterStartDate.value) {
-    return `A partir de: ${filterStartDate.value}`
-  }
-  if (filterEndDate.value) {
-    return `Até: ${filterEndDate.value}`
-  }
-  if (filterDate.value) {
-    return `Data: ${filterDate.value}`
-  }
-  return ''
 })
 
 async function loadGroups(force = false) {
@@ -60,26 +49,14 @@ async function loadGroups(force = false) {
 
   await groupsStore.fetchMyGroups({
     search: searchTerms.value || undefined,
-    date: filterDate.value || undefined,
-    startDate: filterStartDate.value || undefined,
-    endDate: filterEndDate.value || undefined,
-    userId: filterUserId.value || undefined,
   })
 }
 
 watch(
-  () => [
-    route.name,
-    route.query.q,
-    route.query.search,
-    route.query.start_date,
-    route.query.end_date,
-    route.query.date,
-    route.query.user_id,
-  ],
-  ([name, q, search, startDate, endDate, date, userId], [, oldQ, oldSearch, oldStartDate, oldEndDate, oldDate, oldUserId]) => {
+  () => [route.name, route.query.q, route.query.search],
+  ([name, q, search], [, oldQ, oldSearch]) => {
     if (name !== 'groups') return
-    if (q !== oldQ || search !== oldSearch || startDate !== oldStartDate || endDate !== oldEndDate || date !== oldDate || userId !== oldUserId) {
+    if (q !== oldQ || search !== oldSearch) {
       loadGroups(true)
     }
   }
@@ -89,6 +66,39 @@ function clearSearch() {
   router.push({ path: '/groups' })
 }
 
+function openCreateModal() {
+  groupToEdit.value = null
+  showCreateModal.value = true
+}
+
+function openEditModal(group: Group) {
+  groupToEdit.value = group
+  showCreateModal.value = true
+}
+
+function confirmDelete(group: Group) {
+  groupToDelete.value = group
+  showDeleteModal.value = true
+}
+
+async function handleDelete() {
+  if (!groupToDelete.value) return
+  isDeleting.value = true
+  try {
+    await groupsStore.deleteGroup(groupToDelete.value.id)
+    showDeleteModal.value = false
+    groupToDelete.value = null
+  } catch (err) {
+    console.error('Erro ao excluir grupo:', err)
+  } finally {
+    isDeleting.value = false
+  }
+}
+
+function onGroupSaved() {
+  loadGroups(true)
+}
+
 onMounted(async () => {
   await loadGroups()
 })
@@ -96,10 +106,6 @@ onMounted(async () => {
 onUnmounted(() => {
   groupsStore.clearFilters()
 })
-
-function onGroupCreated() {
-  loadGroups(true)
-}
 </script>
 
 <template>
@@ -109,40 +115,58 @@ function onGroupCreated() {
     @touchmove="handleTouchMove"
     @touchend="handleTouchEnd"
   >
-    <!-- Pull-to-refresh indicator box -->
+    <!-- Pull-to-refresh indicator -->
     <PullToRefreshIndicator
       :pull-distance="pullDistance"
       :is-refreshing="isRefreshingFromPull"
       refreshing-text="Atualizando grupos..."
     />
 
-    <!-- Header -->
+    <!-- Header line -->
     <div class="groups-header-line">
-      <h2 class="section-marker">» {{ hasSearchFilters ? 'Grupos Encontrados' : 'Meus Grupos' }}</h2>
-      <button
-        type="button"
-        class="refresh-btn"
-        :class="{ 'is-refreshing': groupsStore.isLoading }"
-        :disabled="groupsStore.isLoading"
-        @click="loadGroups(true)"
-        title="Recarregar grupos"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="refresh-icon"
-          :class="{ 'spin': groupsStore.isLoading }"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          stroke-width="2"
+      <div class="header-left">
+        <h2 class="section-marker">» Meus Grupos de Filtro</h2>
+      </div>
+      <div class="header-actions">
+        <RetroButton size="sm" @click="openCreateModal">
+          + Novo Grupo
+        </RetroButton>
+        <button
+          type="button"
+          class="refresh-btn"
+          :class="{ 'is-refreshing': groupsStore.isLoading }"
+          :disabled="groupsStore.isLoading"
+          @click="loadGroups(true)"
+          title="Recarregar grupos"
         >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-          />
-        </svg>
-      </button>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="refresh-icon"
+            :class="{ 'spin': groupsStore.isLoading }"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+            />
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Explanatory info card -->
+    <div class="groups-guide-card">
+      <div class="guide-icon">🎯</div>
+      <div class="guide-body">
+        <div class="guide-title">Como funcionam os grupos no CapiHouse?</div>
+        <p class="guide-text">
+          Seus grupos são <strong>filtros privados de audiência</strong>. Nenhum outro usuário sabe que esses grupos existem. Ao criar uma publicação, você pode escolher se deseja deixá-la pública ou visível apenas para os amigos que você adicionou a um grupo específico.
+        </p>
+      </div>
     </div>
 
     <!-- Search Results Banner -->
@@ -150,87 +174,125 @@ function onGroupCreated() {
       <div class="search-filter-info">
         <span class="search-filter-title">🔍 Filtro de grupos:</span>
         <span v-if="searchTerms" class="search-tag">Texto: "{{ searchTerms }}"</span>
-        <span v-if="dateFilterLabel" class="search-tag">{{ dateFilterLabel }}</span>
-        <span v-if="filterUserId" class="search-tag">Criador ID: {{ filterUserId }}</span>
       </div>
       <button type="button" class="clear-search-link" @click="clearSearch">
         [✕ Limpar busca]
       </button>
     </div>
 
-    <!-- Loading State com Skeletons Shimmer -->
+    <!-- Loading State with Skeletons -->
     <div v-if="groupsStore.isLoading && groupsStore.myGroups.length === 0" class="groups-grid">
-      <GroupCardSkeleton v-for="i in 4" :key="i" />
+      <GroupCardSkeleton v-for="i in 3" :key="i" />
     </div>
 
-    <!-- User's Groups Grid -->
+    <!-- Groups Grid -->
     <div v-else-if="groupsStore.myGroups.length" class="groups-grid">
-      <router-link
+      <div
         v-for="group in groupsStore.myGroups"
         :key="group.id"
-        :to="`/groups/${group.id}`"
-        class="group-card"
-        :class="{ 'has-unread': (group.unread_messages_count ?? 0) > 0 }"
+        class="audience-group-card"
+        :style="{ borderLeftColor: group.color || '#a66130' }"
       >
-        <div class="group-photo-box">
-          <img
-            v-if="group.image_url"
-            :src="group.image_url"
-            :alt="group.name"
-            class="group-photo-img"
-          />
-          <span v-else class="group-photo-fallback">👥</span>
-        </div>
-
-        <div class="group-info">
-          <div class="group-title-row">
-            <span class="group-name" :title="group.name">{{ group.name }}</span>
-            <span v-if="group.my_role === 'owner'" class="group-role-badge">[ Dono ]</span>
-            <span v-else class="group-role-badge">[ Membro ]</span>
+        <div class="card-header">
+          <div class="group-title-wrapper">
+            <span class="group-color-dot" :style="{ backgroundColor: group.color || '#a66130' }"></span>
+            <h3 class="group-name" :title="group.name">{{ group.name }}</h3>
           </div>
 
-          <div class="group-meta-row">
-            <span class="members-count">👥 {{ group.members_count }} {{ group.members_count === 1 ? 'membro' : 'membros' }}</span>
-            <span v-if="(group.unread_messages_count ?? 0) > 0" class="unread-indicator-badge">
-              <span class="unread-dot">●</span>
-              {{ group.unread_messages_count }} {{ group.unread_messages_count === 1 ? 'nova' : 'novas' }}
+          <div class="card-action-buttons">
+            <button
+              type="button"
+              class="card-btn edit-btn"
+              title="Editar grupo"
+              @click="openEditModal(group)"
+            >
+              ✏️ Editar
+            </button>
+            <button
+              type="button"
+              class="card-btn delete-btn"
+              title="Excluir grupo"
+              @click="confirmDelete(group)"
+            >
+              🗑️ Excluir
+            </button>
+          </div>
+        </div>
+
+        <div class="card-body">
+          <div class="members-status-row">
+            <span class="members-badge">
+              👥 {{ group.members?.length ?? group.members_count ?? 0 }} {{ (group.members?.length ?? group.members_count ?? 0) === 1 ? 'pessoa com acesso' : 'pessoas com acesso' }}
             </span>
           </div>
 
-          <div class="group-footer">
-            <span class="open-group-link">Entrar no grupo &raquo;</span>
+          <!-- Members Avatars Preview -->
+          <div v-if="group.members && group.members.length" class="members-avatars-row">
+            <div class="avatar-stack">
+              <div
+                v-for="member in group.members.slice(0, 6)"
+                :key="member.id"
+                class="stacked-avatar"
+                :title="member.name"
+              >
+                <UserAvatar :user="member" size="sm" />
+              </div>
+              <div v-if="group.members.length > 6" class="avatar-overflow-badge">
+                +{{ group.members.length - 6 }}
+              </div>
+            </div>
+            <div class="member-names-summary">
+              {{ group.members.slice(0, 3).map(m => m.name.split(' ')[0]).join(', ') }}{{ group.members.length > 3 ? ' e outros' : '' }}
+            </div>
+          </div>
+          <div v-else class="empty-members-hint">
+            Nenhuma pessoa adicionada ainda. Clique em "Editar" para adicionar amigos a este filtro.
           </div>
         </div>
-      </router-link>
-    </div>
 
-    <!-- Final dos Grupos -->
-    <div v-if="groupsStore.myGroups.length" class="infinite-end-card">
-      <span class="end-marker">👥</span>
-      <span class="end-text">Você está visualizando todos os seus grupos da casa!</span>
+        <div class="card-footer">
+          <span class="visibility-hint">
+            🔒 Exclusivo: posts enviados para este grupo só aparecerão no feed dessas pessoas.
+          </span>
+        </div>
+      </div>
     </div>
 
     <!-- Empty State -->
     <div v-else class="empty-groups-box">
       <img src="/capihouse-logo.png" alt="Capivara" class="empty-capivara-logo" />
-      <h3 class="empty-title">{{ hasSearchFilters ? 'Nenhum grupo encontrado' : 'Você ainda não participa de nenhum grupo' }}</h3>
+      <h3 class="empty-title">{{ hasSearchFilters ? 'Nenhum grupo encontrado' : 'Você ainda não criou nenhum grupo de filtro' }}</h3>
       <p class="empty-subtitle">
-        {{ hasSearchFilters ? 'Nenhum grupo correspondeu aos filtros de busca aplicados.' : 'Os grupos no CapiHouse funcionam apenas por convite. Crie o seu próprio grupo para reunir os amigos da casa ou aguarde um convite!' }}
+        {{ hasSearchFilters ? 'Nenhum grupo correspondeu aos filtros de busca aplicados.' : 'Crie grupos como "Melhores Amigos", "Família" ou "Música" para publicar conteúdos que apenas essas pessoas poderão ver.' }}
       </p>
       <div class="empty-actions">
         <button v-if="hasSearchFilters" type="button" class="btn-clear-empty" @click="clearSearch">
           [ Limpar busca ]
         </button>
-        <RetroButton v-else @click="showCreateModal = true">
-          + Criar Primeiro Grupo
+        <RetroButton v-else @click="openCreateModal">
+          + Criar Meu Primeiro Grupo
         </RetroButton>
       </div>
     </div>
 
-    <!-- Create Group Modal -->
+    <!-- Create / Edit Group Modal -->
     <GroupCreateModal
       v-model="showCreateModal"
-      @created="onGroupCreated"
+      :group="groupToEdit"
+      @created="onGroupSaved"
+      @updated="onGroupSaved"
+    />
+
+    <!-- Delete Confirmation Modal -->
+    <RetroConfirmModal
+      v-model="showDeleteModal"
+      title="Excluir Grupo de Filtro"
+      :message="`Tem certeza que deseja excluir o grupo '${groupToDelete?.name}'? Publicações antigas feitas com este filtro deixarão de ficar vinculadas a ele.`"
+      confirm-text="Excluir Grupo"
+      cancel-text="Cancelar"
+      :loading="isDeleting"
+      variant="danger"
+      @confirm="handleDelete"
     />
   </div>
 </template>
@@ -239,337 +301,361 @@ function onGroupCreated() {
 .groups-view-container {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.25rem;
+  width: 100%;
 }
 
 .groups-header-line {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  background-color: var(--color-primary, #a66130);
-  border: 1px solid var(--color-primary-800, #5f4120);
-  border-radius: 2px;
-  padding: 0.6rem 0.85rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
 }
 
 .section-marker {
-  font-family: var(--font-heading, 'Space Mono', monospace);
-  font-size: 1.05rem;
+  font-family: var(--font-heading, monospace);
+  font-size: 1.15rem;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--color-primary-800, #5f4120);
   margin: 0;
 }
 
-.refresh-btn {
-  display: inline-flex;
+.header-actions {
+  display: flex;
   align-items: center;
-  gap: 0.4rem;
-  background-color: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  border-radius: 2px;
-  padding: 0.3rem 0.6rem;
-  font-family: var(--font-heading, 'Space Mono', monospace);
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: #ffffff;
+  gap: 0.6rem;
+}
+
+.refresh-btn {
+  background: none;
+  border: none;
+  padding: 0.25rem;
   cursor: pointer;
-  transition: all 0.15s ease;
+  color: var(--color-primary-600, #c4884e);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s ease;
 }
+
 .refresh-btn:hover:not(:disabled) {
-  background-color: rgba(255, 255, 255, 0.25);
-  border-color: #ffffff;
-  color: #ffffff;
-}
-.refresh-btn:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
+  background-color: var(--color-primary-100, #f8efe6);
+  color: var(--color-primary-900, #38200a);
 }
 
 .refresh-icon {
-  width: 15px;
-  height: 15px;
-  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.refresh-icon.spin {
+  animation: spin 1s linear infinite;
 }
 
 @keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
-.spin {
-  animation: spin 0.8s linear infinite;
+/* Guide Card */
+.groups-guide-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  padding: 0.85rem 1.1rem;
+  background-color: var(--color-primary-50, #fcf9f5);
+  border: 2px dashed var(--color-primary-200, #e9d5c2);
+  border-radius: 4px;
+  box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.04);
 }
 
-/* Search Results Banner */
+.guide-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.guide-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.guide-title {
+  font-family: var(--font-heading, monospace);
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--color-primary-900, #38200a);
+}
+
+.guide-text {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #554840;
+  line-height: 1.45;
+}
+
+/* Search Banner */
 .search-filter-banner {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  background-color: var(--color-primary-50, #FFFBF7);
-  border: 1px dashed var(--color-primary, #6B3E26);
-  border-radius: 2px;
-  padding: 0.6rem 0.8rem;
-  font-family: var(--font-body, monospace);
-  font-size: 0.82rem;
+  justify-content: space-between;
+  padding: 0.6rem 0.85rem;
+  background-color: #ffffff;
+  border: 1px solid var(--color-border, #D8CDC5);
+  border-radius: 3px;
+  font-size: 0.85rem;
 }
 
 .search-filter-info {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 0.4rem;
+  gap: 0.5rem;
 }
 
 .search-filter-title {
   font-weight: bold;
-  color: var(--color-primary-900, #3E2723);
 }
 
 .search-tag {
-  background-color: var(--color-primary-100, #F5EBE1);
-  border: 1px solid var(--color-border, #D8CDC5);
-  padding: 0.15rem 0.45rem;
-  border-radius: 2px;
-  font-weight: bold;
-  color: var(--color-primary-800, #3E2723);
+  background-color: var(--color-primary-100, #f8efe6);
+  color: var(--color-primary-900, #38200a);
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  font-size: 0.8rem;
 }
 
 .clear-search-link {
   background: none;
   border: none;
-  color: #c62828;
-  font-family: var(--font-heading, monospace);
-  font-size: 0.78rem;
+  color: #dc2626;
   font-weight: bold;
   cursor: pointer;
-  padding: 0;
-  text-decoration: underline;
-}
-.clear-search-link:hover {
-  color: #b71c1c;
+  font-size: 0.8rem;
 }
 
-.btn-clear-empty {
-  background-color: var(--color-primary, #6B3E26);
-  color: white;
-  border: none;
-  font-family: var(--font-heading, monospace);
-  font-size: 0.85rem;
-  font-weight: bold;
-  padding: 0.5rem 1rem;
-  border-radius: 2px;
-  cursor: pointer;
-}
-.btn-clear-empty:hover {
-  background-color: var(--color-primary-600, #54311e);
-}
-
-.loading-state {
-  text-align: center;
-  padding: 3rem 1rem;
-  font-family: var(--font-heading);
-  color: var(--color-muted);
-}
-
+/* Groups Grid */
 .groups-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 0.85rem;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1rem;
 }
 
-.group-card {
+.audience-group-card {
   display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 0.85rem;
-  padding: 0.75rem;
+  flex-direction: column;
   background-color: #ffffff;
-  border: 1px solid var(--color-border, #d8cdc5);
-  border-radius: 2px;
-  overflow: hidden;
-  text-decoration: none;
-  color: inherit;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  border: 2px solid var(--color-border, #D8CDC5);
+  border-left-width: 6px;
+  box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.06);
+  border-radius: 3px;
+  padding: 1rem;
+  gap: 0.75rem;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-.group-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(62, 39, 35, 0.08);
-  border-color: var(--color-primary, #a66130);
+.audience-group-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 3px 3px 0px rgba(0, 0, 0, 0.09);
 }
 
-.group-card.has-unread {
-  border-color: var(--color-primary, #a66130);
-  background-color: #fdfaf7;
-  box-shadow: 0 1px 4px rgba(166, 97, 48, 0.12);
-}
-
-.group-photo-box {
-  width: 76px;
-  height: 76px;
-  min-width: 76px;
-  min-height: 76px;
-  background-color: var(--color-primary-100, #faede0);
-  border: 1px solid var(--color-border, #d8cdc5);
-  border-radius: 2px;
+.card-header {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-bottom: 1px solid #f3ece5;
+  padding-bottom: 0.5rem;
+}
+
+.group-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
   overflow: hidden;
+}
+
+.group-color-dot {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
   flex-shrink: 0;
 }
 
-.group-photo-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.group-photo-fallback {
-  font-size: 2rem;
-  opacity: 0.55;
-}
-
-.group-info {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 0.35rem;
-  flex: 1;
-  min-width: 0;
-}
-
-.group-title-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.5rem;
-}
-
 .group-name {
-  font-family: var(--font-heading);
-  font-weight: bold;
-  font-size: 0.95rem;
-  color: var(--color-primary-900);
+  font-family: var(--font-heading, monospace);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text, #2c2523);
+  margin: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.group-role-badge {
-  font-family: var(--font-heading);
-  font-size: 0.7rem;
-  font-weight: bold;
-  color: var(--color-primary);
-  white-space: nowrap;
+.card-action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
   flex-shrink: 0;
 }
 
-.group-meta-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  font-size: 0.78rem;
-  font-family: var(--font-heading);
-}
-
-.members-count {
-  color: var(--color-muted);
-}
-
-.unread-indicator-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  background-color: #fbeee4;
-  color: #7c2d12;
-  border: 1px solid #ea580c;
+.card-btn {
+  background: #ffffff;
+  border: 1px solid var(--color-border, #D8CDC5);
   border-radius: 2px;
-  padding: 0.15rem 0.45rem;
-  font-size: 0.72rem;
-  font-weight: 700;
-  font-family: var(--font-heading);
-}
-
-.unread-dot {
-  color: #ea580c;
-  font-size: 0.65rem;
-}
-
-.group-footer {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
+  padding: 0.2rem 0.45rem;
   font-size: 0.75rem;
-  font-family: var(--font-heading);
-  padding-top: 0.2rem;
-  border-top: 1px dashed var(--color-primary-50, #f8f6f1);
-}
-
-.open-group-link {
-  color: var(--color-primary);
+  font-family: var(--font-heading, monospace);
   font-weight: bold;
-  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
 }
 
-.empty-groups-box {
-  background-color: #ffffff;
-  border: 2px solid var(--color-border);
-  border-radius: 2px;
-  padding: 3rem 1.5rem;
-  text-align: center;
+.card-btn.edit-btn:hover {
+  background-color: var(--color-primary-100, #f8efe6);
+  border-color: var(--color-primary-400, #c4884e);
+  color: var(--color-primary-900, #38200a);
+}
+
+.card-btn.delete-btn:hover {
+  background-color: #fee2e2;
+  border-color: #ef4444;
+  color: #b91c1c;
+}
+
+.card-body {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-}
-.empty-icon {
-  font-size: 3.5rem;
-}
-.empty-title {
-  font-family: var(--font-heading);
-  font-size: 1.15rem;
-  color: var(--color-primary-800);
-}
-.empty-subtitle {
-  font-size: 0.85rem;
-  color: var(--color-muted);
-  max-width: 420px;
-}
-.empty-actions {
-  display: flex;
-  gap: 0.75rem;
-  margin-top: 0.75rem;
+  gap: 0.6rem;
 }
 
-.infinite-end-card {
+.members-status-row {
+  display: flex;
+  align-items: center;
+}
+
+.members-badge {
+  font-family: var(--font-heading, monospace);
+  font-size: 0.8rem;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.members-avatars-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.avatar-stack {
+  display: flex;
+  align-items: center;
+}
+
+.stacked-avatar {
+  margin-left: -0.45rem;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.stacked-avatar:first-child {
+  margin-left: 0;
+}
+
+.avatar-overflow-badge {
+  margin-left: -0.45rem;
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 50%;
+  background-color: var(--color-primary-200, #e9d5c2);
+  color: var(--color-primary-900, #38200a);
+  font-size: 0.7rem;
+  font-weight: bold;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  padding: 0.85rem 1.25rem;
-  text-align: center;
-  font-family: var(--font-heading, 'Space Mono', monospace);
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: #5f4120;
-  background-color: #fdf8f3;
-  border: 1px solid #e8c9a5;
-  border-radius: 4px;
-  box-shadow: 0 1px 4px rgba(62, 39, 35, 0.08);
-  margin-top: 0.75rem;
-  margin-bottom: 1rem;
+  border: 2px solid #ffffff;
 }
 
-.end-marker {
-  font-size: 1rem;
+.member-names-summary {
+  font-size: 0.8rem;
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.empty-members-hint {
+  font-size: 0.8rem;
+  color: #9ca3af;
+  font-style: italic;
+}
+
+.card-footer {
+  margin-top: auto;
+  border-top: 1px dashed #f3ece5;
+  padding-top: 0.5rem;
+}
+
+.visibility-hint {
+  font-size: 0.75rem;
+  color: #78716c;
+  line-height: 1.35;
+}
+
+/* Empty State */
+.empty-groups-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.5rem;
+  background-color: #ffffff;
+  border: 2px solid var(--color-border, #D8CDC5);
+  box-shadow: 3px 3px 0px rgba(0, 0, 0, 0.05);
+  text-align: center;
+  gap: 0.75rem;
+}
+
+.empty-capivara-logo {
+  width: 64px;
+  height: 64px;
+  opacity: 0.8;
+}
+
+.empty-title {
+  font-family: var(--font-heading, monospace);
+  font-size: 1.1rem;
+  margin: 0;
+  color: var(--color-text, #2c2523);
+}
+
+.empty-subtitle {
+  max-width: 440px;
+  font-size: 0.88rem;
+  color: #6b7280;
+  margin: 0;
+  line-height: 1.45;
+}
+
+.empty-actions {
+  margin-top: 0.5rem;
+}
+
+.btn-clear-empty {
+  background: none;
+  border: none;
+  color: var(--color-primary, #a66130);
+  font-weight: bold;
+  cursor: pointer;
+  font-family: var(--font-heading, monospace);
 }
 </style>

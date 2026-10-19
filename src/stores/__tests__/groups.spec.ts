@@ -16,7 +16,6 @@ describe('Groups Store', () => {
     const store = useGroupsStore()
     expect(store.myGroups).toEqual([])
     expect(store.currentGroup).toBeNull()
-    expect(store.messages).toEqual([])
   })
 
   it('fetches my groups and populates list', async () => {
@@ -26,13 +25,14 @@ describe('Groups Store', () => {
           {
             id: 1,
             name: 'Capivaras Unidas',
+            color: '#a66130',
             description: 'Desc',
             creator_id: 1,
-            image_url: null,
             members_count: 2,
-            is_member: true,
-            membership_status: 'accepted',
-            my_role: 'owner',
+            members: [
+              { id: 2, name: 'Amigo 1', username: 'amigo1' },
+              { id: 3, name: 'Amigo 2', username: 'amigo2' },
+            ] as any,
             created_at: '',
           },
         ],
@@ -46,115 +46,75 @@ describe('Groups Store', () => {
 
     expect(store.myGroups).toHaveLength(1)
     expect(store.myGroups[0]!.name).toBe('Capivaras Unidas')
+    expect(store.myGroups[0]!.color).toBe('#a66130')
   })
 
-  it('sends message and appends to messages list', async () => {
-    vi.mocked(groupsApi.sendGroupMessage).mockResolvedValueOnce({
-      data: {
-        id: 10,
-        group_id: 1,
-        user_id: 1,
-        content: 'Oi amigos',
-        user: { id: 1, name: 'Capivara', username: 'capi' },
-        created_at: '2026-09-14',
-      },
+  it('creates group and prepends to myGroups', async () => {
+    const newGroup = {
+      id: 2,
+      name: 'Amigos Próximos',
+      color: '#10b981',
+      creator_id: 1,
+      members_count: 1,
+      members: [{ id: 5, name: 'BFF', username: 'bff' }] as any,
+    }
+
+    vi.mocked(groupsApi.createGroup).mockResolvedValueOnce({
+      data: newGroup,
     } as any)
 
     const store = useGroupsStore()
-    await store.sendMessage(1, 'Oi amigos')
+    const result = await store.createGroup({
+      name: 'Amigos Próximos',
+      color: '#10b981',
+      members: [5],
+    })
 
-    expect(store.messages).toHaveLength(1)
-    expect(store.messages[0]!.content).toBe('Oi amigos')
+    expect(result.id).toBe(2)
+    expect(store.myGroups[0]!.name).toBe('Amigos Próximos')
+    expect(store.myGroups[0]!.color).toBe('#10b981')
   })
 
-  it('does not duplicate message if already present in messages list', async () => {
+  it('updates group in myGroups', async () => {
     const store = useGroupsStore()
-    store.messages = [
+    store.myGroups = [
       {
-        id: 10,
-        group_id: 1,
-        user_id: 1,
-        content: 'Oi amigos (via websocket)',
-        user: { id: 1, name: 'Capivara', username: 'capi' } as any,
-        created_at: '2026-09-14',
-      },
+        id: 1,
+        name: 'Nome Antigo',
+        color: '#a66130',
+        creator_id: 1,
+      } as any,
     ]
 
-    vi.mocked(groupsApi.sendGroupMessage).mockResolvedValueOnce({
+    vi.mocked(groupsApi.updateGroup).mockResolvedValueOnce({
       data: {
-        id: 10,
-        group_id: 1,
-        user_id: 1,
-        content: 'Oi amigos',
-        user: { id: 1, name: 'Capivara', username: 'capi' },
-        created_at: '2026-09-14',
+        id: 1,
+        name: 'Nome Novo',
+        color: '#3b82f6',
+        creator_id: 1,
       },
     } as any)
 
-    await store.sendMessage(1, 'Oi amigos')
+    await store.updateGroup(1, { name: 'Nome Novo', color: '#3b82f6' })
 
-    expect(store.messages).toHaveLength(1)
+    expect(store.myGroups[0]!.name).toBe('Nome Novo')
+    expect(store.myGroups[0]!.color).toBe('#3b82f6')
   })
 
-  it('edits message and updates content in messages list', async () => {
+  it('deletes group from myGroups', async () => {
     const store = useGroupsStore()
-    store.messages = [
-      {
-        id: 10,
-        group_id: 1,
-        user_id: 1,
-        content: 'Mensagem antiga',
-        user: { id: 1, name: 'Capivara', username: 'capi' } as any,
-        created_at: '2026-09-14',
-      },
+    store.myGroups = [
+      { id: 1, name: 'Para Deletar', creator_id: 1 } as any,
+      { id: 2, name: 'Para Ficar', creator_id: 1 } as any,
     ]
 
-    vi.mocked(groupsApi.updateGroupMessage).mockResolvedValueOnce({
-      data: {
-        id: 10,
-        group_id: 1,
-        user_id: 1,
-        content: 'Mensagem atualizada',
-        is_edited: true,
-        user: { id: 1, name: 'Capivara', username: 'capi' },
-        created_at: '2026-09-14',
-      },
+    vi.mocked(groupsApi.deleteGroup).mockResolvedValueOnce({
+      data: { message: 'Excluído' },
     } as any)
 
-    await store.editMessage(1, 10, 'Mensagem atualizada')
+    await store.deleteGroup(1)
 
-    expect(store.messages[0]!.content).toBe('Mensagem atualizada')
-    expect(store.messages[0]!.is_edited).toBe(true)
-  })
-
-  it('deletes message and marks it as deleted in messages list', async () => {
-    const store = useGroupsStore()
-    store.messages = [
-      {
-        id: 10,
-        group_id: 1,
-        user_id: 1,
-        content: 'Mensagem para apagar',
-        user: { id: 1, name: 'Capivara', username: 'capi' } as any,
-        created_at: '2026-09-14',
-      },
-    ]
-
-    vi.mocked(groupsApi.deleteGroupMessage).mockResolvedValueOnce({
-      data: {
-        id: 10,
-        group_id: 1,
-        user_id: 1,
-        content: 'mensagem deletada',
-        is_deleted: true,
-        user: { id: 1, name: 'Capivara', username: 'capi' },
-        created_at: '2026-09-14',
-      },
-    } as any)
-
-    await store.deleteMessage(1, 10)
-
-    expect(store.messages[0]!.content).toBe('mensagem deletada')
-    expect(store.messages[0]!.is_deleted).toBe(true)
+    expect(store.myGroups).toHaveLength(1)
+    expect(store.myGroups[0]!.id).toBe(2)
   })
 })

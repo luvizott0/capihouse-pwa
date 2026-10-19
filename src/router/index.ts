@@ -94,8 +94,7 @@ const router = createRouter({
         {
           path: 'groups/:id',
           name: 'group-detail',
-          component: () => import('@/views/app/GroupDetailView.vue'),
-          meta: { requiresApproved: true }
+          redirect: '/groups',
         },
         {
           path: 'notifications',

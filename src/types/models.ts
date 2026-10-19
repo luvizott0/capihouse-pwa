@@ -240,7 +240,7 @@ export interface Post {
   id: number
   user_id: number
   group_id?: number | null
-  group?: { id: number; name: string } | null
+  group?: { id: number; name: string; color?: string } | null
   event_id?: number | null
   event?: { id: number; name: string } | null
   category?: 'feed' | 'entertainment'
@@ -269,17 +269,19 @@ export interface Post {
 export interface Group {
   id: number
   name: string
-  description: string | null
+  color?: string
+  description?: string | null
   creator_id: number
   creator?: User
-  image_url: string | null
-  members_count: number
-  is_member: boolean
-  membership_status: 'pending' | 'accepted' | 'declined' | null
-  my_role: 'owner' | 'admin' | 'member' | null
+  members_count?: number
+  members?: User[]
+  image_url?: string | null
+  is_member?: boolean
+  membership_status?: 'pending' | 'accepted' | 'declined' | null
+  my_role?: 'owner' | 'admin' | 'member' | null
   accepted_members?: User[]
   unread_messages_count?: number
-  created_at: string
+  created_at?: string
 }
 
 export interface GroupMessage {

@@ -1,6 +1,13 @@
 import apiClient from './client'
 import type { Group, GroupMessage, User } from '@/types/models'
 
+export interface GroupPayload {
+  name: string
+  color?: string
+  description?: string
+  members?: number[]
+}
+
 export function getGroups(params?: {
   my_groups?: boolean
   page?: number
@@ -22,20 +29,30 @@ export function getGroup(id: number) {
   return apiClient.get<Group>(`/groups/${id}`)
 }
 
-export function createGroup(formData: FormData) {
-  return apiClient.post<Group>('/groups', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  })
+export function createGroup(data: GroupPayload | FormData) {
+  if (data instanceof FormData) {
+    return apiClient.post<Group>('/groups', data, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  }
+  return apiClient.post<Group>('/groups', data)
 }
 
-export function updateGroup(id: number, formData: FormData) {
-  return apiClient.post<Group>(`/groups/${id}`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  })
+export function updateGroup(id: number, data: Partial<GroupPayload> | FormData) {
+  if (data instanceof FormData) {
+    return apiClient.post<Group>(`/groups/${id}`, data, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  }
+  return apiClient.put<Group>(`/groups/${id}`, data)
 }
 
 export function deleteGroup(id: number) {
   return apiClient.delete<{ message: string }>(`/groups/${id}`)
+}
+
+export function getGroupMembers(groupId: number) {
+  return apiClient.get<User[]>(`/groups/${groupId}/members`)
 }
 
 export function inviteUsers(groupId: number, userIds: number[]) {
@@ -54,10 +71,7 @@ export function leaveGroup(groupId: number) {
   return apiClient.post<{ message: string }>(`/groups/${groupId}/leave`)
 }
 
-export function getGroupMembers(groupId: number) {
-  return apiClient.get<User[]>(`/groups/${groupId}/members`)
-}
-
+// Deprecated chat methods kept for backward compatibility if referenced
 export function getGroupMessages(groupId: number, sinceId?: number) {
   return apiClient.get<GroupMessage[]>(`/groups/${groupId}/messages`, {
     params: sinceId ? { since_id: sinceId } : undefined,
@@ -79,4 +93,3 @@ export function deleteGroupMessage(groupId: number, messageId: number) {
 export function markGroupAsRead(groupId: number) {
   return apiClient.post<{ message: string; unread_messages_count: number }>(`/groups/${groupId}/read`)
 }
-
