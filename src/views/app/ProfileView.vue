@@ -485,6 +485,7 @@ function syncTabFromRoute() {
 }
 
 async function setProfilePostTab(tab: FeedTab) {
+  if (profilePostTab.value === tab) return
   profilePostTab.value = tab
   router.replace({
     query: {
@@ -558,8 +559,9 @@ watch(profileSentinelRef, (newEl) => {
 
 watch(
   () => route.query.tab,
-  async (newTab, oldTab) => {
-    if (newTab !== oldTab && user.value) {
+  async (newTab) => {
+    const targetTab = (newTab as FeedTab) || 'all'
+    if (targetTab !== profilePostTab.value && user.value) {
       syncTabFromRoute()
       await feedStore.fetchUserPosts(user.value.id, 1, profilePostTab.value)
     }
@@ -2145,6 +2147,7 @@ const {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  min-height: 400px;
 }
 
 .user-posts-header {
