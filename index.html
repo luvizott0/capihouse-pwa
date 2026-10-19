@@ -13,9 +13,134 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="CapiHouse">
     <title>CapiHouse - Conectando a Comunidade</title>
+
+    <style>
+      /* Previne tela preta/branca durante inicialização */
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        background-color: #f8f6f1;
+        overflow-x: hidden;
+      }
+
+      /* Splash screen imediata */
+      #app-splash {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background-color: #f8f6f1;
+        z-index: 99999;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        padding: env(safe-area-inset-top, 20px) 20px env(safe-area-inset-bottom, 20px) 20px;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+
+      .splash-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+      }
+
+      .splash-logo-container {
+        position: relative;
+        margin-bottom: 20px;
+      }
+
+      .splash-logo {
+        width: 88px;
+        height: 88px;
+        object-fit: contain;
+        border-radius: 22px;
+        box-shadow: 0 8px 24px rgba(166, 97, 48, 0.18);
+        animation: splash-pulse 2s ease-in-out infinite alternate;
+      }
+
+      .splash-title {
+        font-size: 26px;
+        font-weight: 700;
+        color: #5f4120;
+        margin: 0 0 6px 0;
+        letter-spacing: -0.5px;
+      }
+
+      .splash-subtitle {
+        font-size: 13px;
+        font-weight: 500;
+        color: #847062;
+        margin: 0 0 28px 0;
+        letter-spacing: 0.2px;
+      }
+
+      /* Barra de carregamento suave */
+      .splash-loader-track {
+        width: 120px;
+        height: 4px;
+        background-color: rgba(166, 97, 48, 0.15);
+        border-radius: 999px;
+        overflow: hidden;
+        position: relative;
+      }
+
+      .splash-loader-bar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 40%;
+        background: linear-gradient(90deg, #d4a574, #a66130);
+        border-radius: 999px;
+        animation: splash-loading 1.4s ease-in-out infinite;
+      }
+
+      @keyframes splash-pulse {
+        0% { transform: scale(0.96); filter: drop-shadow(0 4px 12px rgba(166, 97, 48, 0.15)); }
+        100% { transform: scale(1.02); filter: drop-shadow(0 10px 24px rgba(166, 97, 48, 0.25)); }
+      }
+
+      @keyframes splash-loading {
+        0% { left: -40%; width: 30%; }
+        50% { left: 35%; width: 45%; }
+        100% { left: 100%; width: 30%; }
+      }
+    </style>
+    <script>
+      (function() {
+        try {
+          var raw = localStorage.getItem('capihouse_user');
+          if (raw) {
+            var u = JSON.parse(raw);
+            if (u && u.theme && u.theme.bg_type === 'color' && u.theme.bg_value) {
+              document.documentElement.style.backgroundColor = u.theme.bg_value;
+              var s = document.getElementById('app-splash');
+              if (s) s.style.backgroundColor = u.theme.bg_value;
+            }
+          }
+        } catch(e) {}
+      })();
+    </script>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <div id="app-splash">
+        <div class="splash-content">
+          <div class="splash-logo-container">
+            <img src="/capihouse-logo.png" alt="CapiHouse" class="splash-logo" width="88" height="88" />
+          </div>
+          <h1 class="splash-title">CapiHouse</h1>
+          <p class="splash-subtitle">Comunidade da Casa</p>
+          <div class="splash-loader-track">
+            <div class="splash-loader-bar"></div>
+          </div>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
