@@ -6,6 +6,7 @@ import { useThemeStore } from '@/stores/theme'
 import { useNotificationsStore } from '@/stores/notifications'
 import OfflineBanner from '@/components/ui/OfflineBanner.vue'
 import ImageZoomModal from '@/components/ui/ImageZoomModal.vue'
+import ExternalLinkModal from '@/components/ui/ExternalLinkModal.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -46,4 +47,5 @@ onMounted(() => {
   <OfflineBanner />
   <RouterView />
   <ImageZoomModal />
+  <ExternalLinkModal />
 </template>
