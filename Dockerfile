@@ -3,8 +3,8 @@ FROM public.ecr.aws/docker/library/node:22-alpine AS builder
 
 WORKDIR /app
 
-# Copiar arquivos de dependências
-COPY package.json package-lock.json ./
+# Copiar arquivos de dependências e configuração do npm
+COPY package*.json .npmrc* ./
 
 # Instalar dependências
 RUN npm ci --legacy-peer-deps
