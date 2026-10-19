@@ -92,10 +92,6 @@ const filteredUsers = computed(() => {
   )
 })
 
-const selectedUsers = computed(() => {
-  return availableUsers.value.filter(u => selectedUserIds.value.includes(u.id))
-})
-
 function toggleUser(userId: number) {
   const index = selectedUserIds.value.indexOf(userId)
   if (index > -1) {
@@ -103,10 +99,6 @@ function toggleUser(userId: number) {
   } else {
     selectedUserIds.value.push(userId)
   }
-}
-
-function removeSelectedUser(userId: number) {
-  selectedUserIds.value = selectedUserIds.value.filter(id => id !== userId)
 }
 
 async function handleSubmit() {
@@ -229,20 +221,6 @@ function handleClose() {
           </span>
         </div>
 
-        <!-- Selected chips -->
-        <div v-if="selectedUsers.length" class="selected-chips-container">
-          <span v-for="user in selectedUsers" :key="user.id" class="user-chip">
-            <span class="chip-name">{{ user.name }}</span>
-            <button
-              type="button"
-              class="chip-remove"
-              title="Remover"
-              @click.stop="removeSelectedUser(user.id)"
-            >
-              ×
-            </button>
-          </span>
-        </div>
 
         <!-- Search input -->
         <input
@@ -452,40 +430,7 @@ function handleClose() {
   font-weight: bold;
 }
 
-.selected-chips-container {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  max-height: 5rem;
-  overflow-y: auto;
-  padding: 0.25rem;
-  background-color: var(--color-primary-50, #fcf9f5);
-  border: 1px dashed var(--color-primary-200, #e9d5c2);
-  border-radius: 3px;
-}
 
-.user-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  background-color: #ffffff;
-  border: 1px solid var(--color-primary-300, #d9aa7d);
-  color: var(--color-primary-900, #38200a);
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 0.1rem 0.4rem;
-  border-radius: 10px;
-}
-
-.chip-remove {
-  background: none;
-  border: none;
-  color: #dc2626;
-  font-size: 0.9rem;
-  line-height: 1;
-  cursor: pointer;
-  padding: 0;
-}
 
 .user-search-input {
   font-size: 0.85rem;
