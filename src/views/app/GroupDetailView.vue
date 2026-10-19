@@ -11,6 +11,7 @@ import RetroConfirmModal from '@/components/ui/RetroConfirmModal.vue'
 import RetroModal from '@/components/ui/RetroModal.vue'
 import GroupInviteModal from '@/components/groups/GroupInviteModal.vue'
 import ImageCropper from '@/components/profile/ImageCropper.vue'
+import FormattedContent from '@/components/ui/FormattedContent.vue'
 import { useImageViewerStore } from '@/stores/imageViewer'
 
 import type { GroupMessage } from '@/types/models'
@@ -463,7 +464,7 @@ async function openMembersModal() {
                   class="message-content"
                   :class="{ 'content-deleted': msg.is_deleted || msg.deleted_at }"
                 >
-                  {{ msg.content }}
+                  <FormattedContent :content="msg.content" />
                 </div>
                 <div
                   v-if="!msg.is_deleted && !msg.deleted_at && (msg.is_edited || msg.edited_at)"

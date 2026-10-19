@@ -83,12 +83,45 @@ export const useGroupsStore = defineStore('groups', () => {
     }
   }
 
-  async function createGroup(formData: FormData) {
+  async function createGroup(data: groupsApi.GroupPayload | FormData) {
     isLoading.value = true
     try {
-      const res = await groupsApi.createGroup(formData)
+      const res = await groupsApi.createGroup(data)
       myGroups.value.unshift(res.data)
+      saveGroupsCache(myGroups.value)
       return res.data
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  async function updateGroup(groupId: number, data: Partial<groupsApi.GroupPayload> | FormData) {
+    isLoading.value = true
+    try {
+      const res = await groupsApi.updateGroup(groupId, data)
+      const index = myGroups.value.findIndex(g => g.id === groupId)
+      if (index !== -1) {
+        myGroups.value[index] = res.data
+      }
+      if (currentGroup.value?.id === groupId) {
+        currentGroup.value = res.data
+      }
+      saveGroupsCache(myGroups.value)
+      return res.data
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  async function deleteGroup(groupId: number) {
+    isLoading.value = true
+    try {
+      await groupsApi.deleteGroup(groupId)
+      myGroups.value = myGroups.value.filter(g => g.id !== groupId)
+      if (currentGroup.value?.id === groupId) {
+        currentGroup.value = null
+      }
+      saveGroupsCache(myGroups.value)
     } finally {
       isLoading.value = false
     }
@@ -259,6 +292,8 @@ export const useGroupsStore = defineStore('groups', () => {
     fetchMyGroups,
     fetchGroup,
     createGroup,
+    updateGroup,
+    deleteGroup,
     inviteUsers,
     acceptInvite,
     declineInvite,

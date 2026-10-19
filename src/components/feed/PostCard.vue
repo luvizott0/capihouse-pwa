@@ -687,13 +687,14 @@ async function confirmDeletePost() {
           </div>
           <div class="post-sub-line">
             <span class="post-time">{{ formatRelativeTime(post.created_at) }}</span>
-            <router-link
-              v-if="post.group"
-              :to="`/groups/${post.group.id}`"
-              class="post-group-link"
+            <span
+              v-if="post.group && isPostOwner"
+              class="post-audience-badge"
+              :style="{ color: post.group.color || '#a66130' }"
+              :title="`Visível apenas para o grupo de filtro: ${post.group.name}`"
             >
-              • [ 👥 {{ post.group.name }} ]
-            </router-link>
+              • [ 🔒 {{ post.group.name }} ]
+            </span>
             <span v-if="post.feeling" class="feeling-indicator">
               • se sentindo <strong>{{ post.feeling.name }}</strong> {{ post.feeling.emoji }}
             </span>
@@ -1610,15 +1611,11 @@ async function confirmDeletePost() {
   text-decoration: underline;
 }
 
-.post-group-link {
+.post-audience-badge {
   font-family: var(--font-heading, 'Space Mono', monospace);
   font-size: 0.75rem;
   font-weight: bold;
-  color: var(--color-primary, #a66130);
   text-decoration: none;
-}
-.post-group-link:hover {
-  text-decoration: underline;
 }
 
 .recap-badge {

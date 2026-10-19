@@ -1,29 +1,44 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useGroupsStore } from '@/stores/groups'
 import { useAuthStore } from '@/stores/auth'
 import * as usersApi from '@/api/users'
-import type { User } from '@/types/models'
+import type { User, Group } from '@/types/models'
 import axios from 'axios'
 import RetroModal from '@/components/ui/RetroModal.vue'
 import RetroButton from '@/components/ui/RetroButton.vue'
 import UserAvatar from '@/components/ui/UserAvatar.vue'
-import ImageCropper from '@/components/profile/ImageCropper.vue'
 
-defineProps<{ modelValue: boolean }>()
-const emit = defineEmits<{ (e: 'update:modelValue', val: boolean): void; (e: 'created'): void }>()
+const props = defineProps<{
+  modelValue: boolean
+  group?: Group | null
+}>()
 
-const router = useRouter()
+const emit = defineEmits<{
+  (e: 'update:modelValue', val: boolean): void
+  (e: 'created'): void
+  (e: 'updated'): void
+}>()
+
 const groupsStore = useGroupsStore()
 const authStore = useAuthStore()
 
+const PRESET_COLORS = [
+  { name: 'Capivara', hex: '#a66130' },
+  { name: 'Esmeralda', hex: '#10b981' },
+  { name: 'Azul', hex: '#0284c7' },
+  { name: 'Roxo', hex: '#8b5cf6' },
+  { name: 'Rosa', hex: '#ec4899' },
+  { name: 'Vermelho', hex: '#ef4444' },
+  { name: 'Laranja', hex: '#f97316' },
+  { name: 'Índigo', hex: '#4f46e5' },
+  { name: 'Turquesa', hex: '#0d9488' },
+  { name: 'Grafite', hex: '#475569' },
+]
+
 const name = ref('')
+const selectedColor = ref('#a66130')
 const description = ref('')
-const photoBlob = ref<Blob | null>(null)
-const photoPreview = ref<string | null>(null)
-const showCropper = ref(false)
-const initialCropperImage = ref<string | null>(null)
 const errorMsg = ref('')
 const isSubmitting = ref(false)
 
@@ -32,14 +47,42 @@ const selectedUserIds = ref<number[]>([])
 const searchUserQuery = ref('')
 
 onMounted(async () => {
+  await loadAvailableUsers()
+})
+
+async function loadAvailableUsers() {
   try {
     const res = await usersApi.getUsers()
-    // Exclude currently authenticated user
     availableUsers.value = res.data.filter(u => u.id !== authStore.user?.id)
   } catch {
     // Silent
   }
-})
+}
+
+watch(
+  () => props.modelValue,
+  (isOpen) => {
+    if (isOpen) {
+      errorMsg.value = ''
+      searchUserQuery.value = ''
+      if (props.group) {
+        name.value = props.group.name || ''
+        selectedColor.value = props.group.color || '#a66130'
+        description.value = props.group.description || ''
+        selectedUserIds.value = (props.group.members || []).map(m => m.id)
+      } else {
+        name.value = ''
+        selectedColor.value = '#a66130'
+        description.value = ''
+        selectedUserIds.value = []
+      }
+      if (availableUsers.value.length === 0) {
+        loadAvailableUsers()
+      }
+    }
+  },
+  { immediate: true }
+)
 
 const filteredUsers = computed(() => {
   if (!searchUserQuery.value.trim()) return availableUsers.value
@@ -49,28 +92,7 @@ const filteredUsers = computed(() => {
   )
 })
 
-function handlePhotoChange(e: Event) {
-  const input = e.target as HTMLInputElement
-  if (!input.files || !input.files[0]) return
-  const file = input.files[0]
-  initialCropperImage.value = URL.createObjectURL(file)
-  showCropper.value = true
-  input.value = ''
-}
-
-function handlePhotoCropped(blob: Blob) {
-  photoBlob.value = blob
-  photoPreview.value = URL.createObjectURL(blob)
-  showCropper.value = false
-}
-
-function removePhoto() {
-  photoBlob.value = null
-  photoPreview.value = null
-  initialCropperImage.value = null
-}
-
-function toggleUserInvite(userId: number) {
+function toggleUser(userId: number) {
   const index = selectedUserIds.value.indexOf(userId)
   if (index > -1) {
     selectedUserIds.value.splice(index, 1)
@@ -79,43 +101,41 @@ function toggleUserInvite(userId: number) {
   }
 }
 
-async function handleCreate() {
+async function handleSubmit() {
   errorMsg.value = ''
-  if (!name.value.trim()) {
+  const trimmedName = name.value.trim()
+  if (!trimmedName) {
     errorMsg.value = 'O nome do grupo é obrigatório.'
+    return
+  }
+  if (trimmedName.length > 25) {
+    errorMsg.value = 'O nome do grupo deve ter no máximo 25 caracteres.'
     return
   }
 
   isSubmitting.value = true
-  const formData = new FormData()
-  formData.append('name', name.value.trim())
-  if (description.value.trim()) {
-    formData.append('description', description.value.trim())
+
+  const payload = {
+    name: trimmedName,
+    color: selectedColor.value,
+    description: description.value.trim() || undefined,
+    members: selectedUserIds.value,
   }
-  if (photoBlob.value) {
-    formData.append('photo', photoBlob.value, 'group-photo.webp')
-  }
-  selectedUserIds.value.forEach(id => {
-    formData.append('invites[]', id.toString())
-  })
 
   try {
-    const createdGroup = await groupsStore.createGroup(formData)
-    // Reset form
-    name.value = ''
-    description.value = ''
-    photoBlob.value = null
-    photoPreview.value = null
-    initialCropperImage.value = null
-    selectedUserIds.value = []
-    emit('created')
+    if (props.group?.id) {
+      await groupsStore.updateGroup(props.group.id, payload)
+      emit('updated')
+    } else {
+      await groupsStore.createGroup(payload)
+      emit('created')
+    }
     emit('update:modelValue', false)
-    router.push(`/groups/${createdGroup.id}`)
   } catch (err: unknown) {
     if (axios.isAxiosError(err) && err.response?.data?.message) {
       errorMsg.value = err.response.data.message
     } else {
-      errorMsg.value = 'Erro ao criar grupo.'
+      errorMsg.value = 'Erro ao salvar grupo. Tente novamente.'
     }
   } finally {
     isSubmitting.value = false
@@ -128,77 +148,102 @@ function handleClose() {
 </script>
 
 <template>
-  <RetroModal :modelValue="modelValue" @update:modelValue="handleClose" title="» Criar Novo Grupo" size="md">
+  <RetroModal
+    :modelValue="modelValue"
+    @update:modelValue="handleClose"
+    :title="props.group ? '» Editar Grupo de Filtro' : '» Novo Grupo de Filtro'"
+    size="md"
+  >
     <div class="group-form">
       <div v-if="errorMsg" class="error-banner">
-        {{ errorMsg }}
+        ⚠️ {{ errorMsg }}
       </div>
 
-      <!-- Group Name -->
+      <!-- Context note -->
+      <div class="privacy-notice">
+        <span class="notice-icon">🔒</span>
+        <span class="notice-text">
+          Este grupo funciona como um <strong>filtro privado</strong> para suas publicações. Outros usuários não verão este grupo, apenas os posts que você compartilhar nele.
+        </span>
+      </div>
+
+      <!-- Group Name with 25-char limit counter -->
       <div class="form-group">
-        <label class="field-label">Nome do Grupo *</label>
+        <div class="field-label-row">
+          <label class="field-label">Nome do Grupo *</label>
+          <span class="char-counter" :class="{ 'at-limit': name.length >= 25 }">
+            {{ name.length }}/25
+          </span>
+        </div>
         <input
           v-model="name"
           type="text"
           class="retro-input"
-          placeholder="Ex: Capivaras do Fim de Semana"
-          maxlength="255"
+          placeholder="Ex: Melhores Amigos, Família..."
+          maxlength="25"
         />
       </div>
 
-      <!-- Description -->
+      <!-- Color Selector -->
       <div class="form-group">
-        <label class="field-label">Descrição</label>
-        <textarea
-          v-model="description"
-          rows="3"
-          class="retro-input"
-          placeholder="Sobre o que é este grupo?..."
-          maxlength="2000"
-        ></textarea>
-      </div>
+        <label class="field-label">Cor de Identificação</label>
+        <div class="color-palette">
+          <button
+            v-for="color in PRESET_COLORS"
+            :key="color.hex"
+            type="button"
+            class="color-circle"
+            :class="{ active: selectedColor === color.hex }"
+            :style="{ backgroundColor: color.hex }"
+            :title="color.name"
+            @click="selectedColor = color.hex"
+          >
+            <span v-if="selectedColor === color.hex" class="color-check">✓</span>
+          </button>
+        </div>
 
-      <!-- Group Photo Upload -->
-      <div class="form-group">
-        <label class="field-label">
-          Foto do Grupo
-          <span class="muted-note">(formato quadrado 1:1)</span>
-        </label>
-        <div class="photo-upload-row">
-          <div v-if="photoPreview" class="photo-preview-box">
-            <img :src="photoPreview" alt="Foto do grupo" class="preview-img" />
-            <button type="button" class="remove-photo-btn" @click="removePhoto" title="Remover foto">×</button>
-          </div>
-          <label class="upload-btn">
-            <input type="file" accept="image/*" class="hidden-input" @change="handlePhotoChange" />
-            📷 {{ photoPreview ? '[ Alterar Foto ]' : '[ Escolher Foto ]' }}
-          </label>
+        <!-- Live Preview Badge -->
+        <div class="preview-badge-row">
+          <span class="preview-label">Prévia:</span>
+          <span class="group-preview-pill" :style="{ borderColor: selectedColor, color: selectedColor }">
+            <span class="color-dot" :style="{ backgroundColor: selectedColor }"></span>
+            {{ name.trim() || 'Nome do Grupo' }}
+          </span>
         </div>
       </div>
 
-      <!-- Invite Friends -->
+      <!-- Members Selector -->
       <div class="form-group">
-        <label class="field-label">Convidar Amigos da Casa (opcional)</label>
+        <div class="field-label-row">
+          <label class="field-label">Pessoas com Acesso (Filtro)</label>
+          <span class="selected-count-badge">
+            {{ selectedUserIds.length }} {{ selectedUserIds.length === 1 ? 'pessoa' : 'pessoas' }}
+          </span>
+        </div>
+
+
+        <!-- Search input -->
         <input
           v-model="searchUserQuery"
           type="text"
           class="retro-input user-search-input"
-          placeholder="Buscar amigos por nome..."
+          placeholder="🔍 Buscar amigos por nome ou @username..."
         />
 
+        <!-- Scrollable Users List -->
         <div class="users-selection-list">
           <div
             v-for="user in filteredUsers"
             :key="user.id"
             class="user-select-item"
             :class="{ selected: selectedUserIds.includes(user.id) }"
-            @click="toggleUserInvite(user.id)"
+            @click="toggleUser(user.id)"
           >
             <input
               type="checkbox"
               :checked="selectedUserIds.includes(user.id)"
               class="user-checkbox"
-              @click.stop="toggleUserInvite(user.id)"
+              @click.stop="toggleUser(user.id)"
             />
             <UserAvatar :user="user" size="sm" />
             <div class="user-meta">
@@ -206,190 +251,253 @@ function handleClose() {
               <span class="user-handle">@{{ user.username }}</span>
             </div>
           </div>
-        </div>
-
-        <div v-if="selectedUserIds.length" class="selected-count-hint">
-          {{ selectedUserIds.length }} {{ selectedUserIds.length === 1 ? 'convite selecionado' : 'convites selecionados' }}
+          <div v-if="filteredUsers.length === 0" class="no-users-found">
+            Nenhum amigo encontrado com essa busca.
+          </div>
         </div>
       </div>
 
       <!-- Footer Buttons -->
       <div class="modal-footer">
         <RetroButton variant="secondary" @click="handleClose">Cancelar</RetroButton>
-        <RetroButton :loading="isSubmitting" @click="handleCreate">
-          Criar Grupo
+        <RetroButton :loading="isSubmitting" @click="handleSubmit">
+          {{ props.group ? 'Salvar Alterações' : 'Criar Grupo' }}
         </RetroButton>
       </div>
     </div>
   </RetroModal>
-
-  <!-- Image Cropper Modal for Group Photo -->
-  <ImageCropper
-    v-model="showCropper"
-    :aspectRatio="1"
-    title="Editar Foto do Grupo"
-    formatNote="Formato quadrado (1:1)"
-    :initialImage="initialCropperImage"
-    @cropped="handlePhotoCropped"
-  />
 </template>
 
 <style scoped>
 .group-form {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.1rem;
 }
 
 .error-banner {
-  padding: 0.5rem;
+  padding: 0.6rem 0.8rem;
   background-color: #fee2e2;
   border: 1px solid #ef4444;
   color: #b91c1c;
   font-size: 0.85rem;
   border-radius: 2px;
+  font-family: var(--font-body, sans-serif);
+}
+
+.privacy-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.6rem 0.8rem;
+  background-color: var(--color-primary-50, #fcf9f5);
+  border: 1px solid var(--color-primary-200, #e9d5c2);
+  border-radius: 3px;
+  font-size: 0.82rem;
+  color: var(--color-primary-900, #38200a);
+  line-height: 1.4;
+}
+
+.notice-icon {
+  font-size: 1rem;
+  line-height: 1;
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.4rem;
+}
+
+.field-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .field-label {
-  font-family: var(--font-heading);
-  font-size: 0.8rem;
+  font-family: var(--font-heading, monospace);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-text, #2c2523);
+}
+
+.char-counter {
+  font-family: var(--font-heading, monospace);
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.char-counter.at-limit {
+  color: #dc2626;
   font-weight: bold;
-  color: var(--color-primary-800);
-  text-transform: uppercase;
 }
 
-.photo-upload-row {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.photo-preview-box {
-  position: relative;
-  width: 60px;
-  height: 60px;
-  border: 2px solid var(--color-border);
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.preview-img {
+.retro-input {
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  padding: 0.55rem 0.75rem;
+  border: 2px solid var(--color-border, #D8CDC5);
+  border-radius: 2px;
+  background: #ffffff;
+  font-family: var(--font-body, sans-serif);
+  font-size: 0.9rem;
+  color: var(--color-text, #2c2523);
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.15s ease;
 }
 
-.remove-photo-btn {
-  position: absolute;
-  top: 1px;
-  right: 1px;
-  background: rgba(0, 0, 0, 0.7);
-  color: white;
-  border: none;
-  width: 18px;
-  height: 18px;
+.retro-input:focus {
+  border-color: var(--color-primary, #a66130);
+}
+
+/* Color Palette */
+.color-palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+}
+
+.color-circle {
+  width: 2rem;
+  height: 2rem;
   border-radius: 50%;
-  font-size: 12px;
+  border: 2px solid transparent;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+  padding: 0;
 }
 
-.hidden-input {
-  display: none;
+.color-circle:hover {
+  transform: scale(1.1);
 }
 
-.upload-btn {
-  font-family: var(--font-heading);
-  font-size: 0.8rem;
+.color-circle.active {
+  border-color: #000000;
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #000000;
+  transform: scale(1.1);
+}
+
+.color-check {
+  color: #ffffff;
+  font-size: 0.85rem;
   font-weight: bold;
-  color: var(--color-primary-800);
-  background-color: var(--color-primary-100);
-  border: 1px solid var(--color-border);
-  padding: 0.4rem 0.75rem;
-  border-radius: 2px;
-  cursor: pointer;
-  display: inline-block;
-}
-.upload-btn:hover {
-  background-color: var(--color-primary-200);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
 }
 
-.user-search-input {
-  margin-bottom: 0.35rem;
+.preview-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
   font-size: 0.85rem;
 }
 
+.preview-label {
+  font-family: var(--font-heading, monospace);
+  color: #6b7280;
+  font-size: 0.78rem;
+}
+
+.group-preview-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.6rem;
+  background-color: #ffffff;
+  border: 1.5px solid currentColor;
+  border-radius: 12px;
+  font-family: var(--font-heading, monospace);
+  font-size: 0.82rem;
+  font-weight: bold;
+}
+
+.color-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+}
+
+/* Selected User Chips */
+.selected-count-badge {
+  font-family: var(--font-heading, monospace);
+  font-size: 0.75rem;
+  color: var(--color-primary, #a66130);
+  font-weight: bold;
+}
+
+
+
+.user-search-input {
+  font-size: 0.85rem;
+  padding: 0.45rem 0.65rem;
+}
+
 .users-selection-list {
-  max-height: 160px;
+  max-height: 12rem;
   overflow-y: auto;
-  border: 1px solid var(--color-border);
+  border: 2px solid var(--color-border, #D8CDC5);
   border-radius: 2px;
-  background-color: var(--color-primary-50);
-  display: flex;
-  flex-direction: column;
+  background: #ffffff;
 }
 
 .user-select-item {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 0.6rem;
-  border-bottom: 1px solid var(--color-border);
+  gap: 0.6rem;
+  padding: 0.45rem 0.65rem;
+  border-bottom: 1px solid #f3ece5;
   cursor: pointer;
-  user-select: none;
   transition: background-color 0.15s ease;
 }
-.user-select-item:last-child {
-  border-bottom: none;
-}
+
 .user-select-item:hover {
-  background-color: var(--color-primary-100);
+  background-color: #fbf8f5;
 }
+
 .user-select-item.selected {
-  background-color: var(--color-primary-200);
+  background-color: var(--color-primary-100, #f8efe6);
 }
 
 .user-checkbox {
   cursor: pointer;
-  accent-color: var(--color-primary);
+  accent-color: var(--color-primary, #a66130);
 }
 
 .user-meta {
   display: flex;
   flex-direction: column;
 }
+
 .user-name {
-  font-family: var(--font-heading);
-  font-size: 0.8rem;
-  font-weight: bold;
-  color: var(--color-primary-800);
-}
-.user-handle {
-  font-size: 0.7rem;
-  color: var(--color-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text, #2c2523);
 }
 
-.selected-count-hint {
-  font-family: var(--font-heading);
+.user-handle {
   font-size: 0.75rem;
-  color: var(--color-primary);
-  font-weight: bold;
-  margin-top: 0.25rem;
+  color: #6b7280;
+  font-family: var(--font-heading, monospace);
+}
+
+.no-users-found {
+  padding: 1rem;
+  text-align: center;
+  color: #6b7280;
+  font-size: 0.82rem;
 }
 
 .modal-footer {
   display: flex;
   justify-content: flex-end;
   gap: 0.75rem;
-  border-top: 1px solid var(--color-border);
+  margin-top: 0.5rem;
   padding-top: 0.75rem;
+  border-top: 1px solid var(--color-border, #D8CDC5);
 }
 </style>

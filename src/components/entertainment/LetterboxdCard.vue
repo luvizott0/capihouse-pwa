@@ -652,7 +652,7 @@ async function handleAddComment() {
 
         <!-- Review Text if present -->
         <div v-if="post.content" class="review-text">
-          <p>{{ post.content }}</p>
+          <FormattedContent :content="post.content" />
         </div>
 
         <!-- External Letterboxd Link -->

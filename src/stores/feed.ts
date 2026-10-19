@@ -182,26 +182,83 @@ export const useFeedStore = defineStore('feed', () => {
     await fetchPosts(currentPage.value + 1)
   }
 
-  const activeProfileCategory = ref<string | undefined>(undefined)
+  interface UserTabCache {
+    posts: Post[]
+    currentPage: number
+    lastPage: number
+  }
 
-  async function fetchUserPosts(userId: number, page = 1, category?: string) {
+  const userPostsCache = ref<Partial<Record<FeedTab, UserTabCache>>>({})
+
+  function invalidateUserPostsCache() {
+    userPostsCache.value = {}
+  }
+
+  const activeProfileTab = ref<FeedTab>('all')
+
+  async function fetchUserPosts(
+    userId: number,
+    page = 1,
+    tabOrCategory?: FeedTab | string,
+    forceRefresh = false
+  ) {
+    let tab: FeedTab = 'all'
+    if (tabOrCategory) {
+      if (tabOrCategory === 'feed') {
+        tab = 'all'
+      } else if (tabOrCategory === 'entertainment') {
+        tab = 'movies'
+      } else if (['all', 'text', 'media', 'movies', 'series', 'games'].includes(tabOrCategory)) {
+        tab = tabOrCategory as FeedTab
+      }
+    }
+
+    if (activeProfileUserId.value !== userId) {
+      userPostsCache.value = {}
+      userPosts.value = []
+      activeProfileUserId.value = userId
+    }
+
+    // Se a aba anterior possuía posts e estamos mudando para outra aba no mesmo usuário, guarda no cache
+    if (activeProfileTab.value && userPosts.value.length && activeProfileTab.value !== tab) {
+      userPostsCache.value[activeProfileTab.value] = {
+        posts: [...userPosts.value],
+        currentPage: userPostsCurrentPage.value,
+        lastPage: userPostsLastPage.value,
+      }
+    }
+
+    activeProfileTab.value = tab
+
+    // Se a aba já foi carregada, não é recarregamento forçado e é a primeira página:
+    // Retorna instantaneamente os posts do cache sem disparar nova chamada HTTP!
+    if (page === 1 && !forceRefresh && userPostsCache.value[tab]) {
+      const cached = userPostsCache.value[tab]!
+      userPosts.value = cached.posts
+      userPostsCurrentPage.value = cached.currentPage
+      userPostsLastPage.value = cached.lastPage
+      return {
+        data: cached.posts,
+        current_page: cached.currentPage,
+        last_page: cached.lastPage,
+      }
+    }
+
     if (page > 1) {
       isLoadingMoreUserPosts.value = true
     } else {
-      if (activeProfileUserId.value !== userId || activeProfileCategory.value !== category) {
-        userPosts.value = []
-      }
       isLoadingUserPosts.value = true
-      activeProfileUserId.value = userId
-      activeProfileCategory.value = category
     }
 
     try {
-      const res = await postsApi.getPosts({
+      const params: postsApi.GetPostsParams = {
         page,
         userId,
-        category,
-      })
+      }
+      if (tab !== 'all') {
+        params.tab = tab
+      }
+      const res = await postsApi.getPosts(params)
       if (page === 1) {
         userPosts.value = res.data.data
       } else {
@@ -211,6 +268,14 @@ export const useFeedStore = defineStore('feed', () => {
       }
       userPostsCurrentPage.value = res.data.current_page
       userPostsLastPage.value = res.data.last_page
+
+      // Salva no cache da aba
+      userPostsCache.value[tab] = {
+        posts: [...userPosts.value],
+        currentPage: userPostsCurrentPage.value,
+        lastPage: userPostsLastPage.value,
+      }
+
       return res.data
     } finally {
       isLoadingUserPosts.value = false
@@ -220,7 +285,7 @@ export const useFeedStore = defineStore('feed', () => {
 
   async function loadMoreUserPosts() {
     if (isLoadingUserPosts.value || isLoadingMoreUserPosts.value || !hasMoreUserPosts.value || !activeProfileUserId.value) return
-    await fetchUserPosts(activeProfileUserId.value, userPostsCurrentPage.value + 1, activeProfileCategory.value)
+    await fetchUserPosts(activeProfileUserId.value, userPostsCurrentPage.value + 1, activeProfileTab.value)
   }
 
   async function fetchEventPosts(eventId: number, page = 1) {
@@ -298,6 +363,12 @@ export const useFeedStore = defineStore('feed', () => {
       }
       if (activeProfileUserId.value && res.data.user_id === activeProfileUserId.value && !res.data.event_id) {
         userPosts.value.unshift(res.data)
+        userPostsCache.value = {}
+        userPostsCache.value[activeProfileTab.value] = {
+          posts: [...userPosts.value],
+          currentPage: userPostsCurrentPage.value,
+          lastPage: userPostsLastPage.value,
+        }
       }
       return res.data
     } finally {
@@ -506,6 +577,12 @@ export const useFeedStore = defineStore('feed', () => {
     userPosts.value = userPosts.value.filter(p => Number(p.id) !== id)
     eventPosts.value = eventPosts.value.filter(p => Number(p.id) !== id)
     pendingPosts.value = pendingPosts.value.filter(p => Number(p.id) !== id)
+    for (const key of Object.keys(userPostsCache.value)) {
+      const t = key as FeedTab
+      if (userPostsCache.value[t]) {
+        userPostsCache.value[t]!.posts = userPostsCache.value[t]!.posts.filter(p => Number(p.id) !== id)
+      }
+    }
   }
 
   async function deletePost(postId: number) {
@@ -742,6 +819,9 @@ export const useFeedStore = defineStore('feed', () => {
     activeEventId,
     activeTab,
     setActiveTab,
+    activeProfileTab,
+    userPostsCache,
+    invalidateUserPostsCache,
     pendingPosts,
     activeFilters,
     isFiltered,

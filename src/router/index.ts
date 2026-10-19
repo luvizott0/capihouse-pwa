@@ -13,6 +13,9 @@ const router = createRouter({
     if (to.hash) {
       return { el: to.hash, behavior: 'smooth' }
     }
+    if (to.path === from.path) {
+      return false
+    }
     return { top: 0 }
   },
   routes: [
@@ -91,8 +94,7 @@ const router = createRouter({
         {
           path: 'groups/:id',
           name: 'group-detail',
-          component: () => import('@/views/app/GroupDetailView.vue'),
-          meta: { requiresApproved: true }
+          redirect: '/groups',
         },
         {
           path: 'notifications',

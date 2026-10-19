@@ -31,6 +31,10 @@ const MAX_TOTAL_SIZE = 50 * 1024 * 1024 // 50 MB total do lote
 
 const content = ref('')
 const selectedGroupId = ref<number | null>(null)
+const selectedGroup = computed(() => {
+  if (!selectedGroupId.value) return null
+  return groupsStore.myGroups.find(g => g.id === selectedGroupId.value) || null
+})
 const feelingEmoji = ref('😊')
 const feelingText = ref('')
 const hashtagInput = ref('')
@@ -372,12 +376,22 @@ function handleClose() {
       </div>
       <div v-else class="audience-row">
         <label class="audience-label">Visibilidade:</label>
-        <select v-model="selectedGroupId" class="audience-select">
-          <option :value="null">🌐 Público (todos)</option>
-          <option v-for="grp in groupsStore.myGroups" :key="grp.id" :value="grp.id">
-            👥 Grupo: {{ grp.name }}
-          </option>
-        </select>
+        <div class="audience-select-wrapper">
+          <select v-model="selectedGroupId" class="audience-select">
+            <option :value="null">🌐 Público (visível para todos)</option>
+            <option v-for="grp in groupsStore.myGroups" :key="grp.id" :value="grp.id">
+              🔒 Grupo: {{ grp.name }} ({{ grp.members?.length ?? grp.members_count ?? 0 }} pessoas)
+            </option>
+          </select>
+          <span
+            v-if="selectedGroup"
+            class="selected-group-tag"
+            :style="{ borderColor: selectedGroup.color || '#a66130', color: selectedGroup.color || '#a66130' }"
+          >
+            <span class="color-dot" :style="{ backgroundColor: selectedGroup.color || '#a66130' }"></span>
+            Filtro Ativo
+          </span>
+        </div>
       </div>
 
       <MentionInput
@@ -687,6 +701,14 @@ function handleClose() {
   white-space: nowrap;
   flex-shrink: 0;
 }
+.audience-select-wrapper {
+  flex: 1 1 0%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .audience-select {
   flex: 1 1 0%;
   min-width: 0;
@@ -705,6 +727,28 @@ function handleClose() {
   box-sizing: border-box;
   text-overflow: ellipsis;
   overflow: hidden;
+}
+
+.selected-group-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: var(--font-heading, monospace);
+  font-size: 0.72rem;
+  font-weight: bold;
+  padding: 0.2rem 0.5rem;
+  background: #ffffff;
+  border: 1.5px solid currentColor;
+  border-radius: 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.color-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  display: inline-block;
 }
 
 .event-locked-badge {

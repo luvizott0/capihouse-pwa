@@ -1,10 +1,10 @@
 # Stage 1: Build da aplicação Vue 3 / Vite
-FROM public.ecr.aws/docker/library/node:22-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Copiar arquivos de dependências
-COPY package.json package-lock.json ./
+# Copiar arquivos de dependências e configuração do npm
+COPY package*.json .npmrc* ./
 
 # Instalar dependências
 RUN npm ci --legacy-peer-deps
@@ -20,7 +20,7 @@ ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
 
 # Stage 2: Servidor Nginx ultra-leve
-FROM public.ecr.aws/docker/library/nginx:alpine
+FROM nginx:alpine
 
 # Instalar curl para healthchecks e deploy
 RUN apk add --no-cache curl

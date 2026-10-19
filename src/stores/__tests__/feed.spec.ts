@@ -158,6 +158,27 @@ describe('Feed Store', () => {
     expect(store.isFiltered).toBe(false)
   })
 
+  it('fetchUserPosts passes tab parameter when specified', async () => {
+    vi.mocked(postsApi.getPosts).mockResolvedValueOnce({
+      data: {
+        data: [mockPost1],
+        current_page: 1,
+        last_page: 1,
+      },
+    } as any)
+
+    const store = useFeedStore()
+    await store.fetchUserPosts(10, 1, 'games')
+
+    expect(postsApi.getPosts).toHaveBeenCalledWith({
+      page: 1,
+      userId: 10,
+      tab: 'games',
+    })
+    expect(store.activeProfileTab).toBe('games')
+    expect(store.userPosts).toHaveLength(1)
+  })
+
   it('toggleLike updates posts in both feed and userPosts', async () => {
     const store = useFeedStore()
     store.posts = [{ ...mockPost1 }]
@@ -317,4 +338,55 @@ describe('Feed Store', () => {
     expect(store.posts).toHaveLength(0)
     expect(store.eventPosts).toHaveLength(0)
   })
+
+  it('fetchUserPosts caches tab data and does not call API on subsequent visits to the same tab', async () => {
+    const store = useFeedStore()
+
+    // First fetch for 'all'
+    vi.mocked(postsApi.getPosts).mockResolvedValueOnce({
+      data: {
+        data: [mockPost1],
+        current_page: 1,
+        last_page: 1,
+      },
+    } as any)
+
+    await store.fetchUserPosts(10, 1, 'all')
+    expect(postsApi.getPosts).toHaveBeenCalledTimes(1)
+    expect(store.userPosts).toHaveLength(1)
+
+    // Second fetch for 'media'
+    vi.mocked(postsApi.getPosts).mockResolvedValueOnce({
+      data: {
+        data: [mockPost2],
+        current_page: 1,
+        last_page: 1,
+      },
+    } as any)
+
+    await store.fetchUserPosts(10, 1, 'media')
+    expect(postsApi.getPosts).toHaveBeenCalledTimes(2)
+    expect(store.userPosts).toHaveLength(1)
+    expect(store.userPosts[0]!.id).toBe(2)
+
+    // Third switch back to 'all' -> SHOULD USE CACHE, NO API CALL!
+    await store.fetchUserPosts(10, 1, 'all')
+    expect(postsApi.getPosts).toHaveBeenCalledTimes(2) // still 2!
+    expect(store.userPosts).toHaveLength(1)
+    expect(store.userPosts[0]!.id).toBe(1)
+
+    // Fourth switch to 'all' with forceRefresh = true -> SHOULD CALL API!
+    vi.mocked(postsApi.getPosts).mockResolvedValueOnce({
+      data: {
+        data: [mockPost1, mockPost2],
+        current_page: 1,
+        last_page: 1,
+      },
+    } as any)
+
+    await store.fetchUserPosts(10, 1, 'all', true)
+    expect(postsApi.getPosts).toHaveBeenCalledTimes(3) // 3 now!
+    expect(store.userPosts).toHaveLength(2)
+  })
 })
+

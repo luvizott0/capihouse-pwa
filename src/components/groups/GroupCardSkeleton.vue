@@ -1,118 +1,110 @@
 <script setup lang="ts">
-// Skeleton retrô com animação shimmer para carregamento fluido de grupos
+// Skeleton retrô com animação shimmer para carregamento fluido de grupos de audiência
 </script>
 
 <template>
-  <div class="skeleton-group-card">
-    <!-- Photo Box Placeholder -->
-    <div class="skeleton-photo-box shimmer"></div>
-
-    <!-- Group Info Placeholder -->
-    <div class="skeleton-info">
-      <!-- Title row (group name & role badge) -->
-      <div class="skeleton-title-row">
+  <div class="skeleton-audience-card">
+    <div class="skeleton-card-header">
+      <div class="skeleton-header-left">
+        <div class="skeleton-dot shimmer"></div>
         <div class="skeleton-line skeleton-title shimmer"></div>
-        <div class="skeleton-line skeleton-badge shimmer"></div>
       </div>
+      <div class="skeleton-btn shimmer"></div>
+    </div>
 
-      <!-- Meta row -->
-      <div class="skeleton-meta-row">
-        <div class="skeleton-line skeleton-members shimmer"></div>
+    <div class="skeleton-card-body">
+      <div class="skeleton-line skeleton-meta shimmer"></div>
+      <div class="skeleton-avatar-row">
+        <div v-for="i in 4" :key="i" class="skeleton-avatar shimmer"></div>
       </div>
+    </div>
 
-      <!-- Footer action link -->
-      <div class="skeleton-footer">
-        <div class="skeleton-line skeleton-link shimmer"></div>
-      </div>
+    <div class="skeleton-card-footer">
+      <div class="skeleton-line skeleton-footer-hint shimmer"></div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.skeleton-group-card {
+.skeleton-audience-card {
   display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 0.85rem;
-  padding: 0.75rem;
+  flex-direction: column;
   background-color: #ffffff;
-  border: 1px solid var(--color-border, #D8CDC5);
-  border-radius: 2px;
-  overflow: hidden;
+  border: 2px solid var(--color-border, #D8CDC5);
+  border-left: 6px solid #e8dfd8;
+  border-radius: 3px;
+  padding: 1rem;
+  gap: 0.75rem;
 }
 
-.skeleton-photo-box {
-  width: 76px;
-  height: 76px;
-  min-width: 76px;
-  min-height: 76px;
-  border-radius: 2px;
+.skeleton-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #f3ece5;
+  padding-bottom: 0.5rem;
+}
+
+.skeleton-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 60%;
+}
+
+.skeleton-dot {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
   flex-shrink: 0;
 }
 
-.skeleton-info {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 0.5rem;
-  flex: 1;
-  min-width: 0;
-}
-
-.skeleton-meta-row {
-  display: flex;
-  align-items: center;
-}
-
-.skeleton-title-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.skeleton-line {
+.skeleton-title {
+  width: 75%;
+  height: 16px;
   border-radius: 2px;
 }
 
-.skeleton-title {
-  width: 60%;
-  height: 16px;
+.skeleton-btn {
+  width: 50px;
+  height: 20px;
+  border-radius: 2px;
 }
 
-.skeleton-badge {
-  width: 25%;
-  height: 14px;
-}
-
-.skeleton-desc-line1 {
-  width: 90%;
-  height: 12px;
-  margin-top: 0.2rem;
-}
-
-.skeleton-desc-line2 {
-  width: 65%;
-  height: 12px;
-}
-
-.skeleton-footer {
+.skeleton-card-body {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.skeleton-meta {
+  width: 45%;
+  height: 12px;
+  border-radius: 2px;
+}
+
+.skeleton-avatar-row {
+  display: flex;
   align-items: center;
-  padding-top: 0.5rem;
+  gap: 0.25rem;
+}
+
+.skeleton-avatar {
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 50%;
+}
+
+.skeleton-card-footer {
   margin-top: auto;
-  border-top: 1px dashed var(--color-border, #D8CDC5);
+  border-top: 1px dashed #f3ece5;
+  padding-top: 0.5rem;
 }
 
-.skeleton-members {
-  width: 35%;
-  height: 12px;
-}
-
-.skeleton-link {
-  width: 40%;
-  height: 12px;
+.skeleton-footer-hint {
+  width: 90%;
+  height: 10px;
+  border-radius: 2px;
 }
 
 /* Shimmer animation */
