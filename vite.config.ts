@@ -8,7 +8,7 @@ export default defineConfig({
   plugins: [
     vue(),
     VitePWA({
-      registerType: 'prompt',
+      registerType: 'autoUpdate',
       includeAssets: [
         'favicon.ico',
         'apple-touch-icon.png',
@@ -57,6 +57,9 @@ export default defineConfig({
         ]
       },
       workbox: {
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true,
         importScripts: ['push-handler.js'],
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff,woff2,ttf}'],
         navigateFallback: '/index.html',

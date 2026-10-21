@@ -14,6 +14,7 @@ const props = withDefaults(
     disabled?: boolean
     inputClass?: string
     popupPosition?: 'top' | 'bottom'
+    allowEveryone?: boolean
   }>(),
   {
     type: 'textarea',
@@ -23,6 +24,7 @@ const props = withDefaults(
     disabled: false,
     inputClass: '',
     popupPosition: 'bottom',
+    allowEveryone: true,
   }
 )
 
@@ -88,13 +90,14 @@ async function searchUsers(q: string) {
   const lower = q.trim().toLowerCase()
 
   if (!lower) {
-    // If just typed "@", suggest @todos at top followed by cached users
-    searchResults.value = [TODOS_USER, ...cachedUsers.value.filter(u => u.username !== 'todos').slice(0, 7)]
+    // If just typed "@", suggest @todos at top (if allowed) followed by cached users
+    const userSlice = cachedUsers.value.filter(u => u.username !== 'todos').slice(0, props.allowEveryone ? 7 : 8)
+    searchResults.value = props.allowEveryone ? [TODOS_USER, ...userSlice] : userSlice
     selectedIndex.value = 0
     return
   }
 
-  const matchesTodos = 'todos'.includes(lower) || 'todos os usuários'.includes(lower)
+  const matchesTodos = props.allowEveryone && ('todos'.includes(lower) || 'todos os usuários'.includes(lower))
 
   clearTimeout(searchDebounceTimer)
   searchDebounceTimer = setTimeout(async () => {
