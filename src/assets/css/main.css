@@ -55,7 +55,6 @@ body {
   background-attachment: fixed;
   color: var(--text-main);
   line-height: 1.5;
-  overscroll-behavior-y: none;
   -webkit-tap-highlight-color: transparent;
 }
 
