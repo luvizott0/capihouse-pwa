@@ -68,4 +68,28 @@ describe('usePullToRefresh', () => {
 
     expect(onRefresh).toHaveBeenCalledTimes(1)
   })
+
+  it('cancels tracking when swiping finger upwards (scrolling down into feed)', () => {
+    const onRefresh = vi.fn<() => void>()
+    const { pullDistance, handleTouchStart, handleTouchMove } = usePullToRefresh(onRefresh)
+
+    handleTouchStart(createTouchEvent(200))
+    handleTouchMove(createTouchEvent(150)) // diffY = -50 (swiping up)
+
+    expect(pullDistance.value).toBe(0)
+
+    // Moving down afterwards in the same gesture must not activate pull-to-refresh
+    handleTouchMove(createTouchEvent(250))
+    expect(pullDistance.value).toBe(0)
+  })
+
+  it('cancels tracking when horizontal gesture is detected', () => {
+    const onRefresh = vi.fn<() => void>()
+    const { pullDistance, handleTouchStart, handleTouchMove } = usePullToRefresh(onRefresh)
+
+    handleTouchStart({ touches: [{ clientY: 100, clientX: 100 }] } as any)
+    handleTouchMove({ touches: [{ clientY: 110, clientX: 200 }] } as any) // diffX = 100, diffY = 10
+
+    expect(pullDistance.value).toBe(0)
+  })
 })
