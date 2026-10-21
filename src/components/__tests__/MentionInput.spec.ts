@@ -6,7 +6,8 @@ import * as usersApi from '@/api/users'
 import type { User } from '@/types/models'
 
 vi.mock('@/api/users', () => ({
-  getUsers: vi.fn(),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  getUsers: vi.fn<() => any>(),
 }))
 
 describe('MentionInput', () => {
