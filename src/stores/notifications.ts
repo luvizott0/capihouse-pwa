@@ -138,7 +138,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
           categoryCounts.value.likes += 1
         } else if (type === 'post_comment' || type === 'comment_reply') {
           categoryCounts.value.comments += 1
-        } else if (type === 'post_mention' || type === 'comment_mention') {
+        } else if (type === 'post_mention' || type === 'comment_mention' || type === 'bio_mention') {
           categoryCounts.value.mentions += 1
         } else if (type === 'group_invite') {
           categoryCounts.value.groups += 1
@@ -151,7 +151,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
           selectedCategory.value === 'unread' ||
           (selectedCategory.value === 'likes' && (type === 'post_like' || type === 'comment_like')) ||
           (selectedCategory.value === 'comments' && (type === 'post_comment' || type === 'comment_reply')) ||
-          (selectedCategory.value === 'mentions' && (type === 'post_mention' || type === 'comment_mention')) ||
+          (selectedCategory.value === 'mentions' && (type === 'post_mention' || type === 'comment_mention' || type === 'bio_mention')) ||
           (selectedCategory.value === 'groups' && type === 'group_invite') ||
           (selectedCategory.value === 'events' && type === 'event_rsvp')
 

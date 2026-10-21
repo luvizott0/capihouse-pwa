@@ -84,6 +84,8 @@ async function handleItemClick(item: AppNotification) {
   }
   if (item.data?.post_id) {
     router.push(`/posts/${item.data.post_id}`)
+  } else if (item.data?.author_username) {
+    router.push(`/profile/${item.data.author_username}`)
   }
 }
 </script>
@@ -170,7 +172,7 @@ async function handleItemClick(item: AppNotification) {
               <span v-else-if="item.type === 'post_like' || item.type === 'comment_like'" class="type-icon">❤️</span>
               <span v-else-if="item.type === 'post_comment' || item.type === 'comment_reply'" class="type-icon">💬</span>
               <span v-else-if="item.data?.is_all" class="type-icon" title="Menção para todos">📢</span>
-              <span v-else-if="item.type === 'post_mention' || item.type === 'comment_mention'" class="type-icon">🏷️</span>
+              <span v-else-if="item.type === 'post_mention' || item.type === 'comment_mention' || item.type === 'bio_mention'" class="type-icon">🏷️</span>
               <span v-else-if="item.type === 'event_rsvp'" class="type-icon">📅</span>
               <span v-else-if="item.type === 'birthday_post'" class="type-icon">🎂</span>
               <span v-else-if="item.type === 'poll_vote'" class="type-icon">📊</span>
@@ -185,9 +187,12 @@ async function handleItemClick(item: AppNotification) {
               </div>
               <p class="notif-text">{{ item.content }}</p>
 
-              <!-- Post Navigation Hint -->
+              <!-- Post or Profile Navigation Hint -->
               <div v-if="item.data?.post_id" class="post-action-hint">
                 <span class="post-link-text">» Ver publicação</span>
+              </div>
+              <div v-else-if="item.data?.author_username" class="post-action-hint">
+                <span class="post-link-text">» Ver perfil</span>
               </div>
 
               <!-- Group Invite Actions & Status -->
