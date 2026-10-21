@@ -20,6 +20,8 @@ import NowPlayingCard from '@/components/profile/NowPlayingCard.vue'
 import MusicSearchModal from '@/components/profile/MusicSearchModal.vue'
 import MusicRepostModal from '@/components/entertainment/MusicRepostModal.vue'
 import UserAvatar from '@/components/ui/UserAvatar.vue'
+import MentionInput from '@/components/ui/MentionInput.vue'
+import FormattedContent from '@/components/ui/FormattedContent.vue'
 import { formatBirthDate } from '@/utils/date'
 import { usePwaUpdate } from '@/composables/usePwaUpdate'
 import { useWebPush } from '@/composables/useWebPush'
@@ -120,6 +122,7 @@ async function handleLogout() {
 
 // Inline editing: Bio
 const isEditingBio = ref(false)
+const isSavingBio = ref(false)
 const bioInput = ref('')
 
 // Inline editing: Birth
@@ -356,10 +359,27 @@ function startEditBio() {
   isEditingBio.value = true
 }
 
-async function saveBio() {
-  await profileStore.updateProfile({ bio: bioInput.value })
-  await authStore.fetchMe()
+function cancelEditBio() {
+  bioInput.value = user.value?.bio || ''
   isEditingBio.value = false
+}
+
+async function saveBio() {
+  if (isSavingBio.value) return
+  isSavingBio.value = true
+  try {
+    await profileStore.updateProfile({ bio: bioInput.value })
+    await authStore.fetchMe()
+    isEditingBio.value = false
+  } catch (err: any) {
+    showNotice(
+      '» Erro ao salvar Bio',
+      'Não foi possível salvar a biografia.',
+      err.response?.data?.message || 'Tente novamente.'
+    )
+  } finally {
+    isSavingBio.value = false
+  }
 }
 
 // Inline Birth
@@ -758,21 +778,31 @@ const {
 
               <!-- Bio edit mode -->
               <div v-if="isEditingBio" class="inline-editor">
-                <textarea
+                <MentionInput
                   v-model="bioInput"
-                  class="retro-textarea"
-                  rows="3"
-                  maxlength="255"
-                  placeholder="Diga algo sobre você..."
-                ></textarea>
+                  type="textarea"
+                  :rows="3"
+                  :maxlength="500"
+                  :allow-everyone="false"
+                  placeholder="Diga algo sobre você... Use @ para marcar amigos"
+                />
                 <div class="editor-buttons">
-                  <button type="button" class="btn-save" @click="saveBio">[ Salvar ]</button>
-                  <button type="button" class="btn-cancel" @click="isEditingBio = false">Cancelar</button>
+                  <button type="button" class="btn-save" :disabled="isSavingBio" @click="saveBio">
+                    {{ isSavingBio ? '[ Salvando... ]' : '[ Salvar ]' }}
+                  </button>
+                  <button type="button" class="btn-cancel" :disabled="isSavingBio" @click="cancelEditBio">
+                    Cancelar
+                  </button>
                 </div>
               </div>
               <!-- Bio read mode -->
               <div v-else class="bio-text">
-                "{{ user.bio || 'Diga algo sobre você...' }}"
+                <template v-if="user.bio">
+                  "<FormattedContent :content="user.bio" />"
+                </template>
+                <template v-else>
+                  "{{ isOwner ? 'Diga algo sobre você... Use @ para marcar amigos' : 'Nenhuma biografia informada.' }}"
+                </template>
               </div>
             </div>
 
@@ -1643,6 +1673,10 @@ const {
   background-color: #ffffff;
   border-radius: 2px;
   overflow: hidden;
+}
+
+.section-box {
+  overflow: visible;
 }
 
 .profile-header-box {

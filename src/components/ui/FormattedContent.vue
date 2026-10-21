@@ -113,6 +113,7 @@ function onLinkClick(targetUrl: string) {
   color: var(--color-primary, #a66130);
   font-family: var(--font-heading, 'Space Mono', monospace);
   font-weight: 700;
+  font-style: normal;
   font-size: 0.9em;
   text-decoration: none;
   background-color: var(--color-primary-100, #f8efe6);

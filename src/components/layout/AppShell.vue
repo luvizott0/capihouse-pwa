@@ -152,6 +152,9 @@ function onGroupCreated() {
       <NavMenu />
     </header>
 
+    <!-- Header spacer for fixed positioning -->
+    <div class="header-spacer" :style="{ height: `${headerHeight}px` }" aria-hidden="true" />
+
     <!-- 3-Column Main Content -->
     <div class="layout-main">
       <!-- Left Sidebar: Events (Desktop only) -->
@@ -222,11 +225,19 @@ function onGroupCreated() {
 }
 
 .top-header {
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
   z-index: 50;
   background-color: #ffffff;
   border-bottom: 2px solid var(--color-border, #D8CDC5);
+}
+
+.header-spacer {
+  width: 100%;
+  flex-shrink: 0;
 }
 
 .header-main-row {

@@ -76,8 +76,8 @@ server {
         client_max_body_size 100M;
     }
 
-    # PWA Service Worker & Manifest: não cachear para garantir atualizações imediatas
-    location ~* (sw\.js|registerSW\.js|manifest\.webmanifest)$ {
+    # PWA Service Worker, HTML raiz & Manifest: não cachear para garantir atualizações imediatas
+    location ~* (index\.html|sw\.js|registerSW\.js|push-handler\.js|manifest\.webmanifest)$ {
         expires -1;
         add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0";
     }

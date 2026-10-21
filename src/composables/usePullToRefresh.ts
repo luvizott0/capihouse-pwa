@@ -24,6 +24,9 @@ export function usePullToRefresh(onRefresh: () => Promise<unknown> | unknown) {
     const diff = currentY - touchStartY
 
     if (diff > 0 && window.scrollY <= 5) {
+      if (e.cancelable && typeof e.preventDefault === 'function') {
+        e.preventDefault()
+      }
       // Elastic resistance
       pullDistance.value = Math.min(75, Math.pow(diff, 0.85))
     } else {
