@@ -4,7 +4,8 @@ import { useExternalLinkStore } from '@/stores/externalLink'
 import * as externalLinksModule from '@/utils/externalLinks'
 
 vi.mock('@/utils/externalLinks', () => ({
-  openExternalUrl: vi.fn(),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  openExternalUrl: vi.fn<() => any>(),
 }))
 
 describe('ExternalLink Store', () => {
