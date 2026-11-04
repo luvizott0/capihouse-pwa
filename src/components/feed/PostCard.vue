@@ -16,6 +16,8 @@ import PollCard from './PollCard.vue'
 import { formatRelativeTime } from '@/utils/date'
 import { resolveMediaUrl } from '@/utils/media'
 import RepostModal from '@/components/entertainment/RepostModal.vue'
+import PostLikesModal from './PostLikesModal.vue'
+import { useLongPress } from '@/composables/useLongPress'
 import { pinPost } from '@/api/posts'
 import { openExternalUrl } from '@/utils/externalLinks'
 
@@ -616,9 +618,25 @@ async function handleToggleCommentLike(comment: PostComment) {
   await feedStore.toggleCommentLike(props.post.id, comment.id)
 }
 
+const showLikesModal = ref(false)
+
+function openLikesModal() {
+  showLikesModal.value = true
+}
+
 async function handleLike() {
   await feedStore.toggleLike(props.post.id)
 }
+
+const { handlers: likeLongPressHandlers } = useLongPress(
+  () => {
+    openLikesModal()
+  },
+  () => {
+    handleLike()
+  },
+  { delay: 500, moveThreshold: 10 }
+)
 
 async function handleAddComment() {
   if (!commentContent.value.trim()) return
@@ -1210,7 +1228,8 @@ async function confirmDeletePost() {
         type="button"
         class="action-btn like-btn"
         :class="{ liked: post.is_liked }"
-        @click="handleLike"
+        v-bind="likeLongPressHandlers"
+        title="Clique para curtir, segure para ver quem curtiu"
       >
         <span class="icon">{{ post.is_liked ? '❤️' : '🤍' }}</span>
         <span>{{ post.likes_count || 0 }} {{ post.likes_count === 1 ? 'curtida' : 'curtidas' }}</span>
@@ -1495,6 +1514,13 @@ async function confirmDeletePost() {
       v-if="isRecapPost"
       v-model="showRecapModal"
       :post="post"
+    />
+
+    <!-- Post Likers Modal -->
+    <PostLikesModal
+      v-model="showLikesModal"
+      :postId="post.id"
+      :likesCount="post.likes_count"
     />
 
     <!-- Confirm Delete Post Modal -->
@@ -2402,6 +2428,11 @@ async function confirmDeletePost() {
 }
 .action-btn:hover {
   color: var(--color-primary, #a66130);
+}
+.like-btn {
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
 }
 .like-btn.liked {
   color: #dc2626;
