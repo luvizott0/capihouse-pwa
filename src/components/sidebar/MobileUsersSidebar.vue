@@ -28,6 +28,13 @@ const selfSpotifyTrack = computed(() => {
   return inStore?.spotify_current_track || authStore.user?.spotify_current_track || null
 })
 
+const isSelfOnline = computed(() => {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return false
+  }
+  return true
+})
+
 async function checkSelfSpotify() {
   const hasMusic = authStore.user?.has_spotify_connected || authStore.user?.has_lastfm_connected
   if (hasMusic && authStore.user?.username) {
@@ -172,26 +179,29 @@ const offlineCount = computed(() => otherUsers.value.filter(u => !u.is_online).l
         <!-- Scrollable Content Body -->
         <div class="drawer-body">
 
-          <!-- ── Section 1: Self Profile Preview (Separated) ── -->
-          <div class="self-preview-section">
+          <!-- ── Section 1: Self Profile Preview ── -->
+          <div v-if="authStore.user" class="self-preview-section">
             <div class="section-label">
               <span>👤 COMO VOCÊ APARECE</span>
-              <span class="preview-tag">[ Pré-visualização ]</span>
+              <span class="preview-tag">[ Prévia ]</span>
             </div>
 
-            <div class="self-card" v-if="authStore.user">
-              <div class="self-avatar-wrap">
-                <UserAvatar :user="authStore.user" size="md" />
-                <OnlineIndicator :isOnline="true" class="self-online-dot" />
+            <div
+              class="self-preview-card user-row"
+              @click="goToProfile(authStore.user.username)"
+              title="Clique para ver seu perfil"
+            >
+              <div class="user-avatar-wrap">
+                <UserAvatar :user="authStore.user" size="sm" />
+                <OnlineIndicator
+                  :isOnline="isSelfOnline"
+                  class="user-online-dot"
+                />
               </div>
 
-              <div class="self-info">
-                <div class="self-name-row">
-                  <span class="self-name">{{ authStore.user.name }}</span>
-                  <span class="you-badge">[ Você ]</span>
-                </div>
-                <span class="self-username">@{{ authStore.user.username }}</span>
-                <span class="self-status-text">🟢 Online no CapiHouse</span>
+              <div class="user-details">
+                <span class="user-full-name">{{ authStore.user.name }}</span>
+                <span class="user-handle">@{{ authStore.user.username }}</span>
                 <div
                   v-if="selfSpotifyTrack?.is_playing"
                   class="mobile-listening-badge"
@@ -201,10 +211,19 @@ const offlineCount = computed(() => otherUsers.value.filter(u => !u.is_online).l
                   <span class="music-track-text">{{ selfSpotifyTrack.title }} • {{ selfSpotifyTrack.artist }}</span>
                 </div>
               </div>
+
+              <div class="user-status-col">
+                <span
+                  class="status-pill"
+                  :class="isSelfOnline ? 'pill-online' : 'pill-offline'"
+                >
+                  {{ isSelfOnline ? 'Online' : 'Offline' }}
+                </span>
+              </div>
             </div>
 
             <p class="self-hint">
-              Este é o seu visual para os outros membros da casa.
+              » Assim que os outros membros da casa veem você nesta lista.
             </p>
           </div>
 
@@ -409,77 +428,24 @@ const offlineCount = computed(() => otherUsers.value.filter(u => !u.is_online).l
   font-weight: normal;
 }
 
-.self-card {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
+.self-preview-card {
   background-color: var(--color-primary-50, #f8f6f1);
-  border: 2px solid var(--color-primary-200, #e8c9a5);
+  border: 1px dashed var(--color-primary-300, #c8956c);
   border-radius: 2px;
-  padding: 0.65rem 0.75rem;
+  cursor: pointer;
+  padding: 0.5rem 0.6rem;
+  transition: background-color 0.15s ease;
 }
 
-.self-avatar-wrap {
-  position: relative;
-  flex-shrink: 0;
-}
-
-.self-online-dot {
-  position: absolute;
-  bottom: -1px;
-  right: -1px;
-}
-
-.self-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  min-width: 0;
-  flex: 1;
-}
-
-.self-name-row {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-.self-name {
-  font-family: var(--font-heading, monospace);
-  font-size: 0.85rem;
-  font-weight: bold;
-  color: #181818;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.you-badge {
-  font-size: 0.65rem;
-  background-color: var(--color-primary, #a66130);
-  color: #ffffff;
-  padding: 0.05rem 0.3rem;
-  border-radius: 2px;
-  font-family: monospace;
-}
-
-.self-username {
-  font-family: var(--font-heading, monospace);
-  font-size: 0.75rem;
-  color: var(--color-primary, #a66130);
-}
-
-.self-status-text {
-  font-size: 0.7rem;
-  color: #15803d;
-  font-weight: 500;
-  margin-top: 0.1rem;
+.self-preview-card:hover {
+  background-color: var(--color-primary-100, #f0e6d9);
 }
 
 .self-hint {
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   color: var(--color-muted, #847062);
-  font-style: italic;
+  margin-top: 0.35rem;
+  font-family: var(--font-heading, monospace);
 }
 
 .drawer-divider {
