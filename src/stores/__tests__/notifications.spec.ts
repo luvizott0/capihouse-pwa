@@ -2,11 +2,13 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useNotificationsStore } from '@/stores/notifications'
 import * as notifApi from '@/api/notifications'
+import { connectEcho } from '@/services/echo'
 import type { AppNotification } from '@/types/models'
 import type { AxiosResponse } from 'axios'
 
 vi.mock('@/api/notifications')
 vi.mock('@/api/groups')
+vi.mock('@/services/echo')
 
 describe('Notifications Store', () => {
   beforeEach(() => {
@@ -97,5 +99,45 @@ describe('Notifications Store', () => {
     await store.setCategory('likes')
     expect(store.selectedCategory).toBe('all')
     expect(notifApi.getNotifications).toHaveBeenCalledWith(1, 'all')
+  })
+
+  it('updates categoryCounts and list when event_invite notification is received via WebSocket', () => {
+    let listenerCallback: any = null
+    const mockChannel = {
+      listen: vi.fn<any>((_event: string, cb: any) => {
+        listenerCallback = cb
+        return mockChannel
+      }),
+    }
+    vi.mocked(connectEcho).mockReturnValue({
+      private: vi.fn<any>(() => mockChannel),
+    } as any)
+
+    const store = useNotificationsStore()
+    store.selectedCategory = 'events'
+    store.subscribeToNotifications(42)
+
+    expect(listenerCallback).toBeTruthy()
+
+    // Trigger incoming event_invite notification
+    listenerCallback({
+      notification: {
+        id: 99,
+        user_id: 42,
+        type: 'event_invite',
+        title: 'Convite para Evento',
+        content: 'Você foi convidado!',
+        data: { event_id: 12 },
+        read_at: null,
+        created_at: new Date().toISOString(),
+      },
+      unread_count: 2,
+    })
+
+    expect(store.categoryCounts.events).toBe(1)
+    expect(store.categoryCounts.all).toBe(1)
+    expect(store.unreadCount).toBe(2)
+    expect(store.notifications).toHaveLength(1)
+    expect(store.notifications[0]!.type).toBe('event_invite')
   })
 })

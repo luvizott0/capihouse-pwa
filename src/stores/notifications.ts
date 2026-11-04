@@ -142,7 +142,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
           categoryCounts.value.mentions += 1
         } else if (type === 'group_invite') {
           categoryCounts.value.groups += 1
-        } else if (type === 'event_rsvp') {
+        } else if (type === 'event_rsvp' || type === 'event_invite') {
           categoryCounts.value.events += 1
         }
 
@@ -153,7 +153,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
           (selectedCategory.value === 'comments' && (type === 'post_comment' || type === 'comment_reply')) ||
           (selectedCategory.value === 'mentions' && (type === 'post_mention' || type === 'comment_mention' || type === 'bio_mention')) ||
           (selectedCategory.value === 'groups' && type === 'group_invite') ||
-          (selectedCategory.value === 'events' && type === 'event_rsvp')
+          (selectedCategory.value === 'events' && (type === 'event_rsvp' || type === 'event_invite'))
 
         if (matchesCategory) {
           notifications.value.unshift(data.notification)
