@@ -1,5 +1,5 @@
 import apiClient from './client'
-import type { Post, PollVotersResponse } from '@/types/models'
+import type { Post, PollVotersResponse, User } from '@/types/models'
 
 
 export interface GetPostsParams {
@@ -77,6 +77,10 @@ export function updatePost(postId: number, data: FormData | UpdatePostData) {
 
 export function toggleLike(postId: number) {
   return apiClient.post(`/posts/${postId}/like`)
+}
+
+export function getPostLikers(postId: number) {
+  return apiClient.get<User[]>(`/posts/${postId}/likes`)
 }
 
 export function votePoll(postId: number, optionId: number) {
