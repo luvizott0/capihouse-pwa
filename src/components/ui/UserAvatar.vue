@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { User } from '@/types/models'
 import { getInitials } from '@/utils/initials'
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useImageViewerStore } from '@/stores/imageViewer'
 
 const props = defineProps<{
@@ -13,9 +13,18 @@ const props = defineProps<{
 const imageViewer = useImageViewerStore()
 const sizeClass = computed(() => `avatar-${props.size || 'md'}`)
 const initials = computed(() => props.user ? getInitials(props.user.name) : '??')
+const hasError = ref(false)
+
+watch(() => props.user?.avatar_url, () => {
+  hasError.value = false
+})
+
+function handleError() {
+  hasError.value = true
+}
 
 function handleClick(e: MouseEvent) {
-  if (props.zoomable && props.user?.avatar_url) {
+  if (props.zoomable && props.user?.avatar_url && !hasError.value) {
     e.stopPropagation()
     imageViewer.openImage(props.user.avatar_url, props.user.name, 'Foto de Perfil')
   }
@@ -24,11 +33,17 @@ function handleClick(e: MouseEvent) {
 <template>
   <div
     class="user-avatar"
-    :class="[sizeClass, { 'is-zoomable': zoomable && !!user?.avatar_url }]"
-    :title="zoomable && !!user?.avatar_url ? 'Clique para ampliar foto de perfil' : undefined"
+    :class="[sizeClass, { 'is-zoomable': zoomable && !!user?.avatar_url && !hasError }]"
+    :title="zoomable && !!user?.avatar_url && !hasError ? 'Clique para ampliar foto de perfil' : undefined"
     @click="handleClick"
   >
-    <img v-if="user?.avatar_url" :src="user.avatar_url" :alt="user.name" class="avatar-img" />
+    <img
+      v-if="user?.avatar_url && !hasError"
+      :src="user.avatar_url"
+      :alt="user.name"
+      class="avatar-img"
+      @error="handleError"
+    />
     <div v-else class="avatar-initials">{{ initials }}</div>
   </div>
 </template>

@@ -80,11 +80,39 @@ function generateShades(primary: string): Record<string, string> {
   }
 }
 
+function prefetchImage(url: string) {
+  if (typeof window === 'undefined' || !url) return
+  try {
+    const img = new Image()
+    img.src = url
+  } catch {}
+}
+
+const THEME_CACHE_KEY = 'capihouse_theme_cache'
+
+function loadSavedTheme(): UserTheme | null {
+  try {
+    const stored = localStorage.getItem(THEME_CACHE_KEY)
+    if (stored) return JSON.parse(stored)
+  } catch {}
+  return null
+}
+
+function saveThemeToStorage(theme: UserTheme | null) {
+  try {
+    if (theme) {
+      localStorage.setItem(THEME_CACHE_KEY, JSON.stringify(theme))
+    } else {
+      localStorage.removeItem(THEME_CACHE_KEY)
+    }
+  } catch {}
+}
+
 // ──────────────────────────────────────────
 // Store
 // ──────────────────────────────────────────
 export const useThemeStore = defineStore('theme', () => {
-  const activeTheme = ref<UserTheme | null>(null)
+  const activeTheme = ref<UserTheme | null>(loadSavedTheme())
 
   /**
    * Apply a UserTheme object to the document root CSS variables.
@@ -109,6 +137,7 @@ export const useThemeStore = defineStore('theme', () => {
     // ── Background ─────────────────────────────────────────
     if (t.bg_type === 'image' && t.bg_value) {
       const bgImageUrl = resolveMediaUrl(t.bg_value)
+      prefetchImage(bgImageUrl)
       root.style.setProperty('--bg-paper', 'transparent')
       root.style.setProperty('--bg-app-color', 'transparent')
       root.style.setProperty('--bg-app-image', `url("${bgImageUrl}")`)
@@ -127,6 +156,7 @@ export const useThemeStore = defineStore('theme', () => {
     }
 
     activeTheme.value = t
+    saveThemeToStorage(theme ?? null)
   }
 
   /**
@@ -148,6 +178,7 @@ export const useThemeStore = defineStore('theme', () => {
     root.style.removeProperty('--bg-app-position')
 
     activeTheme.value = null
+    saveThemeToStorage(null)
   }
 
   /**

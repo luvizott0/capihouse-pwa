@@ -6,6 +6,26 @@ import * as interestsApi from '@/api/interests'
 import { useAuthStore } from './auth'
 import { useThemeStore } from './theme'
 
+const PROFILE_CACHE_PREFIX = 'capihouse_profile_cache_'
+
+function getProfileCacheKey(username?: string): string {
+  return username ? `${PROFILE_CACHE_PREFIX}${username}` : `${PROFILE_CACHE_PREFIX}me`
+}
+
+function loadProfileFromCache(username?: string): User | null {
+  try {
+    const stored = localStorage.getItem(getProfileCacheKey(username))
+    if (stored) return JSON.parse(stored)
+  } catch {}
+  return null
+}
+
+function saveProfileToCache(user: User, username?: string) {
+  try {
+    localStorage.setItem(getProfileCacheKey(username), JSON.stringify(user))
+  } catch {}
+}
+
 export const useProfileStore = defineStore('profile', () => {
   const profile = ref<User | null>(null)
   const interests = ref<Interest[]>([])
@@ -23,14 +43,33 @@ export const useProfileStore = defineStore('profile', () => {
     if (username && profile.value?.username !== username) {
       profile.value = null
     }
+
+    // Se for o usuário autenticado ou se houver cache local, preenche imediatamente para uso offline
+    const isCurrentUser = !username || (authStore.user && username === authStore.user.username)
+    if (isCurrentUser && authStore.user) {
+      profile.value = authStore.user
+    } else {
+      const cached = loadProfileFromCache(username)
+      if (cached) {
+        profile.value = cached
+      }
+    }
+
     isLoading.value = true
     try {
       const res = await profileApi.getProfile(username)
       const data = (res.data as any)?.data || res.data
       profile.value = data
+      saveProfileToCache(data, username)
       if (!username && authStore.user) {
         authStore.updateUser(data)
       }
+    } catch (err) {
+      // Se a rede falhar e já temos dados locais, mantemos sem quebrar a tela
+      if (profile.value) {
+        return
+      }
+      throw err
     } finally {
       isLoading.value = false
     }

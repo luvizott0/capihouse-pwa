@@ -39,12 +39,27 @@ const mockPost2 = {
 } as any
 
 describe('Feed Store', () => {
+  const storeMap: Record<string, string> = {}
+
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
-    if (typeof localStorage !== 'undefined' && localStorage?.clear) {
-      localStorage.clear()
-    }
+    for (const key in storeMap) delete storeMap[key]
+
+    vi.stubGlobal('localStorage', {
+      getItem: vi.fn<(key: string) => string | null>((k: string) => storeMap[k] ?? null),
+      setItem: vi.fn<(key: string, value: string) => void>((k: string, v: string) => {
+        storeMap[k] = v
+      }),
+      removeItem: vi.fn<(key: string) => void>((k: string) => {
+        delete storeMap[k]
+      }),
+      clear: vi.fn<() => void>(() => {
+        for (const k in storeMap) delete storeMap[k]
+      }),
+      length: 0,
+      key: vi.fn<() => string | null>(() => null),
+    })
   })
 
   it('fetchPosts populates general feed posts and marks isFiltered = false', async () => {
@@ -387,6 +402,32 @@ describe('Feed Store', () => {
     await store.fetchUserPosts(10, 1, 'all', true)
     expect(postsApi.getPosts).toHaveBeenCalledTimes(3) // 3 now!
     expect(store.userPosts).toHaveLength(2)
+  })
+
+  it('fetchUserPosts restores posts from localStorage cache when network request fails (offline)', async () => {
+    // Simula posts previamente armazenados no localStorage do celular
+    localStorage.setItem(
+      'capihouse_user_posts_10_all',
+      JSON.stringify({
+        posts: [mockPost1],
+        currentPage: 1,
+        lastPage: 1,
+      })
+    )
+
+    // Cria nova instância do feed store
+    const store = useFeedStore()
+
+    // Simula falha de rede (offline)
+    vi.mocked(postsApi.getPosts).mockRejectedValueOnce(new Error('Network Error'))
+
+    // Executa busca com forceRefresh para forçar tentativa de rede
+    const result = await store.fetchUserPosts(10, 1, 'all', true)
+
+    // Os posts devem ser resgatados do localStorage e não zerar
+    expect(store.userPosts).toHaveLength(1)
+    expect(store.userPosts[0]!.id).toBe(1)
+    expect(result.data).toHaveLength(1)
   })
 })
 

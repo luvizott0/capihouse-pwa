@@ -86,13 +86,22 @@ export default defineConfig({
             }
           },
           {
-            urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp)$/i,
-            handler: 'StaleWhileRevalidate',
+            // Imagens, avatares, mídias e planos de fundo (inclusive com query strings, storage e fontes externas)
+            urlPattern: ({ request, url }) => {
+              return (
+                request.destination === 'image' ||
+                /\.(?:png|jpg|jpeg|svg|gif|webp|ico|avif)(\?.*)?$/i.test(url.pathname + url.search) ||
+                url.pathname.includes('/storage/') ||
+                url.pathname.includes('/capihouse-media/') ||
+                url.hostname.includes('scdn.co')
+              )
+            },
+            handler: 'CacheFirst',
             options: {
               cacheName: 'capihouse-media-cache',
               expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 * 30
+                maxEntries: 500,
+                maxAgeSeconds: 60 * 60 * 24 * 60
               },
               cacheableResponse: {
                 statuses: [0, 200]
@@ -100,15 +109,15 @@ export default defineConfig({
             }
           },
           {
-            urlPattern: /\/api\/(posts|groups|events|users|notifications|profile)(\?.*)?$/i,
+            urlPattern: /\/api\/(posts|groups|events|users|notifications|profile)(\/.*)?(\?.*)?$/i,
             handler: 'NetworkFirst',
             method: 'GET',
             options: {
               cacheName: 'capihouse-api-cache',
               networkTimeoutSeconds: 3,
               expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 24 * 7
               },
               cacheableResponse: {
                 statuses: [0, 200]

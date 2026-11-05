@@ -188,6 +188,42 @@ export const useFeedStore = defineStore('feed', () => {
     lastPage: number
   }
 
+  function getUserPostsCacheKey(userId: number, tab: FeedTab = 'all'): string {
+    return `capihouse_user_posts_${userId}_${tab}`
+  }
+
+  function loadUserPostsFromStorage(userId: number, tab: FeedTab = 'all'): UserTabCache | null {
+    try {
+      const key = getUserPostsCacheKey(userId, tab)
+      const stored = localStorage.getItem(key)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (parsed && Array.isArray(parsed.posts)) {
+          return {
+            posts: parsed.posts,
+            currentPage: typeof parsed.currentPage === 'number' ? parsed.currentPage : 1,
+            lastPage: typeof parsed.lastPage === 'number' ? parsed.lastPage : 1,
+          }
+        }
+      }
+    } catch {}
+    return null
+  }
+
+  function saveUserPostsToStorage(userId: number, tab: FeedTab, cache: UserTabCache) {
+    try {
+      const key = getUserPostsCacheKey(userId, tab)
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          posts: cache.posts.slice(0, 25),
+          currentPage: cache.currentPage,
+          lastPage: cache.lastPage,
+        })
+      )
+    } catch {}
+  }
+
   const userPostsCache = ref<Partial<Record<FeedTab, UserTabCache>>>({})
 
   function invalidateUserPostsCache() {
@@ -230,17 +266,29 @@ export const useFeedStore = defineStore('feed', () => {
 
     activeProfileTab.value = tab
 
+    // Procura no cache em memória ou no localStorage persistido
+    let existingCache = userPostsCache.value[tab]
+    if (!existingCache && page === 1) {
+      const fromStorage = loadUserPostsFromStorage(userId, tab)
+      if (fromStorage) {
+        existingCache = fromStorage
+        userPostsCache.value[tab] = fromStorage
+        userPosts.value = fromStorage.posts
+        userPostsCurrentPage.value = fromStorage.currentPage
+        userPostsLastPage.value = fromStorage.lastPage
+      }
+    }
+
     // Se a aba já foi carregada, não é recarregamento forçado e é a primeira página:
     // Retorna instantaneamente os posts do cache sem disparar nova chamada HTTP!
-    if (page === 1 && !forceRefresh && userPostsCache.value[tab]) {
-      const cached = userPostsCache.value[tab]!
-      userPosts.value = cached.posts
-      userPostsCurrentPage.value = cached.currentPage
-      userPostsLastPage.value = cached.lastPage
+    if (page === 1 && !forceRefresh && existingCache) {
+      userPosts.value = existingCache.posts
+      userPostsCurrentPage.value = existingCache.currentPage
+      userPostsLastPage.value = existingCache.lastPage
       return {
-        data: cached.posts,
-        current_page: cached.currentPage,
-        last_page: cached.lastPage,
+        data: existingCache.posts,
+        current_page: existingCache.currentPage,
+        last_page: existingCache.lastPage,
       }
     }
 
@@ -269,14 +317,38 @@ export const useFeedStore = defineStore('feed', () => {
       userPostsCurrentPage.value = res.data.current_page
       userPostsLastPage.value = res.data.last_page
 
-      // Salva no cache da aba
-      userPostsCache.value[tab] = {
+      // Salva no cache da aba e persiste localmente para acesso offline
+      const tabData = {
         posts: [...userPosts.value],
         currentPage: userPostsCurrentPage.value,
         lastPage: userPostsLastPage.value,
       }
+      userPostsCache.value[tab] = tabData
+      if (page === 1) {
+        saveUserPostsToStorage(userId, tab, tabData)
+      }
 
       return res.data
+    } catch (err) {
+      // Se a chamada de rede falhar (ex: sem internet), recupera do cache persistido se houver
+      if (!userPosts.value.length && existingCache) {
+        userPosts.value = existingCache.posts
+        userPostsCurrentPage.value = existingCache.currentPage
+        userPostsLastPage.value = existingCache.lastPage
+        return {
+          data: existingCache.posts,
+          current_page: existingCache.currentPage,
+          last_page: existingCache.lastPage,
+        }
+      }
+      if (userPosts.value.length) {
+        return {
+          data: userPosts.value,
+          current_page: userPostsCurrentPage.value,
+          last_page: userPostsLastPage.value,
+        }
+      }
+      throw err
     } finally {
       isLoadingUserPosts.value = false
       isLoadingMoreUserPosts.value = false
@@ -364,11 +436,13 @@ export const useFeedStore = defineStore('feed', () => {
       if (activeProfileUserId.value && res.data.user_id === activeProfileUserId.value && !res.data.event_id) {
         userPosts.value.unshift(res.data)
         userPostsCache.value = {}
-        userPostsCache.value[activeProfileTab.value] = {
+        const tabData = {
           posts: [...userPosts.value],
           currentPage: userPostsCurrentPage.value,
           lastPage: userPostsLastPage.value,
         }
+        userPostsCache.value[activeProfileTab.value] = tabData
+        saveUserPostsToStorage(activeProfileUserId.value, activeProfileTab.value, tabData)
       }
       return res.data
     } finally {
@@ -581,6 +655,9 @@ export const useFeedStore = defineStore('feed', () => {
       const t = key as FeedTab
       if (userPostsCache.value[t]) {
         userPostsCache.value[t]!.posts = userPostsCache.value[t]!.posts.filter(p => Number(p.id) !== id)
+        if (activeProfileUserId.value) {
+          saveUserPostsToStorage(activeProfileUserId.value, t, userPostsCache.value[t]!)
+        }
       }
     }
   }
