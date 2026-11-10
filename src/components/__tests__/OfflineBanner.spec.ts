@@ -122,7 +122,6 @@ describe('OfflineBanner / Notification Banner', () => {
 
   it('does not display push banner if permission is denied', async () => {
     const authStore = useAuthStore()
-     
     authStore.token = 'fake-token'
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     authStore.user = { id: 1, name: 'Capi User' } as any
@@ -131,6 +130,30 @@ describe('OfflineBanner / Notification Banner', () => {
     const wrapper = mount(OfflineBanner)
     await flushPromises()
 
+    expect(wrapper.find('.notification-banner').exists()).toBe(false)
+  })
+
+  it('does not display push banner if permission is already granted (prevents flicker on startup)', async () => {
+    const authStore = useAuthStore()
+    authStore.token = 'fake-token'
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    authStore.user = { id: 1, name: 'Capi User' } as any
+    mockPushPermission.value = 'granted'
+
+    const wrapper = mount(OfflineBanner)
+    await flushPromises()
+
+    expect(wrapper.find('.notification-banner').exists()).toBe(false)
+  })
+
+  it('does not display push banner synchronously before push check completes (prevents flicker)', () => {
+    const authStore = useAuthStore()
+    authStore.token = 'fake-token'
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    authStore.user = { id: 1, name: 'Capi User' } as any
+
+    // Without awaiting flushPromises(), isPushReady is still false
+    const wrapper = mount(OfflineBanner)
     expect(wrapper.find('.notification-banner').exists()).toBe(false)
   })
 

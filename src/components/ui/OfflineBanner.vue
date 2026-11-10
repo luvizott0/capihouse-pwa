@@ -55,6 +55,7 @@ const {
 const dismissedPush = ref(false)
 const pushSuccessMessage = ref('')
 const pushFeedbackError = ref('')
+const isPushReady = ref(false)
 const PUSH_PROMPT_STORAGE_KEY = 'capihouse_push_prompt_dismissed_until'
 
 function isPushPromptDismissed(): boolean {
@@ -74,12 +75,22 @@ const showPushBanner = computed(() => {
   if (!isOnline.value) return false
   if (!isPushSupported.value) return false
   if (isPushIos.value && !isPushStandalone.value) return false
+  // Não exibir enquanto o status inicial de push ainda estiver sendo verificado
+  if (!isPushReady.value) return false
+  // Apenas solicitar se a permissão ainda estiver indefinida ('default'). Se já foi 'granted' ou 'denied', não exibe
+  if (pushPermission.value !== 'default') return false
   if (isPushSubscribed.value) return false
-  if (pushPermission.value === 'denied') return false
   if (dismissedPush.value) return false
 
   return true
 })
+
+async function initPushStatus() {
+  if (authStore.isAuthenticated && isPushSupported.value) {
+    await checkPushSubscription()
+  }
+  isPushReady.value = true
+}
 
 async function handleEnablePush() {
   pushFeedbackError.value = ''
@@ -116,14 +127,12 @@ function onWindowFocus() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
   window.addEventListener('focus', onWindowFocus)
   dismissedPush.value = isPushPromptDismissed()
 
-  if (authStore.isAuthenticated) {
-    checkPushSubscription()
-  }
+  await initPushStatus()
 })
 
 onUnmounted(() => {
@@ -133,9 +142,9 @@ onUnmounted(() => {
 
 watch(
   () => authStore.isAuthenticated,
-  (isAuth) => {
+  async (isAuth) => {
     if (isAuth) {
-      checkPushSubscription()
+      await initPushStatus()
     }
   }
 )
