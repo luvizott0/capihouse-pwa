@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useNetworkStatus } from '@/composables/useNetworkStatus'
 import { usePwaUpdate } from '@/composables/usePwaUpdate'
+import { useAuthStore } from '@/stores/auth'
+import { useWebPush } from '@/composables/useWebPush'
 
 const { isOnline } = useNetworkStatus()
+const authStore = useAuthStore()
 
 // PWA update registration via shared composable
 const { needRefresh, updateServiceWorker } = usePwaUpdate()
@@ -12,6 +15,7 @@ const dismissedOffline = ref(false)
 const dismissUpdate = ref(false)
 
 // PWA Install prompt handling
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const deferredPrompt = ref<any>(null)
 const showInstallBanner = ref(false)
 
@@ -35,13 +39,106 @@ function dismissInstall() {
   showInstallBanner.value = false
 }
 
+// Push notification prompt handling
+const {
+  isSupported: isPushSupported,
+  isIos: isPushIos,
+  isStandalone: isPushStandalone,
+  permission: pushPermission,
+  isSubscribed: isPushSubscribed,
+  isLoading: isPushLoading,
+  errorMessage: pushErrorMessage,
+  checkSubscription: checkPushSubscription,
+  subscribe: subscribePush,
+} = useWebPush()
+
+const dismissedPush = ref(false)
+const pushSuccessMessage = ref('')
+const pushFeedbackError = ref('')
+const PUSH_PROMPT_STORAGE_KEY = 'capihouse_push_prompt_dismissed_until'
+
+function isPushPromptDismissed(): boolean {
+  try {
+    const dismissedUntil = localStorage.getItem(PUSH_PROMPT_STORAGE_KEY)
+    if (!dismissedUntil) return false
+    const untilTime = parseInt(dismissedUntil, 10)
+    if (isNaN(untilTime)) return false
+    return Date.now() < untilTime
+  } catch {
+    return false
+  }
+}
+
+const showPushBanner = computed(() => {
+  if (!authStore.isAuthenticated) return false
+  if (!isOnline.value) return false
+  if (!isPushSupported.value) return false
+  if (isPushIos.value && !isPushStandalone.value) return false
+  if (isPushSubscribed.value) return false
+  if (pushPermission.value === 'denied') return false
+  if (dismissedPush.value) return false
+
+  return true
+})
+
+async function handleEnablePush() {
+  pushFeedbackError.value = ''
+  pushSuccessMessage.value = ''
+  try {
+    const success = await subscribePush()
+    if (success) {
+      pushSuccessMessage.value = 'Notificações ativadas com sucesso!'
+      setTimeout(() => {
+        dismissedPush.value = true
+      }, 3000)
+    } else if (pushErrorMessage.value) {
+      pushFeedbackError.value = pushErrorMessage.value
+    }
+  } catch {
+    pushFeedbackError.value = 'Não foi possível ativar as notificações no momento.'
+  }
+}
+
+function dismissPushPrompt() {
+  dismissedPush.value = true
+  try {
+    // Lembrar mais tarde: dispensa por 7 dias
+    const sevenDaysInMs = 7 * 24 * 60 * 60 * 1000
+    localStorage.setItem(PUSH_PROMPT_STORAGE_KEY, String(Date.now() + sevenDaysInMs))
+  } catch (err) {
+    console.error('Falha ao salvar dispensa no localStorage:', err)
+  }
+}
+
+function onWindowFocus() {
+  if (authStore.isAuthenticated) {
+    checkPushSubscription()
+  }
+}
+
 onMounted(() => {
   window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+  window.addEventListener('focus', onWindowFocus)
+  dismissedPush.value = isPushPromptDismissed()
+
+  if (authStore.isAuthenticated) {
+    checkPushSubscription()
+  }
 })
 
 onUnmounted(() => {
   window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+  window.removeEventListener('focus', onWindowFocus)
 })
+
+watch(
+  () => authStore.isAuthenticated,
+  (isAuth) => {
+    if (isAuth) {
+      checkPushSubscription()
+    }
+  }
+)
 </script>
 
 <template>
@@ -73,6 +170,45 @@ onUnmounted(() => {
             [ Atualizar agora ]
           </button>
           <button type="button" class="banner-close" @click="dismissUpdate = true" title="Lembrar mais tarde">
+            ✕
+          </button>
+        </div>
+      </div>
+    </div>
+  </transition>
+
+  <!-- Push Notification Permission Banner -->
+  <transition name="slide-fade">
+    <div v-if="showPushBanner" class="pwa-banner offline-banner notification-banner" role="alert">
+      <div class="banner-content">
+        <span class="banner-icon">🔔</span>
+        <div class="banner-text">
+          <template v-if="pushSuccessMessage">
+            <strong>Notificações ativadas!</strong> {{ pushSuccessMessage }}
+          </template>
+          <template v-else-if="pushFeedbackError">
+            <strong>Aviso:</strong> {{ pushFeedbackError }}
+          </template>
+          <template v-else>
+            <strong>Notificações:</strong> Ative para receber avisos sobre curtidas, comentários e interações em tempo real.
+          </template>
+        </div>
+        <div class="banner-buttons">
+          <button
+            v-if="!pushSuccessMessage"
+            type="button"
+            class="banner-action-btn notification-btn"
+            :disabled="isPushLoading"
+            @click="handleEnablePush"
+          >
+            {{ isPushLoading ? '[ Ativando... ]' : '[ Ativar Notificações ]' }}
+          </button>
+          <button
+            type="button"
+            class="banner-close"
+            @click="dismissPushPrompt"
+            title="Agora não"
+          >
             ✕
           </button>
         </div>
@@ -160,6 +296,22 @@ onUnmounted(() => {
 
 .update-btn:hover {
   background-color: #92400e !important;
+}
+
+.notification-btn {
+  background-color: #b45309 !important;
+  color: #ffffff !important;
+  border: 1px solid #78350f !important;
+  box-shadow: 2px 2px 0 #78350f;
+}
+
+.notification-btn:hover:not(:disabled) {
+  background-color: #92400e !important;
+}
+
+.notification-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .install-banner {
